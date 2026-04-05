@@ -35,8 +35,6 @@ export default function App() {
   const [teamChatInput, setTeamChatInput] = useState('');
   const [exportData, setExportData] = useState(null);
   const [showExport, setShowExport] = useState(false);
-  const [renameId, setRenameId] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
   const chatEndRef = useRef(null);
   const teamChatEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -132,11 +130,24 @@ export default function App() {
   };
 
   const renameFile = async (id, name) => {
-    try { await fetch('/api/files/rename',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,customName:name})}); setRenameId(null); fetchFiles(); } catch(e){}
+    try { await fetch('/api/files/edit',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,merchant:name})}); setRenameId(null); fetchFiles(); fetchDashboard(); } catch(e){}
   };
 
-  const fetchExport = async () => {
-    try { const r = await fetch('/api/files/export'); const d = await r.json(); setExportData(d); setShowExport(true); } catch(e){}
+  const editFile = async (id, data) => {
+    try { await fetch('/api/files/edit',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,...data})}); fetchFiles(); fetchDashboard(); if(activeTab==='team') fetchTeamActivity(); } catch(e){}
+  };
+
+  const fetchExport = async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if(filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if(filters.dateTo) params.set('dateTo', filters.dateTo);
+      if(filters.amountMin) params.set('amountMin', filters.amountMin);
+      if(filters.amountMax) params.set('amountMax', filters.amountMax);
+      if(filters.category && filters.category !== 'all') params.set('category', filters.category);
+      const r = await fetch(`/api/files/export?${params.toString()}`);
+      const d = await r.json(); setExportData(d); setShowExport(true);
+    } catch(e){}
   };
 
   // Theme
@@ -161,7 +172,7 @@ export default function App() {
         </div>
         <div className="flex items-center gap-3">
           {activeTab === 'files' && (
-            <button onClick={fetchExport} className="bg-[#44e571] text-[#00531f] px-4 py-2 rounded-full font-bold flex items-center gap-2 text-sm hover:opacity-90 transition">
+            <button onClick={()=>fetchExport({})} className="bg-[#44e571] text-[#00531f] px-4 py-2 rounded-full font-bold flex items-center gap-2 text-sm hover:opacity-90 transition">
               <Icon name="description" className="text-sm" /> Export PDF
             </button>
           )}
@@ -178,7 +189,7 @@ export default function App() {
         {activeTab==='home' && <HomeTab d={dashboard} {...themeProps} />}
         {activeTab==='chat' && <ChatTab messages={chatMessages} input={chatInput} setInput={setChatInput} onSend={sendMessage} loading={chatLoading} sessions={sessions} onLoadSession={loadSession} onNewChat={startNewChat} onUpload={handleReceiptUpload} fileInputRef={fileInputRef} chatEndRef={chatEndRef} pendingTransaction={pendingTransaction} onVerify={verifyTransaction} onDismiss={()=>setPendingTransaction(null)} {...themeProps} />}
         {activeTab==='team' && <TeamTab team={team} activity={teamActivity} showInvite={showInviteModal} setShowInvite={setShowInviteModal} onInvite={inviteMember} teamChat={teamChatMessages} teamChatInput={teamChatInput} setTeamChatInput={setTeamChatInput} onSendTeamChat={sendTeamChatMsg} teamChatEndRef={teamChatEndRef} profile={profile} {...themeProps} />}
-        {activeTab==='files' && <FilesTab files={files} renameId={renameId} setRenameId={setRenameId} renameValue={renameValue} setRenameValue={setRenameValue} onRename={renameFile} {...themeProps} />}
+        {activeTab==='files' && <FilesTab files={files} onEdit={editFile} fetchFiles={fetchFiles} onExport={fetchExport} {...themeProps} />}
         {activeTab==='settings' && <SettingsTab profile={profile} setProfile={setProfile} {...themeProps} />}
       </main>
 
@@ -439,9 +450,36 @@ function TeamTab({ team, activity, showInvite, setShowInvite, onInvite, teamChat
 }
 
 // ============ FILES VAULT TAB ============
-function FilesTab({ files, renameId, setRenameId, renameValue, setRenameValue, onRename, textP, textS, textM, cardBg, surfaceLow, border, darkMode }) {
+function FilesTab({ files, onEdit, fetchFiles, onExport, textP, textS, textM, cardBg, surfaceLow, border, darkMode }) {
   const [filterType, setFilterType] = useState('all');
-  const iconMap = { Food:'restaurant', Transport:'local_gas_station', Shopping:'shopping_cart', Office:'business_center', Utilities:'bolt', Entertainment:'movie', Health:'health_and_safety', Travel:'flight', General:'receipt_long' };
+  const [editingFile, setEditingFile] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [showHistory, setShowHistory] = useState(null);
+
+  const iconMap = { Food:'restaurant', Transport:'local_gas_station', Shopping:'shopping_cart', Office:'business_center', Utilities:'bolt', Entertainment:'movie', Health:'health_and_safety', Travel:'flight', Banking:'account_balance', General:'receipt_long' };
+  const categories = ['Food','Transport','Shopping','Office','Utilities','Entertainment','Health','Travel','Banking','General'];
+
+  const startEdit = (file) => {
+    setEditingFile(file.id);
+    setEditName(file.customName || file.merchant);
+    setEditCategory(file.category);
+    setEditAmount(String(file.amount));
+  };
+
+  const confirmEdit = async (file) => {
+    const changes = {};
+    if (editName !== (file.customName || file.merchant)) changes.merchant = editName;
+    if (editCategory !== file.category) changes.category = editCategory;
+    if (parseFloat(editAmount) !== file.amount) changes.amount = editAmount;
+    if (Object.keys(changes).length > 0) {
+      await onEdit(file.id, changes);
+    }
+    setEditingFile(null);
+  };
+
+  const filteredFiles = files.filter(f => filterType === 'all' || f.category === filterType);
 
   return (
     <div className="px-6 max-w-5xl mx-auto">
@@ -453,45 +491,108 @@ function FilesTab({ files, renameId, setRenameId, renameValue, setRenameValue, o
       {/* Filter Bar */}
       <div className={`${cardBg} p-6 rounded-2xl shadow-[0_40px_40px_rgba(12,30,38,0.06)] flex flex-wrap items-center gap-6 mb-10`}>
         <div className="flex flex-col gap-2">
-          <span className={`text-[10px] font-bold uppercase ${textM} tracking-widest`}>Type</span>
-          <div className="flex gap-2">
-            {['all','Food','Transport','Shopping'].map(t=>(
+          <span className={`text-[10px] font-bold uppercase ${textM} tracking-widest`}>Category</span>
+          <div className="flex gap-2 flex-wrap">
+            {['all','Food','Transport','Shopping','Office','Banking'].map(t=>(
               <button key={t} onClick={()=>setFilterType(t)} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${filterType===t?(darkMode?'bg-white text-black':'bg-[#0c1e26] text-white'):`${surfaceLow} ${textS}`}`}>{t==='all'?'All':t}</button>
             ))}
           </div>
         </div>
-        <div className="flex-1"><span className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-2`}>Total Files</span><span className={`font-['Space_Grotesk'] text-2xl font-bold ${textP}`}>{files.length}</span></div>
+        <div className="flex-1 text-right">
+          <span className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-2`}>Total Files</span>
+          <span className={`font-['Space_Grotesk'] text-2xl font-bold ${textP}`}>{filteredFiles.length}</span>
+        </div>
       </div>
 
       {/* Files Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {files.filter(f=>filterType==='all'||f.category===filterType).map((file,i)=>(
-          <div key={i} className={`${i===2&&files.length>2?`${darkMode?'bg-white':'bg-[#0c1e26]'} ${darkMode?'text-[#0c1e26]':'text-white'} shadow-xl`:`${cardBg}`} p-5 rounded-xl flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300`}>
-            <div className="flex justify-between items-start mb-6">
-              <div className={`w-12 h-12 ${i===2&&files.length>2?(darkMode?'bg-black/10':'bg-white/10'):`${surfaceLow}`} flex items-center justify-center rounded-lg`}>
-                <Icon name={iconMap[file.category]||'receipt_long'} className={i===2&&files.length>2?'text-[#44e571]':textP}/>
+        {filteredFiles.map((file, i) => {
+          const isEditing = editingFile === file.id;
+          const isHighValue = file.amount >= 500;
+          const isDark = isHighValue && !isEditing;
+
+          return (
+            <div key={file.id} className={`${isDark ? `${darkMode?'bg-white':'bg-[#0c1e26]'} ${darkMode?'text-[#0c1e26]':'text-white'} shadow-xl` : `${cardBg}`} p-5 rounded-xl flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 border ${isDark ? 'border-transparent' : border}`}>
+              <div className="flex justify-between items-start mb-4">
+                <div className={`w-12 h-12 ${isDark ? (darkMode?'bg-black/10':'bg-white/10') : surfaceLow} flex items-center justify-center rounded-lg`}>
+                  <Icon name={iconMap[file.category] || 'receipt_long'} className={isDark ? 'text-[#44e571]' : textP} />
+                </div>
+                {!isEditing && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => startEdit(file)} className={`p-2 rounded-full ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>
+                      <Icon name="edit" className="text-sm" />
+                    </button>
+                    <button onClick={() => setShowHistory(showHistory === file.id ? null : file.id)} className={`p-2 rounded-full ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>
+                      <Icon name="history" className="text-sm" />
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={()=>{setRenameId(file.id);setRenameValue(file.customName||file.merchant);}} className="p-2 rounded-full hover:bg-black/10"><Icon name="drive_file_rename_outline" className="text-sm"/></button>
-              </div>
-            </div>
-            <div>
-              {renameId===file.id?(
-                <div className="flex gap-2 mb-2"><input value={renameValue} onChange={e=>setRenameValue(e.target.value)} className={`flex-1 bg-transparent border-b ${border} outline-none font-['Space_Grotesk'] font-bold ${textP} text-lg`} autoFocus onKeyDown={e=>{if(e.key==='Enter')onRename(file.id,renameValue);}}/><button onClick={()=>onRename(file.id,renameValue)} className="text-[#44e571]"><Icon name="check" className="text-sm"/></button></div>
-              ):(
-                <h3 className={`font-['Space_Grotesk'] text-xl font-bold tracking-tight`}>{file.customName||file.merchant}</h3>
+
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Name</label>
+                    <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full bg-transparent border-b-2 ${isDark ? 'border-white/30 text-white' : `${border} ${textP}`} outline-none font-['Space_Grotesk'] font-bold text-lg pb-1`} />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Category</label>
+                    <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className={`w-full bg-transparent border-b-2 ${isDark ? 'border-white/30 text-white' : `${border} ${textP}`} outline-none text-sm py-1`}>
+                      {categories.map(c => <option key={c} value={c} className="text-black">{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Amount (AED)</label>
+                    <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className={`w-full bg-transparent border-b-2 ${isDark ? 'border-white/30 text-white' : `${border} ${textP}`} outline-none font-['Space_Grotesk'] font-bold text-2xl pb-1`} />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={() => confirmEdit(file)} className="flex-1 bg-[#44e571] text-[#00531f] font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-1 active:scale-95">
+                      <Icon name="check" className="text-sm" /> Confirm
+                    </button>
+                    <button onClick={() => setEditingFile(null)} className={`flex-1 border ${isDark ? 'border-white/20' : border} font-bold py-2 rounded-lg text-sm active:scale-95`}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="font-['Space_Grotesk'] text-xl font-bold tracking-tight">{file.customName || file.merchant}</h3>
+                  <div className="flex justify-between items-center mt-4">
+                    <span className="text-2xl font-black">{file.amount} <span className="text-sm font-medium opacity-40">AED</span></span>
+                    <span className={`text-[10px] ${isHighValue ? 'border border-[#44e571]/30 text-[#44e571]' : 'bg-[#44e571]/20 text-[#006e2c]'} px-2 py-0.5 rounded-full font-bold`}>{isHighValue ? 'High Value' : 'Processed'}</span>
+                  </div>
+                  <p className={`text-[10px] ${isDark ? (darkMode ? 'text-[#0c1e26]/40' : 'text-white/30') : textM} mt-4 border-t ${isDark ? (darkMode ? 'border-[#0c1e26]/10' : 'border-white/10') : border} pt-3`}>{file.date} &bull; {file.category}</p>
+                </div>
               )}
-              <div className="flex justify-between items-center mt-4">
-                <span className="text-2xl font-black">{file.amount} <span className="text-sm font-medium opacity-40">AED</span></span>
-                <span className={`text-[10px] ${file.amount>=500?'border border-[#44e571]/30 text-[#44e571]':'bg-[#44e571]/20 text-[#006e2c]'} px-2 py-0.5 rounded-full font-bold`}>{file.amount>=500?'High Value':'Processed'}</span>
-              </div>
-              <p className={`text-[10px] ${i===2&&files.length>2?(darkMode?'text-[#0c1e26]/40':'text-white/30'):textM} mt-4 border-t ${i===2&&files.length>2?(darkMode?'border-[#0c1e26]/10':'border-white/10'):border} pt-3`}>{file.date} &bull; {file.category}</p>
+
+              {/* Edit History */}
+              {showHistory === file.id && (file.editHistory || []).length > 0 && (
+                <div className={`mt-3 pt-3 border-t ${isDark ? 'border-white/10' : border} space-y-2`}>
+                  <p className={`text-[10px] font-bold uppercase ${textM} tracking-widest`}>Edit History</p>
+                  {(file.editHistory || []).slice().reverse().map((h, hi) => (
+                    <div key={hi} className={`text-[10px] ${isDark ? 'text-white/50' : textS} flex items-start gap-2`}>
+                      <Icon name="edit_note" className="text-xs mt-0.5" />
+                      <div>
+                        <span className="font-bold">{h.editedBy}</span>: {h.changes?.map(c => `${c.field}: ${c.from} → ${c.to}`).join(', ')}
+                        <br /><span className="opacity-60">{new Date(h.timestamp).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {showHistory === file.id && (!file.editHistory || file.editHistory.length === 0) && (
+                <div className={`mt-3 pt-3 border-t ${isDark ? 'border-white/10' : border}`}>
+                  <p className={`text-[10px] ${textM}`}>No edit history</p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
+
         {/* Upload placeholder */}
-        <button className={`border-2 border-dashed ${border} p-5 rounded-xl flex flex-col items-center justify-center ${textM} hover:border-[#44e571]/50 hover:${textP} transition-all cursor-pointer min-h-[200px]`}>
-          <Icon name="add_circle" className="text-4xl mb-2"/><span className="font-['Space_Grotesk'] font-bold text-sm">Upload New Receipt</span>
+        <button className={`border-2 border-dashed ${border} p-5 rounded-xl flex flex-col items-center justify-center ${textM} hover:border-[#44e571]/50 transition-all cursor-pointer min-h-[200px]`}>
+          <Icon name="add_circle" className="text-4xl mb-2" />
+          <span className="font-['Space_Grotesk'] font-bold text-sm">Upload New Receipt</span>
         </button>
       </div>
     </div>
@@ -500,29 +601,123 @@ function FilesTab({ files, renameId, setRenameId, renameValue, setRenameValue, o
 
 // ============ EXPORT MODAL ============
 function ExportModal({ data, onClose, textP, textS, textM, cardBg, surfaceLow, border, darkMode }) {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [category, setCategory] = useState('all');
+  const [filtered, setFiltered] = useState(false);
+  const [exportData, setExportData] = useState(data);
+
+  const applyFilters = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+      if (amountMin) params.set('amountMin', amountMin);
+      if (amountMax) params.set('amountMax', amountMax);
+      if (category && category !== 'all') params.set('category', category);
+      const r = await fetch(`/api/files/export?${params.toString()}`);
+      const d = await r.json();
+      setExportData(d);
+      setFiltered(true);
+    } catch (e) {}
+  };
+
+  const setCurrentMonth = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    setDateFrom(`${y}-${m}-01`);
+    const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+    setDateTo(`${y}-${m}-${lastDay}`);
+  };
+
+  const d = exportData || data;
+  const categories = ['all','Food','Transport','Shopping','Office','Utilities','Entertainment','Health','Travel','Banking','General'];
+
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div className={`${cardBg} rounded-2xl shadow-2xl p-8 md:p-12 max-w-3xl w-full relative overflow-hidden my-8`} onClick={e=>e.stopPropagation()}>
-        <div className="absolute -top-10 -right-10 w-40 h-40 border border-dashed opacity-10 rounded-full" style={{borderColor:darkMode?'#fff':'#0c1e26'}}/>
-        
-        {/* Header */}
-        <div className="flex justify-between items-start mb-10">
-          <div><p className={`text-[10px] font-bold ${textM} uppercase tracking-[0.2em] mb-1`}>Document ID</p><p className={`font-mono text-xs ${textP}`}>{data.reportId}</p></div>
-          <div className="text-right"><h2 className={`font-['Space_Grotesk'] text-2xl font-bold ${textP} mb-1`}>Expense Report</h2><p className={`text-sm ${textS}`}>Generated: {new Date(data.generatedAt).toLocaleDateString()}</p></div>
+      <div className={`${cardBg} rounded-2xl shadow-2xl p-6 md:p-10 max-w-4xl w-full relative overflow-hidden my-8`} onClick={e => e.stopPropagation()}>
+        <div className="absolute -top-10 -right-10 w-40 h-40 border border-dashed opacity-10 rounded-full" style={{ borderColor: darkMode ? '#fff' : '#0c1e26' }} />
+
+        {/* Filter Section */}
+        <div className={`${surfaceLow} p-5 rounded-xl mb-8 border ${border}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Icon name="filter_alt" className="text-[#44e571]" />
+            <h3 className={`font-['Space_Grotesk'] font-bold ${textP}`}>Export Filters</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Date From</label>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={`w-full ${cardBg} ${textP} rounded-lg px-3 py-2 border ${border} text-sm outline-none focus:border-[#44e571]`} />
+            </div>
+            <div>
+              <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Date To</label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={`w-full ${cardBg} ${textP} rounded-lg px-3 py-2 border ${border} text-sm outline-none focus:border-[#44e571]`} />
+            </div>
+            <div>
+              <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Min AED</label>
+              <input type="number" value={amountMin} onChange={e => setAmountMin(e.target.value)} placeholder="0" className={`w-full ${cardBg} ${textP} rounded-lg px-3 py-2 border ${border} text-sm outline-none focus:border-[#44e571]`} />
+            </div>
+            <div>
+              <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Max AED</label>
+              <input type="number" value={amountMax} onChange={e => setAmountMax(e.target.value)} placeholder="999999" className={`w-full ${cardBg} ${textP} rounded-lg px-3 py-2 border ${border} text-sm outline-none focus:border-[#44e571]`} />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            <div className="flex-1">
+              <label className={`text-[10px] font-bold uppercase ${textM} tracking-widest block mb-1`}>Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className={`w-full ${cardBg} ${textP} rounded-lg px-3 py-2 border ${border} text-sm outline-none`}>
+                {categories.map(c => <option key={c} value={c} className="text-black">{c === 'all' ? 'All Categories' : c}</option>)}
+              </select>
+            </div>
+            <button onClick={setCurrentMonth} className={`mt-5 px-4 py-2 rounded-lg ${surfaceLow} border ${border} text-sm font-bold ${textP} hover:opacity-80`}>
+              Current Month
+            </button>
+            <button onClick={applyFilters} className="mt-5 px-6 py-2 rounded-lg bg-[#44e571] text-[#00531f] text-sm font-bold hover:opacity-90 active:scale-95">
+              Apply Filters
+            </button>
+          </div>
+        </div>
+
+        {/* Report Header */}
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <p className={`text-[10px] font-bold ${textM} uppercase tracking-[0.2em] mb-1`}>Document ID</p>
+            <p className={`font-mono text-xs ${textP}`}>{d.reportId}</p>
+          </div>
+          <div className="text-right">
+            <h2 className={`font-['Space_Grotesk'] text-2xl font-bold ${textP} mb-1`}>Expense Report</h2>
+            <p className={`text-sm ${textS}`}>Generated: {new Date(d.generatedAt).toLocaleDateString()}</p>
+            {filtered && <p className={`text-xs text-[#44e571] font-bold mt-1`}>Filtered: {d.transactionCount} entries</p>}
+          </div>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead><tr className="bg-[#44e571]">
-              <th className="py-4 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">Date</th>
-              <th className="py-4 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">Merchant</th>
-              <th className="py-4 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">VAT (5%)</th>
-              <th className="py-4 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest text-right">Total AED</th>
-            </tr></thead>
+            <thead>
+              <tr className="bg-[#44e571]">
+                <th className="py-3 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">Date</th>
+                <th className="py-3 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">Merchant</th>
+                <th className="py-3 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">Category</th>
+                <th className="py-3 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest">VAT (5%)</th>
+                <th className="py-3 px-4 text-[#00531f] font-bold text-xs uppercase tracking-widest text-right">Total AED</th>
+              </tr>
+            </thead>
             <tbody className="text-sm">
-              {(data.transactions||[]).map((t,i)=>(
-                <tr key={i}><td className={`py-4 px-4 border-b ${border} ${textS}`}>{t.date}</td><td className={`py-4 px-4 border-b ${border} font-bold ${textP}`}>{t.merchant}</td><td className={`py-4 px-4 border-b ${border} ${textP}`}>{t.vat?.toFixed(2)}</td><td className={`py-4 px-4 border-b ${border} text-right font-medium ${textP}`}>{t.amount?.toLocaleString()}</td></tr>
+              {(d.transactions || []).length === 0 && (
+                <tr><td colSpan="5" className={`py-8 text-center ${textS}`}>No transactions match your filters</td></tr>
+              )}
+              {(d.transactions || []).map((t, i) => (
+                <tr key={i}>
+                  <td className={`py-3 px-4 border-b ${border} ${textS}`}>{t.date}</td>
+                  <td className={`py-3 px-4 border-b ${border} font-bold ${textP}`}>{t.merchant}</td>
+                  <td className={`py-3 px-4 border-b ${border} ${textS}`}>{t.category}</td>
+                  <td className={`py-3 px-4 border-b ${border} ${textP}`}>{t.vat?.toFixed(2)}</td>
+                  <td className={`py-3 px-4 border-b ${border} text-right font-medium ${textP}`}>{t.amount?.toLocaleString()}</td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -530,20 +725,20 @@ function ExportModal({ data, onClose, textP, textS, textM, cardBg, surfaceLow, b
 
         {/* Totals */}
         <div className="mt-8 flex justify-end">
-          <div className="w-full max-w-xs space-y-3 pt-6 border-t-2" style={{borderColor:darkMode?'#fff':'#0c1e26'}}>
-            <div className={`flex justify-between items-center text-sm`}><span className={textS}>Subtotal</span><span className={`font-medium ${textP}`}>{data.subtotal?.toLocaleString()} AED</span></div>
-            <div className={`flex justify-between items-center text-sm`}><span className={textS}>Total VAT (5%)</span><span className={`font-medium ${textP}`}>{data.totalVat?.toLocaleString()} AED</span></div>
-            <div className="flex justify-between items-center pt-2"><span className={`text-xs font-bold uppercase tracking-widest ${textP}`}>Grand Total</span><span className={`font-['Space_Grotesk'] text-3xl font-black ${textP}`}>{data.grandTotal?.toLocaleString()} AED</span></div>
+          <div className="w-full max-w-xs space-y-3 pt-6 border-t-2" style={{ borderColor: darkMode ? '#fff' : '#0c1e26' }}>
+            <div className="flex justify-between items-center text-sm"><span className={textS}>Subtotal</span><span className={`font-medium ${textP}`}>{d.subtotal?.toLocaleString()} AED</span></div>
+            <div className="flex justify-between items-center text-sm"><span className={textS}>Total VAT (5%)</span><span className={`font-medium ${textP}`}>{d.totalVat?.toLocaleString()} AED</span></div>
+            <div className="flex justify-between items-center pt-2"><span className={`text-xs font-bold uppercase tracking-widest ${textP}`}>Grand Total</span><span className={`font-['Space_Grotesk'] text-3xl font-black ${textP}`}>{d.grandTotal?.toLocaleString()} AED</span></div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className={`mt-12 flex items-center gap-4 opacity-30`}><Icon name="verified"/><div className={`h-[1px] flex-grow ${darkMode?'bg-white':'bg-[#0c1e26]'}`}/><span className="text-[10px] font-bold tracking-[0.3em] uppercase">Audit-Filely Precision</span></div>
+        <div className={`mt-10 flex items-center gap-4 opacity-30`}><Icon name="verified" /><div className={`h-[1px] flex-grow ${darkMode ? 'bg-white' : 'bg-[#0c1e26]'}`} /><span className="text-[10px] font-bold tracking-[0.3em] uppercase">Audit-Filely Precision</span></div>
 
         {/* Actions */}
-        <div className="mt-8 flex gap-4 justify-end">
-          <button onClick={onClose} className={`px-8 py-4 rounded-lg ${surfaceLow} ${textP} font-bold text-sm`}>Close</button>
-          <button onClick={()=>window.print()} className="flex items-center gap-3 px-10 py-4 rounded-full bg-[#44e571] text-[#00531f] font-bold text-sm shadow-lg hover:scale-105 active:scale-95 transition-all"><Icon name="download"/>Export PDF</button>
+        <div className="mt-6 flex gap-4 justify-end">
+          <button onClick={onClose} className={`px-8 py-3 rounded-lg ${surfaceLow} ${textP} font-bold text-sm`}>Close</button>
+          <button onClick={() => window.print()} className="flex items-center gap-3 px-10 py-3 rounded-full bg-[#44e571] text-[#00531f] font-bold text-sm shadow-lg hover:scale-105 active:scale-95 transition-all"><Icon name="download" />Export PDF</button>
         </div>
       </div>
     </div>

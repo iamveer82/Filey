@@ -61,8 +61,9 @@ async function handler(request, { params }) {
 
     // ============ FILES VAULT ============
     if (routePath === 'files' && method === 'GET') return getFiles(request);
-    if (routePath === 'files/rename' && method === 'PUT') return renameFile(request);
+    if (routePath === 'files/edit' && method === 'PUT') return editFile(request);
     if (routePath === 'files/export' && method === 'GET') return exportData(request);
+    if (routePath === 'files/history' && method === 'GET') return getEditHistory(request);
 
     // ============ TEAM CHAT ============
     if (routePath === 'team/chat' && method === 'GET') return getTeamChat(request);
@@ -75,15 +76,46 @@ async function handler(request, { params }) {
   }
 }
 
-// System prompt
-const SYSTEM_PROMPT = `You are Filely AI, a UAE finance assistant. Track expenses in AED with 5% VAT.
+// System prompt - built dynamically with transaction context
+async function buildSystemPrompt(db, orgId) {
+  // Fetch recent transactions for context
+  const recentTxns = await db.collection('transactions')
+    .find({ orgId }).sort({ createdAt: -1 }).limit(20).toArray();
+
+  // Build category summary with latest entry per category
+  const categoryLatest = {};
+  recentTxns.forEach(t => {
+    const cat = t.category || 'General';
+    if (!categoryLatest[cat]) {
+      categoryLatest[cat] = { merchant: t.customName || t.merchant, amount: t.amount, date: t.date, vat: t.vat, payment_method: t.payment_method };
+    }
+  });
+
+  const txnContext = Object.entries(categoryLatest).map(([cat, t]) =>
+    `${cat}: ${t.merchant} - ${t.amount} AED (VAT: ${t.vat} AED) on ${t.date}`
+  ).join('\n');
+
+  const allTxnList = recentTxns.slice(0, 10).map(t =>
+    `- ${t.customName || t.merchant}: ${t.amount} AED, ${t.category}, ${t.date}`
+  ).join('\n');
+
+  return `You are Filely AI, a UAE finance assistant. Track expenses in AED with 5% VAT.
 
 When user describes a transaction, respond with JSON then a brief message:
 \`\`\`json
 {"type":"transaction","merchant":"","date":"","amount":0,"currency":"AED","vat":0,"category":"","payment_method":"","description":"","tagged_person":""}
 \`\`\`
-Categories: Food, Transport, Office, Utilities, Entertainment, Shopping, Health, Travel, General
-VAT = amount * 0.05. Today is ${new Date().toISOString().split('T')[0]}. Be brief and friendly with emojis.`;
+Categories: Food, Transport, Office, Utilities, Entertainment, Shopping, Health, Travel, Banking, General
+VAT = amount * 0.05. Today is ${new Date().toISOString().split('T')[0]}. Be brief and friendly with emojis.
+
+IMPORTANT: When user asks about a specific category bill (like "show my last food bill", "what was my latest transport expense", "last shopping receipt"), look up from the data below and provide the details. DO NOT generate a transaction JSON for lookups - just share the info.
+
+=== LATEST ENTRY PER CATEGORY ===
+${txnContext || 'No transactions yet.'}
+
+=== RECENT TRANSACTIONS ===
+${allTxnList || 'No transactions yet.'}`;
+}
 
 // ============ CHAT ============
 async function handleChat(request) {
@@ -110,6 +142,9 @@ async function handleChat(request) {
     const genAI = getGemini();
     const model = genAI.getGenerativeModel({ model: AI_MODEL });
 
+    // Build dynamic system prompt with transaction context
+    const systemPrompt = await buildSystemPrompt(db, orgId);
+
     const chatHistory = history.slice(0, -1).map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }],
@@ -117,7 +152,7 @@ async function handleChat(request) {
 
     const chat = model.startChat({
       history: [
-        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+        { role: 'user', parts: [{ text: systemPrompt }] },
         { role: 'model', parts: [{ text: 'Ready to track your UAE finances! Send me expenses or receipts.' }] },
         ...chatHistory,
       ],
@@ -458,18 +493,82 @@ async function getFiles(request) {
   return jsonResponse({ files, total: files.length });
 }
 
-async function renameFile(request) {
+async function editFile(request) {
   const body = await request.json();
   const db = await getDb();
-  const { id, customName } = body;
+  const { id, merchant, category, amount, editedBy = 'admin' } = body;
 
-  if (!id || !customName) return jsonResponse({ error: 'id and customName required' }, 400);
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
 
+  // Get the current transaction first
+  const current = await db.collection('transactions').findOne({ id });
+  if (!current) return jsonResponse({ error: 'Transaction not found' }, 404);
+
+  // Build update and history entry
+  const changes = [];
+  const update = { updatedAt: new Date().toISOString() };
+
+  if (merchant !== undefined && merchant !== (current.customName || current.merchant)) {
+    changes.push({ field: 'name', from: current.customName || current.merchant, to: merchant });
+    update.customName = merchant;
+  }
+  if (category !== undefined && category !== current.category) {
+    changes.push({ field: 'category', from: current.category, to: category });
+    update.category = category;
+  }
+  if (amount !== undefined && parseFloat(amount) !== current.amount) {
+    const newAmount = parseFloat(amount);
+    changes.push({ field: 'amount', from: current.amount, to: newAmount });
+    update.amount = newAmount;
+    update.vat = Math.round(newAmount * 0.05 * 100) / 100;
+  }
+
+  if (changes.length === 0) return jsonResponse({ message: 'No changes detected' });
+
+  // Create history entry
+  const historyEntry = {
+    id: uuidv4(),
+    transactionId: id,
+    editedBy,
+    changes,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Update transaction and push to edit history
   await db.collection('transactions').updateOne(
     { id },
-    { $set: { customName, updatedAt: new Date().toISOString() } }
+    {
+      $set: update,
+      $push: { editHistory: historyEntry },
+    }
   );
-  return jsonResponse({ message: 'File renamed successfully', customName });
+
+  // Also log as activity
+  const changeDesc = changes.map(c => `${c.field}: ${c.from} → ${c.to}`).join(', ');
+  await db.collection('activity').insertOne({
+    id: uuidv4(),
+    orgId: current.orgId || 'default',
+    userId: editedBy,
+    type: 'edit',
+    description: `${editedBy} edited ${current.customName || current.merchant}: ${changeDesc}`,
+    category: 'Edit',
+    timestamp: new Date().toISOString(),
+  });
+
+  return jsonResponse({ message: 'Transaction updated!', changes, historyEntry });
+}
+
+async function getEditHistory(request) {
+  const db = await getDb();
+  const { searchParams } = new URL(request.url);
+  const transactionId = searchParams.get('id');
+
+  if (!transactionId) return jsonResponse({ error: 'id required' }, 400);
+
+  const txn = await db.collection('transactions').findOne({ id: transactionId });
+  if (!txn) return jsonResponse({ error: 'Not found' }, 404);
+
+  return jsonResponse({ editHistory: (txn.editHistory || []).reverse() });
 }
 
 async function exportData(request) {
@@ -478,6 +577,9 @@ async function exportData(request) {
   const orgId = searchParams.get('orgId') || 'default';
   const dateFrom = searchParams.get('dateFrom');
   const dateTo = searchParams.get('dateTo');
+  const amountMin = parseFloat(searchParams.get('amountMin') || '0');
+  const amountMax = parseFloat(searchParams.get('amountMax') || '999999');
+  const category = searchParams.get('category');
 
   const query = { orgId };
   if (dateFrom || dateTo) {
@@ -485,12 +587,17 @@ async function exportData(request) {
     if (dateFrom) query.date.$gte = dateFrom;
     if (dateTo) query.date.$lte = dateTo;
   }
+  if (amountMin > 0 || amountMax < 999999) {
+    query.amount = { $gte: amountMin, $lte: amountMax };
+  }
+  if (category && category !== 'all') {
+    query.category = category;
+  }
 
-  const transactions = await db.collection('transactions').find(query).sort({ date: 1 }).toArray();
+  const transactions = await db.collection('transactions').find(query).sort({ date: -1 }).toArray();
 
   const subtotal = transactions.reduce((s, t) => s + (t.amount || 0), 0);
   const totalVat = transactions.reduce((s, t) => s + (t.vat || 0), 0);
-  const grandTotal = subtotal;
 
   const reportId = `FLD-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 9999)}`;
 
@@ -498,7 +605,9 @@ async function exportData(request) {
     reportId,
     generatedAt: new Date().toISOString(),
     dateRange: { from: dateFrom || 'All', to: dateTo || 'All' },
+    filters: { amountMin, amountMax, category: category || 'All' },
     transactions: transactions.map(t => ({
+      id: t.id,
       date: t.date,
       merchant: t.customName || t.merchant,
       vat: t.vat || 0,
@@ -507,7 +616,7 @@ async function exportData(request) {
     })),
     subtotal: Math.round(subtotal * 100) / 100,
     totalVat: Math.round(totalVat * 100) / 100,
-    grandTotal: Math.round(grandTotal * 100) / 100,
+    grandTotal: Math.round(subtotal * 100) / 100,
     transactionCount: transactions.length,
   });
 }
