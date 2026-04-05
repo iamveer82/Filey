@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 97.6%;
+    --foreground: 200 50% 8.6%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 50% 8.6%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 50% 8.6%;
+    --primary: 145 100% 21.6%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 200 16% 36.1%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 7% 95.3%;
+    --muted-foreground: 200 14% 30%;
+    --accent: 136 78% 58%;
+    --accent-foreground: 145 100% 16%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 10% 90%;
+    --input: 200 10% 90%;
+    --ring: 145 100% 21.6%;
+    --chart-1: 136 78% 58%;
+    --chart-2: 145 100% 21.6%;
+    --chart-3: 200 50% 8.6%;
+    --chart-4: 30 70% 50%;
+    --chart-5: 200 16% 36.1%;
+    --radius: 1rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 200 50% 8.6%;
+    --sidebar-primary: 145 100% 21.6%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 136 78% 58%;
+    --sidebar-accent-foreground: 145 100% 16%;
+    --sidebar-border: 200 10% 90%;
+    --sidebar-ring: 145 100% 21.6%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 136 78% 58%;
+    --primary-foreground: 145 100% 10%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 136 78% 58%;
+    --accent-foreground: 145 100% 10%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 136 78% 58%;
+    --chart-1: 136 78% 58%;
+    --chart-2: 145 100% 21.6%;
+    --chart-3: 0 0% 80%;
+    --chart-4: 30 70% 50%;
+    --chart-5: 200 16% 50%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 136 78% 58%;
+    --sidebar-primary-foreground: 145 100% 10%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 136 78% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Manrope', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Hide scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
