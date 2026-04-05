@@ -255,6 +255,81 @@ backend:
         - agent: "testing"
         - comment: "✅ Verified: GET /api/chat/sessions returns 6 sessions. GET /api/chat/messages?sessionId=test-session-1 returns 2 messages for the session."
 
+  - task: "Files Vault - File Listing"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+        - agent: "main"
+        - comment: "GET /api/files returns list of all processed transactions/files with filtering support"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ Verified: GET /api/files returns 4 transactions/files. Supports filtering by date range, amount range, and type. Response includes files array and total count."
+
+  - task: "Files Vault - Rename File"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+        - agent: "main"
+        - comment: "PUT /api/files/rename allows renaming transactions with customName field"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ Verified: PUT /api/files/rename successfully renamed transaction to 'April Fuel Expense'. Requires id and customName fields."
+
+  - task: "Files Vault - Export Data"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+        - agent: "main"
+        - comment: "GET /api/files/export returns PDF export data with reportId, transactions, subtotal, totalVat, grandTotal"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ Verified: GET /api/files/export returns complete export data. Report FLD-2026-04-6383 with 4 transactions, subtotal 935 AED, VAT 46.75 AED, grand total 935 AED."
+
+  - task: "Team Chat - Get Messages"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+        - agent: "main"
+        - comment: "GET /api/team/chat returns team chat messages"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ Verified: GET /api/team/chat returns team chat messages. Found 2 existing messages in chat history."
+
+  - task: "Team Chat - Send Message"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+        - agent: "main"
+        - comment: "POST /api/team/chat sends team chat message with message and userName"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ Verified: POST /api/team/chat successfully sent message 'Team meeting at 3pm - Backend API Testing' by Admin. Message appears in subsequent GET requests."
+
 frontend:
   - task: "4-Tab UI with glassmorphism nav"
     implemented: true
@@ -294,6 +369,8 @@ test_plan:
 
 agent_communication:
     - agent: "main"
-    - message: "All backend APIs implemented and manually verified working. Using Gemini 2.5 flash lite model via Google Generative AI SDK. Key env: GEMINI_API_KEY. MongoDB collections: messages, chat_sessions, transactions, activity, teams, profiles. Base URL: http://localhost:3000/api. Please test all endpoints. For receipt scan testing, read /app/image_testing.md for image handling rules. The AI chat endpoint may take 5-10 seconds for response."
+    - message: "Enhancement v2 complete. Added 5 new backend endpoints: GET /api/files (file listing with filters), PUT /api/files/rename (rename transactions), GET /api/files/export (PDF export data), GET /api/team/chat (team chat messages), POST /api/team/chat (send team chat). Frontend now has 5 tabs: Home (with Fili mascot + streak), Chat, Team (with team chat), Files Vault (with filters + rename + export), Settings (with Model Switcher + Notifications). Please test the new endpoints."
     - agent: "testing"
     - message: "✅ BACKEND TESTING COMPLETE: All 9 backend API endpoints tested and working perfectly. Health check, AI chat with transaction extraction, receipt OCR scanning, transaction CRUD, dashboard stats, team management, profile settings, and chat sessions all functioning correctly. Gemini AI integration working with ~500ms response for chat and ~1.2s for receipt scanning. MongoDB data persistence verified. No critical issues found."
+    - agent: "testing"
+    - message: "✅ NEW ENDPOINTS TESTING COMPLETE: All 5 new backend endpoints tested successfully. Files Vault APIs (GET /api/files, PUT /api/files/rename, GET /api/files/export) working perfectly with 4 transactions, rename functionality, and export data generation. Team Chat APIs (GET/POST /api/team/chat) working with message persistence. All existing endpoints (health, dashboard, team) still functioning correctly. Total: 14/14 backend endpoints passing. No critical issues found."

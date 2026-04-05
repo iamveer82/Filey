@@ -1,437 +1,227 @@
 #!/usr/bin/env python3
 """
-Filely UAE Finance Tracker - Backend API Testing
-Tests all backend endpoints for the finance tracking application.
+Backend API Testing Script for Filely UAE Finance Tracker
+Tests new endpoints: files, files/rename, files/export, team/chat
+Also verifies existing endpoints: health, dashboard, team
 """
 
 import requests
 import json
-import base64
-import time
-from PIL import Image, ImageDraw, ImageFont
-import io
-import os
+import sys
 from datetime import datetime
 
-# Configuration
+# Base URL from .env
 BASE_URL = "https://vat-tracker-ae.preview.emergentagent.com/api"
-TIMEOUT = 15  # Increased timeout for AI endpoints
 
-def create_test_receipt_image():
-    """Create a test receipt image with realistic content"""
-    try:
-        # Create a simple receipt-like image
-        img = Image.new('RGB', (400, 600), color='white')
-        draw = ImageDraw.Draw(img)
-        
-        # Try to use a basic font, fallback to default if not available
-        try:
-            font = ImageFont.load_default()
-        except:
-            font = None
-        
-        # Draw receipt content
-        y_pos = 20
-        receipt_lines = [
-            "ADNOC STATION",
-            "TRN: 100474993400003",
-            "Al Wasl Road, Dubai",
-            "========================",
-            "Fuel - Super 98",
-            "Quantity: 25.5L",
-            "Price/L: 2.94 AED",
-            "========================",
-            "Subtotal: 75.00 AED",
-            "VAT (5%): 3.75 AED",
-            "Total: 78.75 AED",
-            "========================",
-            "Payment: Credit Card",
-            f"Date: {datetime.now().strftime('%Y-%m-%d')}",
-            "Time: 14:30:25",
-            "Thank you!"
-        ]
-        
-        for line in receipt_lines:
-            draw.text((20, y_pos), line, fill='black', font=font)
-            y_pos += 25
-        
-        # Convert to base64
-        buffer = io.BytesIO()
-        img.save(buffer, format='JPEG', quality=85)
-        img_data = buffer.getvalue()
-        return base64.b64encode(img_data).decode('utf-8')
+def test_endpoint(method, endpoint, data=None, params=None, description=""):
+    """Test an API endpoint and return response"""
+    url = f"{BASE_URL}/{endpoint}"
     
-    except Exception as e:
-        print(f"Error creating test image: {e}")
-        # Fallback: create minimal image
-        img = Image.new('RGB', (200, 300), color='white')
-        draw = ImageDraw.Draw(img)
-        draw.text((10, 10), "ADNOC Receipt", fill='black')
-        draw.text((10, 40), "Total: 75 AED", fill='black')
-        draw.text((10, 70), "VAT: 3.75 AED", fill='black')
-        
-        buffer = io.BytesIO()
-        img.save(buffer, format='JPEG')
-        img_data = buffer.getvalue()
-        return base64.b64encode(img_data).decode('utf-8')
-
-def test_health_check():
-    """Test health check endpoint"""
-    print("\n=== Testing Health Check ===")
     try:
-        response = requests.get(f"{BASE_URL}/health", timeout=TIMEOUT)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.json()}")
+        print(f"\n🧪 Testing {method} {endpoint}")
+        if description:
+            print(f"   Description: {description}")
+        
+        if method == "GET":
+            response = requests.get(url, params=params, timeout=10)
+        elif method == "POST":
+            response = requests.post(url, json=data, timeout=10)
+        elif method == "PUT":
+            response = requests.put(url, json=data, timeout=10)
+        else:
+            print(f"❌ Unsupported method: {method}")
+            return None
+            
+        print(f"   Status: {response.status_code}")
         
         if response.status_code == 200:
-            data = response.json()
-            if data.get('status') == 'ok':
-                print("✅ Health check passed")
-                return True
-            else:
-                print("❌ Health check failed - invalid response")
-                return False
+            try:
+                json_data = response.json()
+                print(f"   ✅ SUCCESS: {response.status_code}")
+                return json_data
+            except:
+                print(f"   ✅ SUCCESS: {response.status_code} (non-JSON response)")
+                return {"status": "ok", "text": response.text}
         else:
-            print(f"❌ Health check failed - status {response.status_code}")
-            return False
+            print(f"   ❌ FAILED: {response.status_code}")
+            try:
+                error_data = response.json()
+                print(f"   Error: {error_data}")
+            except:
+                print(f"   Error: {response.text}")
+            return None
             
+    except requests.exceptions.RequestException as e:
+        print(f"   ❌ REQUEST ERROR: {str(e)}")
+        return None
     except Exception as e:
-        print(f"❌ Health check error: {e}")
-        return False
-
-def test_ai_chat():
-    """Test AI chat endpoint with expense parsing"""
-    print("\n=== Testing AI Chat - Text Expense Parsing ===")
-    try:
-        payload = {
-            "message": "Paid 75 AED at ADNOC for fuel",
-            "sessionId": "test-session-1"
-        }
-        
-        print(f"Sending: {payload}")
-        response = requests.post(f"{BASE_URL}/chat", json=payload, timeout=TIMEOUT)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"AI Response: {data.get('message', 'No message')}")
-            
-            extracted = data.get('extractedTransaction')
-            if extracted:
-                print(f"✅ Extracted Transaction: {json.dumps(extracted, indent=2)}")
-                
-                # Verify key fields
-                required_fields = ['merchant', 'amount', 'currency', 'category']
-                missing_fields = [field for field in required_fields if not extracted.get(field)]
-                
-                if not missing_fields:
-                    print("✅ AI chat with transaction extraction passed")
-                    return True
-                else:
-                    print(f"❌ Missing required fields: {missing_fields}")
-                    return False
-            else:
-                print("❌ No transaction extracted from AI response")
-                return False
-        else:
-            print(f"❌ AI chat failed - status {response.status_code}")
-            print(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ AI chat error: {e}")
-        return False
-
-def test_receipt_scan():
-    """Test receipt scanning endpoint"""
-    print("\n=== Testing AI Receipt Scan ===")
-    try:
-        # Create test receipt image
-        print("Creating test receipt image...")
-        test_image = create_test_receipt_image()
-        
-        payload = {
-            "image": test_image,
-            "mimeType": "image/jpeg",
-            "sessionId": "test-scan-1"
-        }
-        
-        print("Sending receipt for scanning...")
-        response = requests.post(f"{BASE_URL}/scan", json=payload, timeout=TIMEOUT)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Scan Response: {data.get('message', 'No message')}")
-            
-            extracted = data.get('extractedTransaction')
-            if extracted:
-                print(f"✅ Extracted from Receipt: {json.dumps(extracted, indent=2)}")
-                print("✅ Receipt scan passed")
-                return True
-            else:
-                print("❌ No transaction extracted from receipt")
-                return False
-        else:
-            print(f"❌ Receipt scan failed - status {response.status_code}")
-            print(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Receipt scan error: {e}")
-        return False
-
-def test_create_transaction():
-    """Test transaction creation"""
-    print("\n=== Testing Create Transaction ===")
-    try:
-        payload = {
-            "merchant": "Emirates NBD",
-            "amount": 150.00,
-            "currency": "AED",
-            "vat": 7.50,
-            "category": "Banking",
-            "payment_method": "Debit Card",
-            "description": "Account maintenance fee"
-        }
-        
-        print(f"Creating transaction: {payload}")
-        response = requests.post(f"{BASE_URL}/transactions", json=payload, timeout=TIMEOUT)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            transaction = data.get('transaction')
-            if transaction and transaction.get('id'):
-                print(f"✅ Transaction created: {transaction.get('id')}")
-                print(f"Transaction details: {json.dumps(transaction, indent=2)}")
-                return True
-            else:
-                print("❌ Transaction creation failed - no transaction returned")
-                return False
-        else:
-            print(f"❌ Transaction creation failed - status {response.status_code}")
-            print(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Transaction creation error: {e}")
-        return False
-
-def test_get_transactions():
-    """Test getting transactions list"""
-    print("\n=== Testing Get Transactions ===")
-    try:
-        response = requests.get(f"{BASE_URL}/transactions", timeout=TIMEOUT)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            transactions = data.get('transactions', [])
-            print(f"✅ Retrieved {len(transactions)} transactions")
-            
-            if transactions:
-                print(f"Sample transaction: {json.dumps(transactions[0], indent=2)}")
-            
-            return True
-        else:
-            print(f"❌ Get transactions failed - status {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Get transactions error: {e}")
-        return False
-
-def test_dashboard():
-    """Test dashboard stats endpoint"""
-    print("\n=== Testing Dashboard Stats ===")
-    try:
-        response = requests.get(f"{BASE_URL}/dashboard", timeout=TIMEOUT)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            required_fields = ['totalSpend', 'totalVat', 'transactionCount', 'recentTransactions']
-            
-            print(f"Dashboard data: {json.dumps(data, indent=2)}")
-            
-            missing_fields = [field for field in required_fields if field not in data]
-            if not missing_fields:
-                print("✅ Dashboard stats passed")
-                return True
-            else:
-                print(f"❌ Missing dashboard fields: {missing_fields}")
-                return False
-        else:
-            print(f"❌ Dashboard failed - status {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Dashboard error: {e}")
-        return False
-
-def test_team_management():
-    """Test team management endpoints"""
-    print("\n=== Testing Team Management ===")
-    try:
-        # Test get team
-        print("Getting team...")
-        response = requests.get(f"{BASE_URL}/team", timeout=TIMEOUT)
-        print(f"Get Team Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print(f"❌ Get team failed - status {response.status_code}")
-            return False
-        
-        team_data = response.json()
-        print(f"Team data: {json.dumps(team_data, indent=2)}")
-        
-        # Test invite team member
-        print("Inviting team member...")
-        invite_payload = {
-            "name": "Ahmed Al-Rashid",
-            "email": "ahmed@company.ae",
-            "role": "accountant"
-        }
-        
-        response = requests.post(f"{BASE_URL}/team/invite", json=invite_payload, timeout=TIMEOUT)
-        print(f"Invite Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            invite_data = response.json()
-            print(f"✅ Team member invited: {invite_data}")
-            
-            # Test team activity
-            print("Getting team activity...")
-            response = requests.get(f"{BASE_URL}/team/activity", timeout=TIMEOUT)
-            if response.status_code == 200:
-                activity_data = response.json()
-                print(f"✅ Team activity: {len(activity_data.get('activity', []))} activities")
-                return True
-            else:
-                print(f"❌ Team activity failed - status {response.status_code}")
-                return False
-        else:
-            print(f"❌ Team invite failed - status {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Team management error: {e}")
-        return False
-
-def test_profile_settings():
-    """Test profile settings endpoints"""
-    print("\n=== Testing Profile Settings ===")
-    try:
-        # Test get profile
-        print("Getting profile...")
-        response = requests.get(f"{BASE_URL}/settings/profile", timeout=TIMEOUT)
-        print(f"Get Profile Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print(f"❌ Get profile failed - status {response.status_code}")
-            return False
-        
-        profile_data = response.json()
-        print(f"Profile data: {json.dumps(profile_data, indent=2)}")
-        
-        # Test update profile
-        print("Updating profile...")
-        update_payload = {
-            "name": "Khalid Al-Mansouri",
-            "email": "khalid@filely.ae",
-            "company": "Dubai Tech Solutions LLC"
-        }
-        
-        response = requests.put(f"{BASE_URL}/settings/profile", json=update_payload, timeout=TIMEOUT)
-        print(f"Update Profile Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            update_data = response.json()
-            print(f"✅ Profile updated: {update_data}")
-            return True
-        else:
-            print(f"❌ Profile update failed - status {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Profile settings error: {e}")
-        return False
-
-def test_chat_sessions():
-    """Test chat sessions and messages endpoints"""
-    print("\n=== Testing Chat Sessions & Messages ===")
-    try:
-        # Test get chat sessions
-        print("Getting chat sessions...")
-        response = requests.get(f"{BASE_URL}/chat/sessions", timeout=TIMEOUT)
-        print(f"Chat Sessions Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print(f"❌ Get chat sessions failed - status {response.status_code}")
-            return False
-        
-        sessions_data = response.json()
-        print(f"Chat sessions: {len(sessions_data.get('sessions', []))} sessions")
-        
-        # Test get messages for a session
-        print("Getting messages for test session...")
-        response = requests.get(f"{BASE_URL}/chat/messages?sessionId=test-session-1", timeout=TIMEOUT)
-        print(f"Chat Messages Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            messages_data = response.json()
-            print(f"✅ Chat messages: {len(messages_data.get('messages', []))} messages")
-            return True
-        else:
-            print(f"❌ Get chat messages failed - status {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Chat sessions error: {e}")
-        return False
+        print(f"   ❌ UNEXPECTED ERROR: {str(e)}")
+        return None
 
 def main():
-    """Run all backend tests"""
-    print("🚀 Starting Filely UAE Finance Tracker Backend API Tests")
-    print(f"Base URL: {BASE_URL}")
+    print("=" * 60)
+    print("🚀 FILELY UAE FINANCE TRACKER - BACKEND API TESTING")
     print("=" * 60)
     
-    test_results = {}
+    results = {}
     
-    # Run all tests
-    test_results['health'] = test_health_check()
-    test_results['ai_chat'] = test_ai_chat()
-    test_results['receipt_scan'] = test_receipt_scan()
-    test_results['create_transaction'] = test_create_transaction()
-    test_results['get_transactions'] = test_get_transactions()
-    test_results['dashboard'] = test_dashboard()
-    test_results['team_management'] = test_team_management()
-    test_results['profile_settings'] = test_profile_settings()
-    test_results['chat_sessions'] = test_chat_sessions()
+    # ============ EXISTING ENDPOINTS VERIFICATION ============
+    print("\n📋 TESTING EXISTING ENDPOINTS")
     
-    # Summary
-    print("\n" + "=" * 60)
-    print("🏁 BACKEND API TEST SUMMARY")
-    print("=" * 60)
+    # 1. Health Check
+    health_result = test_endpoint("GET", "health", description="Health check endpoint")
+    results["health"] = health_result is not None
     
-    passed = 0
-    total = len(test_results)
+    # 2. Dashboard Stats
+    dashboard_result = test_endpoint("GET", "dashboard", description="Dashboard statistics")
+    results["dashboard"] = dashboard_result is not None
+    if dashboard_result:
+        required_fields = ["totalSpend", "totalVat", "transactionCount", "recentTransactions"]
+        missing_fields = [f for f in required_fields if f not in dashboard_result]
+        if missing_fields:
+            print(f"   ⚠️  Missing fields: {missing_fields}")
+        else:
+            print(f"   📊 Dashboard data: {dashboard_result.get('totalSpend', 0)} AED total, {dashboard_result.get('transactionCount', 0)} transactions")
     
-    for test_name, result in test_results.items():
-        status = "✅ PASSED" if result else "❌ FAILED"
-        print(f"{test_name.replace('_', ' ').title()}: {status}")
-        if result:
-            passed += 1
+    # 3. Team Management
+    team_result = test_endpoint("GET", "team", description="Team information")
+    results["team"] = team_result is not None
+    if team_result and "team" in team_result:
+        team_data = team_result["team"]
+        print(f"   👥 Team: {team_data.get('name', 'Unknown')} with {len(team_data.get('members', []))} members")
     
-    print(f"\nOverall: {passed}/{total} tests passed")
+    # ============ NEW ENDPOINTS TESTING ============
+    print("\n🆕 TESTING NEW ENDPOINTS")
     
-    if passed == total:
-        print("🎉 All backend API tests passed!")
-        return True
+    # 4. GET /api/files - File listing
+    files_result = test_endpoint("GET", "files", description="Get all processed transactions/files")
+    results["files_get"] = files_result is not None
+    transaction_id = None
+    
+    if files_result and "files" in files_result:
+        files = files_result["files"]
+        print(f"   📁 Found {len(files)} files/transactions")
+        if files:
+            transaction_id = files[0].get("id")
+            print(f"   📄 Sample transaction: {files[0].get('merchant', 'Unknown')} - {files[0].get('amount', 0)} AED")
+        else:
+            print("   ℹ️  No transactions found - creating a test transaction")
+            # Create a test transaction for rename testing
+            test_transaction = {
+                "merchant": "Test Merchant for Rename",
+                "amount": 100.0,
+                "vat": 5.0,
+                "category": "General",
+                "payment_method": "Cash",
+                "description": "Test transaction for rename functionality"
+            }
+            create_result = test_endpoint("POST", "transactions", data=test_transaction, description="Create test transaction")
+            if create_result and "transaction" in create_result:
+                transaction_id = create_result["transaction"]["id"]
+                print(f"   ✅ Created test transaction with ID: {transaction_id}")
+    
+    # 5. PUT /api/files/rename - Rename file
+    if transaction_id:
+        rename_data = {
+            "id": transaction_id,
+            "customName": "April Fuel Expense"
+        }
+        rename_result = test_endpoint("PUT", "files/rename", data=rename_data, description="Rename a transaction/file")
+        results["files_rename"] = rename_result is not None
+        if rename_result:
+            print(f"   ✏️  Renamed transaction to: {rename_data['customName']}")
     else:
-        print(f"⚠️  {total - passed} tests failed")
+        print("   ⚠️  Skipping rename test - no transaction ID available")
+        results["files_rename"] = False
+    
+    # 6. GET /api/files/export - Export data
+    export_result = test_endpoint("GET", "files/export", description="Get PDF export data")
+    results["files_export"] = export_result is not None
+    if export_result:
+        required_export_fields = ["reportId", "transactions", "subtotal", "totalVat", "grandTotal"]
+        missing_export_fields = [f for f in required_export_fields if f not in export_result]
+        if missing_export_fields:
+            print(f"   ⚠️  Missing export fields: {missing_export_fields}")
+        else:
+            print(f"   📊 Export data: Report {export_result.get('reportId', 'Unknown')}, {len(export_result.get('transactions', []))} transactions")
+            print(f"   💰 Totals: Subtotal {export_result.get('subtotal', 0)} AED, VAT {export_result.get('totalVat', 0)} AED, Grand Total {export_result.get('grandTotal', 0)} AED")
+    
+    # 7. GET /api/team/chat - Get team chat messages
+    team_chat_get_result = test_endpoint("GET", "team/chat", description="Get team chat messages")
+    results["team_chat_get"] = team_chat_get_result is not None
+    if team_chat_get_result and "messages" in team_chat_get_result:
+        messages = team_chat_get_result["messages"]
+        print(f"   💬 Found {len(messages)} team chat messages")
+    
+    # 8. POST /api/team/chat - Send team chat message
+    chat_message_data = {
+        "message": "Team meeting at 3pm - Backend API Testing",
+        "userName": "Admin"
+    }
+    team_chat_post_result = test_endpoint("POST", "team/chat", data=chat_message_data, description="Send team chat message")
+    results["team_chat_post"] = team_chat_post_result is not None
+    if team_chat_post_result and "chatMessage" in team_chat_post_result:
+        sent_message = team_chat_post_result["chatMessage"]
+        print(f"   📤 Sent message: '{sent_message.get('message', 'Unknown')}' by {sent_message.get('userName', 'Unknown')}")
+    
+    # 9. Verify GET /api/team/chat returns the sent message
+    print("\n🔄 VERIFYING SENT MESSAGE")
+    team_chat_verify_result = test_endpoint("GET", "team/chat", description="Verify sent message appears in chat")
+    results["team_chat_verify"] = False
+    if team_chat_verify_result and "messages" in team_chat_verify_result:
+        messages = team_chat_verify_result["messages"]
+        sent_message_found = any(msg.get("message") == chat_message_data["message"] for msg in messages)
+        if sent_message_found:
+            print("   ✅ Sent message found in chat history")
+            results["team_chat_verify"] = True
+        else:
+            print("   ❌ Sent message NOT found in chat history")
+    
+    # ============ RESULTS SUMMARY ============
+    print("\n" + "=" * 60)
+    print("📊 TEST RESULTS SUMMARY")
+    print("=" * 60)
+    
+    passed = sum(1 for result in results.values() if result)
+    total = len(results)
+    
+    print(f"\n✅ PASSED: {passed}/{total} tests")
+    print(f"❌ FAILED: {total - passed}/{total} tests")
+    
+    print("\nDetailed Results:")
+    test_names = {
+        "health": "Health Check API",
+        "dashboard": "Dashboard Stats API", 
+        "team": "Team Management API",
+        "files_get": "GET /api/files (File Listing)",
+        "files_rename": "PUT /api/files/rename (Rename File)",
+        "files_export": "GET /api/files/export (Export Data)",
+        "team_chat_get": "GET /api/team/chat (Get Messages)",
+        "team_chat_post": "POST /api/team/chat (Send Message)",
+        "team_chat_verify": "Team Chat Message Verification"
+    }
+    
+    for test_key, passed in results.items():
+        status = "✅ PASS" if passed else "❌ FAIL"
+        test_name = test_names.get(test_key, test_key)
+        print(f"  {status} - {test_name}")
+    
+    # Critical issues check
+    critical_failures = []
+    if not results.get("health"):
+        critical_failures.append("Health Check API")
+    if not results.get("files_get"):
+        critical_failures.append("Files Listing API")
+    if not results.get("team_chat_post"):
+        critical_failures.append("Team Chat Send API")
+    
+    if critical_failures:
+        print(f"\n🚨 CRITICAL FAILURES: {', '.join(critical_failures)}")
         return False
+    else:
+        print(f"\n🎉 ALL CRITICAL ENDPOINTS WORKING!")
+        return True
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    sys.exit(0 if success else 1)

@@ -59,6 +59,15 @@ async function handler(request, { params }) {
     if (routePath === 'settings/profile' && method === 'GET') return getProfile(request);
     if (routePath === 'settings/profile' && method === 'PUT') return updateProfile(request);
 
+    // ============ FILES VAULT ============
+    if (routePath === 'files' && method === 'GET') return getFiles(request);
+    if (routePath === 'files/rename' && method === 'PUT') return renameFile(request);
+    if (routePath === 'files/export' && method === 'GET') return exportData(request);
+
+    // ============ TEAM CHAT ============
+    if (routePath === 'team/chat' && method === 'GET') return getTeamChat(request);
+    if (routePath === 'team/chat' && method === 'POST') return sendTeamChat(request);
+
     return jsonResponse({ error: 'Not found', path: routePath }, 404);
   } catch (error) {
     console.error('API Error:', error);
@@ -422,6 +431,111 @@ async function updateProfile(request) {
 
   await db.collection('profiles').updateOne({ orgId }, { $set: updateData }, { upsert: true });
   return jsonResponse({ message: 'Profile updated!' });
+}
+
+// ============ FILES VAULT ============
+async function getFiles(request) {
+  const db = await getDb();
+  const { searchParams } = new URL(request.url);
+  const orgId = searchParams.get('orgId') || 'default';
+  const dateFrom = searchParams.get('dateFrom');
+  const dateTo = searchParams.get('dateTo');
+  const amountMin = parseFloat(searchParams.get('amountMin') || '0');
+  const amountMax = parseFloat(searchParams.get('amountMax') || '999999');
+  const type = searchParams.get('type') || 'all';
+
+  const query = { orgId };
+  if (dateFrom || dateTo) {
+    query.date = {};
+    if (dateFrom) query.date.$gte = dateFrom;
+    if (dateTo) query.date.$lte = dateTo;
+  }
+  if (amountMin > 0 || amountMax < 999999) {
+    query.amount = { $gte: amountMin, $lte: amountMax };
+  }
+
+  const files = await db.collection('transactions').find(query).sort({ createdAt: -1 }).toArray();
+  return jsonResponse({ files, total: files.length });
+}
+
+async function renameFile(request) {
+  const body = await request.json();
+  const db = await getDb();
+  const { id, customName } = body;
+
+  if (!id || !customName) return jsonResponse({ error: 'id and customName required' }, 400);
+
+  await db.collection('transactions').updateOne(
+    { id },
+    { $set: { customName, updatedAt: new Date().toISOString() } }
+  );
+  return jsonResponse({ message: 'File renamed successfully', customName });
+}
+
+async function exportData(request) {
+  const db = await getDb();
+  const { searchParams } = new URL(request.url);
+  const orgId = searchParams.get('orgId') || 'default';
+  const dateFrom = searchParams.get('dateFrom');
+  const dateTo = searchParams.get('dateTo');
+
+  const query = { orgId };
+  if (dateFrom || dateTo) {
+    query.date = {};
+    if (dateFrom) query.date.$gte = dateFrom;
+    if (dateTo) query.date.$lte = dateTo;
+  }
+
+  const transactions = await db.collection('transactions').find(query).sort({ date: 1 }).toArray();
+
+  const subtotal = transactions.reduce((s, t) => s + (t.amount || 0), 0);
+  const totalVat = transactions.reduce((s, t) => s + (t.vat || 0), 0);
+  const grandTotal = subtotal;
+
+  const reportId = `FLD-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 9999)}`;
+
+  return jsonResponse({
+    reportId,
+    generatedAt: new Date().toISOString(),
+    dateRange: { from: dateFrom || 'All', to: dateTo || 'All' },
+    transactions: transactions.map(t => ({
+      date: t.date,
+      merchant: t.customName || t.merchant,
+      vat: t.vat || 0,
+      amount: t.amount || 0,
+      category: t.category,
+    })),
+    subtotal: Math.round(subtotal * 100) / 100,
+    totalVat: Math.round(totalVat * 100) / 100,
+    grandTotal: Math.round(grandTotal * 100) / 100,
+    transactionCount: transactions.length,
+  });
+}
+
+// ============ TEAM CHAT ============
+async function getTeamChat(request) {
+  const db = await getDb();
+  const { searchParams } = new URL(request.url);
+  const orgId = searchParams.get('orgId') || 'default';
+
+  const messages = await db.collection('team_chat')
+    .find({ orgId }).sort({ timestamp: 1 }).limit(50).toArray();
+  return jsonResponse({ messages });
+}
+
+async function sendTeamChat(request) {
+  const body = await request.json();
+  const db = await getDb();
+  const { orgId = 'default', userId = 'admin', userName = 'Admin', message } = body;
+
+  if (!message) return jsonResponse({ error: 'Message required' }, 400);
+
+  const chatMsg = {
+    id: uuidv4(), orgId, userId, userName, message,
+    timestamp: new Date().toISOString(),
+  };
+  await db.collection('team_chat').insertOne(chatMsg);
+  return jsonResponse({ chatMessage: chatMsg });
 }
 
 // Export handlers
