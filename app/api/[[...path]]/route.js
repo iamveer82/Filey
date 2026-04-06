@@ -85,43 +85,64 @@ async function handler(request, { params }) {
 
 // System prompt - built dynamically with transaction context
 async function buildSystemPrompt(db, orgId) {
-  // Fetch recent transactions for context
   const recentTxns = await db.collection('transactions')
     .find({ orgId }).sort({ createdAt: -1 }).limit(20).toArray();
 
-  // Build category summary with latest entry per category
   const categoryLatest = {};
   recentTxns.forEach(t => {
     const cat = t.category || 'General';
     if (!categoryLatest[cat]) {
-      categoryLatest[cat] = { merchant: t.customName || t.merchant, amount: t.amount, date: t.date, vat: t.vat, payment_method: t.payment_method };
+      categoryLatest[cat] = { merchant: t.customName || t.merchant, amount: t.amount, date: t.date, vat: t.vat, payment_method: t.payment_method, txnType: t.txnType || 'expense' };
     }
   });
 
   const txnContext = Object.entries(categoryLatest).map(([cat, t]) =>
-    `${cat}: ${t.merchant} - ${t.amount} AED (VAT: ${t.vat} AED) on ${t.date}`
+    `${cat}: ${t.merchant} - ${t.amount} AED (${t.txnType}) on ${t.date}`
   ).join('\n');
 
   const allTxnList = recentTxns.slice(0, 10).map(t =>
-    `- ${t.customName || t.merchant}: ${t.amount} AED, ${t.category}, ${t.date}`
+    `- ${t.customName || t.merchant}: ${t.amount} AED, ${t.category}, ${t.txnType || 'expense'}, ${t.date}`
   ).join('\n');
 
-  return `You are Filely AI, a UAE finance assistant. Track expenses in AED with 5% VAT.
+  // Calculate balance
+  const expenses = recentTxns.filter(t => (t.txnType || 'expense') === 'expense');
+  const incomes = recentTxns.filter(t => t.txnType === 'income');
+  const totalExpenses = expenses.reduce((s, t) => s + (t.amount || 0), 0);
+  const totalIncome = incomes.reduce((s, t) => s + (t.amount || 0), 0);
+  const cashReceived = incomes.filter(t => t.incomeMode === 'cash').reduce((s, t) => s + (t.amount || 0), 0);
+  const accountReceived = incomes.filter(t => t.incomeMode === 'account').reduce((s, t) => s + (t.amount || 0), 0);
 
-When user describes a transaction, respond with JSON then a brief message:
+  return `You are Filely AI, a UAE finance assistant. Track expenses AND income in AED with 5% VAT on expenses.
+
+EXPENSES: When user describes spending/paying, respond with:
 \`\`\`json
-{"type":"transaction","merchant":"","date":"","amount":0,"currency":"AED","vat":0,"category":"","payment_method":"","description":"","tagged_person":""}
+{"type":"transaction","txnType":"expense","merchant":"","date":"","amount":0,"currency":"AED","vat":0,"category":"","payment_method":"","description":"","tagged_person":""}
 \`\`\`
-Categories: Food, Transport, Office, Utilities, Entertainment, Shopping, Health, Travel, Banking, General
-VAT = amount * 0.05. Today is ${new Date().toISOString().split('T')[0]}. Be brief and friendly with emojis.
 
-IMPORTANT: When user asks about a specific category bill (like "show my last food bill", "what was my latest transport expense", "last shopping receipt"), look up from the data below and provide the details. DO NOT generate a transaction JSON for lookups - just share the info.
+INCOME/RECEIVED: When user says they RECEIVED money, got paid, or someone paid them, respond with:
+\`\`\`json
+{"type":"transaction","txnType":"income","merchant":"","date":"","amount":0,"currency":"AED","vat":0,"category":"Income","payment_method":"","incomeMode":"cash","description":"","tagged_person":""}
+\`\`\`
+incomeMode must be "cash" or "account" based on context. If user says "received in cash" → cash. "bank transfer"/"account"/"deposited" → account. Default to "account" if unclear.
 
-=== LATEST ENTRY PER CATEGORY ===
+Categories for expenses: Food, Transport, Office, Utilities, Entertainment, Shopping, Health, Travel, Banking, General
+Category for income: Income
+VAT = amount * 0.05 (only on expenses, vat=0 for income). Today is ${new Date().toISOString().split('T')[0]}.
+
+LOOKUPS: When user asks about specific category/bill, look up data below. No JSON for lookups.
+
+BALANCE CONTEXT:
+- Total Expenses: ${totalExpenses} AED
+- Total Income: ${totalIncome} AED (Cash: ${cashReceived}, Account: ${accountReceived})
+- Net Balance: ${totalIncome - totalExpenses} AED
+
+=== LATEST PER CATEGORY ===
 ${txnContext || 'No transactions yet.'}
 
-=== RECENT TRANSACTIONS ===
-${allTxnList || 'No transactions yet.'}`;
+=== RECENT ===
+${allTxnList || 'No transactions yet.'}
+
+Be brief and friendly with emojis.`;
 }
 
 // ============ CHAT ============
@@ -174,7 +195,10 @@ async function handleChat(request) {
     if (jsonMatch) {
       try {
         extractedTransaction = JSON.parse(jsonMatch[1]);
-        if (extractedTransaction.amount && !extractedTransaction.vat) {
+        // VAT only for expenses, not income
+        if (extractedTransaction.txnType === 'income') {
+          extractedTransaction.vat = 0;
+        } else if (extractedTransaction.amount && !extractedTransaction.vat) {
           extractedTransaction.vat = Math.round(extractedTransaction.amount * 0.05 * 100) / 100;
         }
         if (!extractedTransaction.date) {
@@ -321,6 +345,7 @@ async function createTransaction(request) {
   const body = await request.json();
   const db = await getDb();
 
+  const txnType = body.txnType || 'expense';
   const transaction = {
     id: body.id || uuidv4(),
     orgId: body.orgId || 'default',
@@ -329,24 +354,27 @@ async function createTransaction(request) {
     date: body.date || new Date().toISOString().split('T')[0],
     amount: parseFloat(body.amount) || 0,
     currency: body.currency || 'AED',
-    vat: parseFloat(body.vat) || 0,
+    vat: txnType === 'income' ? 0 : (parseFloat(body.vat) || 0),
     trn: body.trn || '',
-    category: body.category || 'General',
+    category: body.category || (txnType === 'income' ? 'Income' : 'General'),
     payment_method: body.payment_method || 'Cash',
     description: body.description || '',
     tagged_person: body.tagged_person || '',
+    txnType,
+    incomeMode: body.incomeMode || (txnType === 'income' ? 'account' : ''),
     status: 'verified',
     createdAt: new Date().toISOString(),
   };
 
   await db.collection('transactions').insertOne(transaction);
 
+  const actionWord = txnType === 'income' ? 'received' : 'added';
   await db.collection('activity').insertOne({
     id: uuidv4(),
     orgId: transaction.orgId,
     userId: transaction.tagged_person || transaction.userId,
     type: 'transaction',
-    description: `${transaction.tagged_person || transaction.userId} added: ${transaction.merchant} - ${transaction.amount} ${transaction.currency}`,
+    description: `${transaction.tagged_person || transaction.userId} ${actionWord}: ${transaction.merchant} - ${transaction.amount} ${transaction.currency}${txnType === 'income' ? ` (${transaction.incomeMode})` : ''}`,
     category: transaction.category,
     timestamp: new Date().toISOString(),
   });
@@ -364,8 +392,14 @@ async function getDashboard(request) {
   const transactions = await db.collection('transactions').find({ orgId }).sort({ date: -1 }).toArray();
   const monthly = transactions.filter(t => t.createdAt >= startOfMonth);
 
-  const totalSpend = monthly.reduce((s, t) => s + (t.amount || 0), 0);
-  const totalVat = monthly.reduce((s, t) => s + (t.vat || 0), 0);
+  const expenses = monthly.filter(t => (t.txnType || 'expense') === 'expense');
+  const incomes = monthly.filter(t => t.txnType === 'income');
+
+  const totalSpend = expenses.reduce((s, t) => s + (t.amount || 0), 0);
+  const totalVat = expenses.reduce((s, t) => s + (t.vat || 0), 0);
+  const totalIncome = incomes.reduce((s, t) => s + (t.amount || 0), 0);
+  const cashReceived = incomes.filter(t => t.incomeMode === 'cash').reduce((s, t) => s + (t.amount || 0), 0);
+  const accountReceived = incomes.filter(t => t.incomeMode === 'account').reduce((s, t) => s + (t.amount || 0), 0);
 
   const categories = {};
   monthly.forEach(t => { categories[t.category || 'General'] = (categories[t.category || 'General'] || 0) + (t.amount || 0); });
@@ -375,12 +409,18 @@ async function getDashboard(request) {
   return jsonResponse({
     totalSpend: Math.round(totalSpend * 100) / 100,
     totalVat: Math.round(totalVat * 100) / 100,
+    totalIncome: Math.round(totalIncome * 100) / 100,
+    cashReceived: Math.round(cashReceived * 100) / 100,
+    accountReceived: Math.round(accountReceived * 100) / 100,
+    balance: Math.round((totalIncome - totalSpend) * 100) / 100,
     transactionCount: monthly.length,
+    expenseCount: expenses.length,
+    incomeCount: incomes.length,
     categories,
     recentTransactions: transactions.slice(0, 5),
     recentActivity,
-    scanCount: monthly.length,
-    scanLimit: 10,
+    scanCount: expenses.length,
+    scanLimit: 50,
     plan: 'basic',
   });
 }

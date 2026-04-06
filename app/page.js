@@ -44,6 +44,9 @@ export default function App() {
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
 
+  // Fetch profile on mount for header avatar
+  useEffect(() => { fetchProfile(); }, []);
+
   useEffect(() => {
     if (activeTab === 'home') fetchDashboard();
     if (activeTab === 'team') { fetchTeam(); fetchTeamActivity(); fetchTeamChat(); }
@@ -179,9 +182,14 @@ export default function App() {
           <button onClick={()=>setDarkMode(!darkMode)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition">
             <Icon name={darkMode?'light_mode':'dark_mode'} className={textS} />
           </button>
-          <div className={`w-8 h-8 rounded-full ${surfaceLow} flex items-center justify-center text-sm font-bold ${textP}`}>
-            {profile?.name?.[0]||'U'}
-          </div>
+          {/* Profile Avatar - navigates to Settings */}
+          <button onClick={()=>setActiveTab('settings')} className={`w-9 h-9 rounded-full ${activeTab==='settings'?'ring-2 ring-[#44e571]':''} overflow-hidden flex items-center justify-center border-2 ${darkMode?'border-white/30':'border-[#0c1e26]/20'} hover:border-[#44e571] transition-colors`}>
+            {profile?.avatar ? (
+              <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className={`text-sm font-bold ${textP}`}>{profile?.name?.[0]||'U'}</span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -214,7 +222,6 @@ export default function App() {
 function HomeTab({ d, textP, textS, textM, cardBg, surfaceLow, border, darkMode }) {
   const data = d || {};
   const greeting = new Date().getHours()<12?'Morning':new Date().getHours()<17?'Afternoon':'Evening';
-  // Streak calculation (simple: count consecutive days with transactions)
   const streak = Math.min(data.transactionCount || 0, 3);
 
   return (
@@ -226,39 +233,48 @@ function HomeTab({ d, textP, textS, textM, cardBg, surfaceLow, border, darkMode 
       <header className="mb-10 mt-4">
         <div className="flex items-center gap-3 mb-2">
           <p className={`text-sm uppercase tracking-widest ${textM} font-semibold`}>{greeting}</p>
-          {streak > 0 && (
-            <div className="flex items-center gap-1 bg-[#44e571]/10 px-3 py-1 rounded-full">
-              <span className="text-lg">🔥</span>
-              <span className="text-xs font-bold text-[#006e2c]">{streak}-day streak</span>
-            </div>
-          )}
+          {streak > 0 && (<div className="flex items-center gap-1 bg-[#44e571]/10 px-3 py-1 rounded-full"><span className="text-lg">🔥</span><span className="text-xs font-bold text-[#006e2c]">{streak}-day streak</span></div>)}
         </div>
-        <h1 className={`font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tighter ${textP} leading-tight`}>
-          Your financial <span className="text-[#006e2c] italic">clarity</span><br/>at a glance.
-        </h1>
+        <h1 className={`font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tighter ${textP} leading-tight`}>Your financial <span className="text-[#006e2c] italic">clarity</span><br/>at a glance.</h1>
       </header>
 
-      {/* Fili Mascot Card */}
+      {/* Fili Mascot */}
       <div className={`${cardBg} p-6 rounded-2xl border ${border} mb-8 flex items-center gap-4`}>
         <div className="w-14 h-14 bg-[#44e571]/20 rounded-full flex items-center justify-center text-3xl">🦅</div>
         <div className="flex-1">
           <p className={`font-['Space_Grotesk'] font-bold ${textP}`}>Fili says:</p>
-          <p className={`text-sm ${textS}`}>
-            {data.transactionCount > 0 
-              ? `Great work! You've tracked ${data.transactionCount} expenses this month. Keep it up! 💪`
-              : `Hey! Got any new receipts for Filely to sort? Let's get that VAT back! ☀️`}
-          </p>
+          <p className={`text-sm ${textS}`}>{data.transactionCount > 0 ? `Great work! ${data.transactionCount} entries tracked. Balance: ${data.balance||0} AED 💪` : `Hey! Got any receipts for Filely to sort? ☀️`}</p>
         </div>
       </div>
 
-      {/* Bento Grid */}
+      {/* Balance & Income Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className={`${cardBg} p-5 rounded-2xl border ${border}`}>
+          <div className="flex items-center gap-2 mb-2"><Icon name="account_balance_wallet" className="text-[#44e571] text-lg"/><span className={`text-[10px] font-bold uppercase tracking-widest ${textM}`}>Balance</span></div>
+          <p className={`font-['Space_Grotesk'] text-2xl font-black ${textP}`}>{(data.balance||0).toLocaleString()} <span className={`text-xs font-medium ${textM}`}>AED</span></p>
+        </div>
+        <div className={`${cardBg} p-5 rounded-2xl border ${border}`}>
+          <div className="flex items-center gap-2 mb-2"><Icon name="arrow_downward" className="text-[#44e571] text-lg"/><span className={`text-[10px] font-bold uppercase tracking-widest ${textM}`}>Total Received</span></div>
+          <p className={`font-['Space_Grotesk'] text-2xl font-black text-[#006e2c]`}>{(data.totalIncome||0).toLocaleString()} <span className={`text-xs font-medium ${textM}`}>AED</span></p>
+        </div>
+        <div className={`${cardBg} p-5 rounded-2xl border ${border}`}>
+          <div className="flex items-center gap-2 mb-2"><Icon name="payments" className="text-amber-500 text-lg"/><span className={`text-[10px] font-bold uppercase tracking-widest ${textM}`}>Cash In</span></div>
+          <p className={`font-['Space_Grotesk'] text-2xl font-black ${textP}`}>{(data.cashReceived||0).toLocaleString()} <span className={`text-xs font-medium ${textM}`}>AED</span></p>
+        </div>
+        <div className={`${cardBg} p-5 rounded-2xl border ${border}`}>
+          <div className="flex items-center gap-2 mb-2"><Icon name="account_balance" className="text-blue-500 text-lg"/><span className={`text-[10px] font-bold uppercase tracking-widest ${textM}`}>Account In</span></div>
+          <p className={`font-['Space_Grotesk'] text-2xl font-black ${textP}`}>{(data.accountReceived||0).toLocaleString()} <span className={`text-xs font-medium ${textM}`}>AED</span></p>
+        </div>
+      </div>
+
+      {/* Expense Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div className={`${cardBg} p-8 rounded-2xl shadow-[0_40px_40px_rgba(12,30,38,0.04)] flex flex-col justify-between h-64 relative overflow-hidden`}>
-          <div className="z-10"><Icon name="payments" className={`${textM} mb-4`} /><h3 className={`text-sm font-semibold ${textS}`}>This Month&apos;s Spend</h3><div className={`font-['Space_Grotesk'] text-4xl font-bold mt-2 ${textP}`}>{(data.totalSpend||0).toLocaleString()} AED</div></div>
+          <div className="z-10"><Icon name="arrow_upward" className="text-red-400 mb-4"/><h3 className={`text-sm font-semibold ${textS}`}>This Month&apos;s Spend</h3><div className={`font-['Space_Grotesk'] text-4xl font-bold mt-2 ${textP}`}>{(data.totalSpend||0).toLocaleString()} AED</div></div>
           <div className="h-12 w-full mt-auto z-10"><div className="w-full h-2 bg-[#44e571]/20 rounded-full overflow-hidden"><div className="bg-[#44e571] h-full rounded-full transition-all" style={{width:`${Math.min((data.scanCount||0)/(data.scanLimit||50)*100,100)}%`}}/></div></div>
         </div>
         <div className={`${cardBg} p-8 rounded-2xl shadow-[0_40px_40px_rgba(12,30,38,0.04)] flex flex-col justify-between h-64 border-l-4 border-l-[#44e571]`}>
-          <div><Icon name="account_balance" className={`${textM} mb-4`}/><h3 className={`text-sm font-semibold ${textS}`}>VAT Tracked (5%)</h3><div className={`font-['Space_Grotesk'] text-4xl font-bold mt-2 ${textP}`}>{(data.totalVat||0).toLocaleString()} AED</div></div>
+          <div><Icon name="receipt_long" className={`${textM} mb-4`}/><h3 className={`text-sm font-semibold ${textS}`}>VAT Tracked (5%)</h3><div className={`font-['Space_Grotesk'] text-4xl font-bold mt-2 ${textP}`}>{(data.totalVat||0).toLocaleString()} AED</div></div>
           <div className="flex items-center gap-2 text-[#006e2c] font-bold text-sm bg-[#44e571]/10 self-start px-3 py-1 rounded-full"><Icon name="check_circle" filled className="text-sm"/>UAE VAT Compliant</div>
         </div>
         <div className={`${darkMode?'bg-white':'bg-[#0c1e26]'} p-8 rounded-2xl shadow-[0_40px_40px_rgba(12,30,38,0.12)] flex flex-col justify-between h-64 ${darkMode?'text-[#0c1e26]':'text-white'}`}>
@@ -272,14 +288,16 @@ function HomeTab({ d, textP, textS, textM, cardBg, surfaceLow, border, darkMode 
         <div className="lg:col-span-2">
           <h2 className={`font-['Space_Grotesk'] text-2xl font-bold mb-6 flex items-center gap-3 ${textP}`}><span className="w-8 h-[2px] bg-[#44e571]"></span>Recent Transactions</h2>
           <div className="space-y-4">
-            {(data.recentTransactions||[]).length===0 && <div className={`${surfaceLow} p-6 rounded-xl text-center ${textS}`}><Icon name="receipt_long" className="text-4xl mb-2 block"/>No transactions yet. Start by scanning a receipt in Chat!</div>}
+            {(data.recentTransactions||[]).length===0 && <div className={`${surfaceLow} p-6 rounded-xl text-center ${textS}`}><Icon name="receipt_long" className="text-4xl mb-2 block"/>No transactions yet.</div>}
             {(data.recentTransactions||[]).map((txn,i)=>(
               <div key={i} className={`${surfaceLow} p-6 rounded-xl flex items-center justify-between`}>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#44e571]/20 flex items-center justify-center font-bold text-[#006e2c]">{(txn.merchant||'U')[0]}</div>
-                  <div><p className={`${textP} font-bold`}>{txn.customName||txn.merchant}</p><p className={`text-sm ${textM}`}>{txn.category} &bull; {txn.date}</p></div>
+                  <div className={`w-12 h-12 rounded-full ${txn.txnType==='income'?'bg-[#006e2c]/10':'bg-[#44e571]/20'} flex items-center justify-center`}>
+                    <Icon name={txn.txnType==='income'?'arrow_downward':'arrow_upward'} className={`text-lg ${txn.txnType==='income'?'text-[#006e2c]':'text-red-400'}`}/>
+                  </div>
+                  <div><p className={`${textP} font-bold`}>{txn.customName||txn.merchant}</p><p className={`text-sm ${textM}`}>{txn.category}{txn.incomeMode?` (${txn.incomeMode})`:''} &bull; {txn.date}</p></div>
                 </div>
-                <span className={`font-['Space_Grotesk'] font-bold ${textP}`}>{txn.amount} AED</span>
+                <span className={`font-['Space_Grotesk'] font-bold ${txn.txnType==='income'?'text-[#006e2c]':textP}`}>{txn.txnType==='income'?'+':'-'}{txn.amount} AED</span>
               </div>
             ))}
           </div>
@@ -287,8 +305,12 @@ function HomeTab({ d, textP, textS, textM, cardBg, surfaceLow, border, darkMode 
         <div className={`${darkMode?'bg-[#44e571]/5 border-[#44e571]/20':'bg-[#44e571]/5 border-[#44e571]/30'} p-8 rounded-2xl border-dashed border-[1.5px] relative`}>
           <div className="absolute -top-4 -right-4 bg-[#44e571] text-[#00531f] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter">AI Ready</div>
           <h3 className={`font-['Space_Grotesk'] text-xl font-bold ${textP} mb-4`}>Quick Start</h3>
-          <p className={`text-sm ${textS} mb-6`}>Scan receipts, type expenses, or ask about your finances.</p>
-          <div className={`text-sm ${textM} space-y-2`}><p>Try saying:</p><p className={`${textP} font-medium italic`}>&ldquo;Paid 50 AED at ADNOC&rdquo;</p><p className={`${textP} font-medium italic`}>&ldquo;Upload a receipt photo&rdquo;</p></div>
+          <p className={`text-sm ${textS} mb-6`}>Track expenses and income:</p>
+          <div className={`text-sm ${textM} space-y-2`}>
+            <p className={`${textP} font-medium italic`}>&ldquo;Paid 50 AED at ADNOC&rdquo;</p>
+            <p className={`${textP} font-medium italic`}>&ldquo;Received 5000 AED salary in account&rdquo;</p>
+            <p className={`${textP} font-medium italic`}>&ldquo;Got 200 AED cash from client&rdquo;</p>
+          </div>
         </div>
       </div>
     </div>
@@ -343,14 +365,19 @@ function ChatTab({ messages, input, setInput, onSend, loading, sessions, onLoadS
 // ============ TRANSACTION CARD ============
 function TransactionCard({ txn, onVerify, onDismiss, isPending, textP, textM, cardBg, border, darkMode }) {
   if(!txn) return null;
+  const isIncome = txn.txnType === 'income';
   return (
-    <div className={`${cardBg} rounded-2xl p-6 shadow-[0_40px_80px_rgba(12,30,38,0.08)] border ${border}`}>
-      <div className="flex items-center gap-3 mb-5"><div className="w-2 h-8 bg-[#44e571] rounded-full"/><h2 className={`font-['Space_Grotesk'] text-lg font-bold ${textP}`}>AI Confirmation</h2></div>
+    <div className={`${cardBg} rounded-2xl p-6 shadow-[0_40px_80px_rgba(12,30,38,0.08)] border ${isIncome ? 'border-[#006e2c]/30' : border}`}>
+      <div className="flex items-center gap-3 mb-5"><div className={`w-2 h-8 ${isIncome ? 'bg-[#006e2c]' : 'bg-[#44e571]'} rounded-full`}/><h2 className={`font-['Space_Grotesk'] text-lg font-bold ${textP}`}>{isIncome ? 'Income Received' : 'AI Confirmation'}</h2></div>
       <div className="grid grid-cols-2 gap-y-5 gap-x-4 mb-6">
-        <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>Merchant</p><p className={`font-['Space_Grotesk'] font-bold ${textP}`}>{txn.merchant||'Unknown'}</p></div>
+        <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>{isIncome ? 'Source' : 'Merchant'}</p><p className={`font-['Space_Grotesk'] font-bold ${textP}`}>{txn.merchant||'Unknown'}</p></div>
         <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>Date</p><p className={`font-['Space_Grotesk'] font-bold ${textP}`}>{txn.date||'Today'}</p></div>
-        <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>Amount</p><p className={`font-['Space_Grotesk'] font-bold ${textP} text-2xl`}>{txn.amount||0} <span className="text-sm">AED</span></p></div>
-        <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>VAT (5%)</p><p className="font-['Space_Grotesk'] font-bold text-[#006e2c]">{txn.vat||0} AED</p></div>
+        <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>Amount</p><p className={`font-['Space_Grotesk'] font-bold ${isIncome ? 'text-[#006e2c]' : textP} text-2xl`}>{isIncome ? '+' : ''}{txn.amount||0} <span className="text-sm">AED</span></p></div>
+        {isIncome ? (
+          <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>Mode</p><span className={`inline-flex px-3 py-1 ${txn.incomeMode==='cash' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'} rounded-full font-bold text-xs`}>{txn.incomeMode==='cash' ? '💵 Cash' : '🏦 Account'}</span></div>
+        ) : (
+          <div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>VAT (5%)</p><p className="font-['Space_Grotesk'] font-bold text-[#006e2c]">{txn.vat||0} AED</p></div>
+        )}
         {txn.category&&<div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>Category</p><span className={`inline-flex px-2 py-1 ${darkMode?'bg-white/10':'bg-[#f3f3f4]'} rounded-md font-bold text-xs ${textP}`}>{txn.category}</span></div>}
         {txn.trn&&<div><p className={`text-[10px] uppercase tracking-widest ${textM} mb-1 font-bold`}>TRN</p><p className={`font-mono text-sm ${textP}`}>{txn.trn}</p></div>}
       </div>
