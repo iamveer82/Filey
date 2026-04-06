@@ -751,7 +751,6 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
   const [editName, setEditName] = useState(profile?.name||'');
   const [editEmail, setEditEmail] = useState(profile?.email||'');
   const [editCompany, setEditCompany] = useState(profile?.company||'');
-  const [aiModel, setAiModel] = useState('gemini');
   const [notifications, setNotifications] = useState(true);
 
   useEffect(()=>{if(profile){setEditName(profile.name||'');setEditEmail(profile.email||'');setEditCompany(profile.company||'');}}, [profile]);
@@ -761,104 +760,150 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
   };
 
   return (
-    <div className="px-6 max-w-2xl mx-auto">
-      <section className="mb-12 mt-4">
-        <p className={`text-[10px] uppercase tracking-[0.2em] ${textM} mb-2 font-bold`}>Preferences</p>
-        <h2 className={`font-['Space_Grotesk'] text-4xl md:text-5xl font-bold tracking-tighter ${textP}`}>Settings</h2>
-        <div className="w-12 h-1 bg-[#44e571] mt-4"/>
-      </section>
+    <div className="px-6 max-w-xl mx-auto">
+      {/* Profile Section */}
+      <section className="flex flex-col items-center text-center mt-4 mb-12">
+        <div className="relative group mb-6">
+          <div className={`w-20 h-20 rounded-full border-2 ${darkMode ? 'border-white' : 'border-[#0c1e26]'} flex items-center justify-center overflow-hidden bg-[#44e571]/10`}>
+            <span className={`text-3xl font-black ${textP}`}>{profile?.name?.[0] || 'U'}</span>
+          </div>
+          <div className={`absolute bottom-0 -right-2 w-8 h-8 bg-[#44e571] rounded-full border-2 ${darkMode ? 'border-white' : 'border-[#0c1e26]'} flex items-center justify-center`}>
+            <Icon name="camera_alt" className="text-xs" />
+          </div>
+        </div>
 
-      {/* Model Switcher */}
-      <section className="mb-16">
-        <div className="flex justify-between items-end mb-6">
-          <div><h3 className={`font-['Space_Grotesk'] text-xl font-bold ${textP}`}>Model Switcher</h3><p className={`${textS} text-sm`}>Select the AI engine for processing</p></div>
-          <Icon name="memory" className="text-[#44e571]"/>
-        </div>
-        <div className={`${surfaceLow} p-1.5 rounded-full flex gap-1 items-center`}>
-          {[{id:'gemini',label:'Speedy (Gemini)'},{id:'claude',label:'Smart (Claude)'},{id:'auto',label:'Auto'}].map(m=>(
-            <button key={m.id} onClick={()=>setAiModel(m.id)} className={`flex-1 py-3 px-4 rounded-full text-sm font-bold font-['Space_Grotesk'] transition-all ${aiModel===m.id?'bg-[#44e571] text-[#0c1e26] shadow-[0_4px_20px_rgba(68,229,113,0.3)]':`${textS} hover:${textP}`}`}>{m.label}</button>
-          ))}
-        </div>
-        <div className={`mt-6 flex items-start gap-4 p-4 ${cardBg} rounded-xl border ${border}`}>
-          <Icon name="info" className={`${textM} mt-1`}/>
-          <p className={`text-xs ${textS} leading-relaxed`}>
-            {aiModel==='gemini'?'Speedy mode uses Gemini for fast OCR and low-cost processing. Best for everyday receipts.':
-             aiModel==='claude'?'Smart mode uses Claude for advanced reasoning and complex document parsing. Higher accuracy, slightly longer.':
-             'Auto mode intelligently selects the best model based on document complexity.'}
-          </p>
-        </div>
-      </section>
-
-      {/* Notifications */}
-      <section className="mb-16">
-        <h3 className={`font-['Space_Grotesk'] text-xl font-bold ${textP} mb-8`}>Notifications</h3>
-        <div className={`${cardBg} rounded-xl p-6 shadow-[0_40px_40px_rgba(12,30,38,0.04)] border ${border}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-full ${surfaceLow} flex items-center justify-center`}><Icon name="notifications_active" className={textS}/></div>
-              <div><span className={`block font-['Space_Grotesk'] font-bold ${textP}`}>Remind me twice daily</span><span className={`block text-xs ${textM}`}>Morning digest & Evening summary</span></div>
+        {editing ? (
+          <div className="w-full space-y-4">
+            <div><label className={`text-[10px] font-bold ${textM} uppercase tracking-widest block mb-2`}>Full Name</label><input value={editName} onChange={e=>setEditName(e.target.value)} className={`w-full ${surfaceLow} ${textP} rounded-xl px-4 py-3 border ${border} focus:border-[#44e571] outline-none`}/></div>
+            <div><label className={`text-[10px] font-bold ${textM} uppercase tracking-widest block mb-2`}>Email</label><input value={editEmail} onChange={e=>setEditEmail(e.target.value)} className={`w-full ${surfaceLow} ${textP} rounded-xl px-4 py-3 border ${border} focus:border-[#44e571] outline-none`}/></div>
+            <div><label className={`text-[10px] font-bold ${textM} uppercase tracking-widest block mb-2`}>Company</label><input value={editCompany} onChange={e=>setEditCompany(e.target.value)} className={`w-full ${surfaceLow} ${textP} rounded-xl px-4 py-3 border ${border} focus:border-[#44e571] outline-none`}/></div>
+            <div className="flex gap-3"><button onClick={saveProfile} className="flex-1 bg-[#44e571] text-[#00531f] font-bold rounded-2xl py-3">Save</button><button onClick={()=>setEditing(false)} className={`flex-1 border ${border} ${textP} font-bold rounded-2xl py-3`}>Cancel</button></div>
+          </div>
+        ) : (
+          <div className="w-full">
+            <h2 className={`font-['Space_Grotesk'] font-black text-3xl tracking-tighter ${textP} mb-4`}>{profile?.name || 'Set your name'}</h2>
+            <div className="flex flex-col gap-3 py-4">
+              <div className={`flex justify-between items-center border-b ${border} pb-2`}>
+                <span className={`text-xs font-bold uppercase tracking-widest ${textM}`}>Email</span>
+                <span className={`font-medium ${textP}`}>{profile?.email || 'Set email'}</span>
+              </div>
+              <div className={`flex justify-between items-center border-b ${border} pb-2`}>
+                <span className={`text-xs font-bold uppercase tracking-widest ${textM}`}>Company</span>
+                <span className={`font-medium ${textP}`}>{profile?.company || 'Set company'}</span>
+              </div>
             </div>
-            <button onClick={()=>setNotifications(!notifications)} className={`w-14 h-8 rounded-full relative transition-colors ${notifications?'bg-[#44e571]':darkMode?'bg-white/20':'bg-gray-300'}`}>
-              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${notifications?'translate-x-7':'translate-x-1'}`}/>
+          </div>
+        )}
+      </section>
+
+      {/* Organization Details Card */}
+      <section className="relative mb-10">
+        <div className={`${cardBg} p-6 rounded-2xl shadow-[0_8px_30px_rgba(12,30,38,0.04)] border ${border}`}>
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#006e2c] mb-1 block">Management</span>
+              <h3 className={`font-['Space_Grotesk'] font-bold text-xl ${textP}`}>Organization Details</h3>
+            </div>
+            <button onClick={()=>setEditing(true)} className={`bg-[#44e571] p-2 rounded-lg border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} active:scale-95 transition-transform`}>
+              <Icon name="edit" className="text-sm" />
             </button>
           </div>
-          {notifications && (
-            <div className={`mt-4 pt-4 border-t ${border} space-y-2`}>
-              <p className={`text-sm ${textS}`}>☀️ &ldquo;Hey! Any new ADNOC or Etisalat bills for Filely to sort?&rdquo;</p>
-              <p className={`text-sm ${textS}`}>🌙 &ldquo;Evening check-in: Did anyone spend Dirhams today? Snap a photo!&rdquo;</p>
+          <div className="grid gap-6">
+            <div>
+              <label className={`text-[10px] font-bold ${textM} block mb-1`}>Company Name</label>
+              <p className={`font-bold text-lg ${textP}`}>{profile?.company || 'Set company'}</p>
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* Profile */}
-      <section className="mb-12">
-        <h3 className={`font-['Space_Grotesk'] text-xl font-bold ${textP} mb-6`}>Profile</h3>
-        <div className={`${cardBg} p-8 rounded-2xl shadow-[0_40px_40px_rgba(12,30,38,0.06)] border ${border}`}>
-          {editing?(
-            <div className="space-y-4">
-              <div><label className={`text-xs font-bold ${textM} uppercase mb-2 block`}>Full Name</label><input value={editName} onChange={e=>setEditName(e.target.value)} className={`w-full ${surfaceLow} ${textP} rounded-xl px-4 py-3 border ${border} focus:border-[#44e571] outline-none`}/></div>
-              <div><label className={`text-xs font-bold ${textM} uppercase mb-2 block`}>Email</label><input value={editEmail} onChange={e=>setEditEmail(e.target.value)} className={`w-full ${surfaceLow} ${textP} rounded-xl px-4 py-3 border ${border} focus:border-[#44e571] outline-none`}/></div>
-              <div><label className={`text-xs font-bold ${textM} uppercase mb-2 block`}>Company</label><input value={editCompany} onChange={e=>setEditCompany(e.target.value)} className={`w-full ${surfaceLow} ${textP} rounded-xl px-4 py-3 border ${border} focus:border-[#44e571] outline-none`}/></div>
-              <div className="flex gap-3"><button onClick={saveProfile} className="flex-1 bg-[#44e571] text-[#00531f] font-bold rounded-full py-3">Save</button><button onClick={()=>setEditing(false)} className={`flex-1 border ${border} ${textP} font-bold rounded-full py-3`}>Cancel</button></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={`text-[10px] font-bold ${textM} block mb-1`}>TRN</label><p className={`font-medium ${textP}`}>10034455290003</p></div>
+              <div><label className={`text-[10px] font-bold ${textM} block mb-1`}>VAT Quarters</label><p className={`font-medium ${textP}`}>Jan, Apr, Jul, Oct</p></div>
             </div>
-          ):(
-            <div className="space-y-5">
-              <div><span className={`text-xs font-bold ${textM} uppercase`}>Name</span><p className={`text-xl font-medium ${textP} mt-1`}>{profile?.name||'Set name'}</p></div>
-              <div className={`h-[0.5px] ${border}`}/>
-              <div><span className={`text-xs font-bold ${textM} uppercase`}>Email</span><p className={`text-xl font-medium ${textP} mt-1`}>{profile?.email||'Set email'}</p></div>
-              <div className={`h-[0.5px] ${border}`}/>
-              <div><span className={`text-xs font-bold ${textM} uppercase`}>Company</span><p className={`text-xl font-medium ${textP} mt-1`}>{profile?.company||'Set company'}</p></div>
-              <button onClick={()=>setEditing(true)} className="text-[#006e2c] text-sm font-bold flex items-center gap-1 mt-2">Edit profile <Icon name="arrow_forward" className="text-sm"/></button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Subscription */}
-      <section className="mb-12">
-        <div className={`${cardBg} border ${border} p-8 rounded-2xl relative overflow-hidden`}>
-          <div className="flex justify-between items-start mb-8">
-            <div><h4 className={`font-['Space_Grotesk'] text-3xl font-bold tracking-tighter ${textP}`}>Elite Plan</h4><p className={`${textS} text-sm mt-1`}>9.99 AED/month</p></div>
-            <div className="bg-[#44e571]/20 text-[#006e2c] px-3 py-1 rounded-full text-[10px] font-bold uppercase">Recommended</div>
           </div>
-          <ul className="space-y-4 mb-8">
-            {['150 AI Scans per month','Team Access + Invites','Audit-Ready PDF Export','Advanced AI (Gemini Pro + Claude)'].map((f,i)=>(
-              <li key={i} className="flex items-center gap-3"><Icon name="check_circle" className="text-[#006e2c] text-lg"/><span className={`text-sm font-medium ${textP}`}>{f}</span></li>
-            ))}
-          </ul>
-          <button className="w-full py-4 bg-[#44e571] text-[#00531f] font-bold rounded-full hover:shadow-lg active:scale-95 transition-all">Upgrade to Elite</button>
         </div>
       </section>
 
-      {/* Settings List */}
-      <section className="space-y-4 mb-8">
-        {[{icon:'lock',label:'Privacy & Security'},{icon:'cloud_done',label:'Storage Management'},{icon:'help',label:'Help & Support'}].map((item,i)=>(
-          <div key={i} className={`${cardBg} p-5 rounded-xl flex items-center justify-between border ${border} hover:bg-opacity-80 cursor-pointer group transition`}>
-            <div className="flex items-center gap-4"><Icon name={item.icon} className={`${textM} group-hover:text-[#44e571] transition-colors`}/><span className={`font-['Space_Grotesk'] font-medium text-sm ${textP}`}>{item.label}</span></div>
-            <Icon name="chevron_right" className={`${textM} text-sm`}/>
+      {/* Certificates */}
+      <section className="mb-10">
+        <span className={`text-[10px] font-black uppercase tracking-widest ${textM} mb-3 block px-2`}>Certificates</span>
+        <div className="flex gap-4 overflow-x-auto pb-2" style={{scrollbarWidth:'none'}}>
+          <div className={`flex-none w-40 p-4 ${cardBg} border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-xl shadow-[2px_2px_0px_0px] ${darkMode ? 'shadow-white' : 'shadow-[#0c1e26]'} flex flex-col justify-between h-32`}>
+            <div className="flex justify-between items-start">
+              <Icon name="description" className={textM} />
+              <button className={`w-6 h-6 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}><Icon name="visibility" className="text-[14px]" /></button>
+            </div>
+            <p className={`text-xs font-bold truncate ${textP}`}>VAT Certificate.pdf</p>
+          </div>
+          <div className={`flex-none w-40 p-4 ${cardBg} border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-xl shadow-[2px_2px_0px_0px] ${darkMode ? 'shadow-white' : 'shadow-[#0c1e26]'} flex flex-col justify-between h-32`}>
+            <div className="flex justify-between items-start">
+              <Icon name="image" className={textM} />
+              <button className={`w-6 h-6 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}><Icon name="visibility" className="text-[14px]" /></button>
+            </div>
+            <p className={`text-xs font-bold truncate ${textP}`}>Trade License.png</p>
+          </div>
+          <div className={`flex-none w-40 p-4 border border-dashed ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-xl flex flex-col items-center justify-center h-32 gap-2 cursor-pointer hover:bg-[#44e571]/5 transition-colors`}>
+            <div className={`w-8 h-8 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}><Icon name="add" className="text-sm" /></div>
+            <span className={`text-[10px] font-black uppercase tracking-tight ${textP}`}>Add New</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Notifications & Reminders */}
+      <section className="mb-10 space-y-6">
+        <div className={`flex items-center justify-between p-4 ${surfaceLow} rounded-xl`}>
+          <div className="flex items-center gap-3">
+            <Icon name="notifications_active" className={textP} />
+            <span className={`font-bold text-sm tracking-tight ${textP}`}>Daily Reminders</span>
+          </div>
+          <button onClick={()=>setNotifications(!notifications)} className={`w-11 h-6 rounded-full relative border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} transition-colors ${notifications ? 'bg-[#44e571]' : darkMode ? 'bg-white/10' : 'bg-black/10'}`}>
+            <div className={`absolute top-[2px] w-5 h-5 bg-white border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-full transition-transform ${notifications ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+          </button>
+        </div>
+
+        {notifications && (
+          <div className="px-2">
+            <span className={`text-[10px] font-black uppercase tracking-widest ${textM} mb-3 block`}>Reminder Times</span>
+            <div className="flex gap-3 items-center">
+              <div className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-white text-black' : 'bg-[#0c1e26] text-white'} rounded-full text-xs font-bold shadow-lg`}>
+                <span>10:00 AM</span><Icon name="close" className="text-[14px]" />
+              </div>
+              <div className={`flex items-center gap-2 px-4 py-2 border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-full text-xs font-bold ${textP}`}>
+                <span>06:00 PM</span><Icon name="close" className="text-[14px]" />
+              </div>
+              <button className={`w-8 h-8 flex items-center justify-center rounded-full bg-[#44e571] border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}>
+                <Icon name="add" className="text-sm" />
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Menu Items */}
+      <section className="space-y-2 mb-10">
+        {[
+          { icon: 'security', label: 'Privacy & Security', sub: null },
+          { icon: 'language', label: 'Language', sub: 'English (US) / Arabic' },
+          { icon: 'chat_bubble', label: 'Help & Support', sub: null },
+        ].map((item, i) => (
+          <div key={i} className={`group flex items-center justify-between p-4 ${darkMode ? 'hover:bg-white/5' : 'hover:bg-[#f3f3f4]'} transition-colors cursor-pointer rounded-xl`}>
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 flex items-center justify-center rounded-xl ${cardBg} shadow-sm border ${border} group-hover:border-[#0c1e26] transition-all`}>
+                <Icon name={item.icon} className={textP} />
+              </div>
+              <div>
+                <span className={`font-bold text-sm ${textP}`}>{item.label}</span>
+                {item.sub && <span className="block text-[10px] font-bold text-[#006e2c]">{item.sub}</span>}
+              </div>
+            </div>
+            <Icon name="chevron_right" className={`${textM} group-hover:translate-x-1 transition-transform text-sm`} />
           </div>
         ))}
+      </section>
+
+      {/* Logout Button */}
+      <section className="flex justify-center pb-8 w-full">
+        <button className={`w-full flex items-center justify-center gap-3 bg-[#44e571] text-black h-14 px-6 rounded-2xl border ${darkMode ? 'border-white' : 'border-black'} shadow-[4px_4px_0px_0px] ${darkMode ? 'shadow-white' : 'shadow-black'} hover:shadow-[2px_2px_0px_0px] hover:scale-[1.02] transition-all duration-200 active:scale-95`}>
+          <Icon name="logout" className="font-bold" />
+          <span className="font-['Space_Grotesk'] font-black uppercase text-sm tracking-tight">Logout</span>
+        </button>
       </section>
     </div>
   );
