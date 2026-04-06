@@ -752,24 +752,102 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
   const [editEmail, setEditEmail] = useState(profile?.email||'');
   const [editCompany, setEditCompany] = useState(profile?.company||'');
   const [notifications, setNotifications] = useState(true);
+  const [certificates, setCertificates] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [showCertView, setShowCertView] = useState(null);
+  const [showAddCert, setShowAddCert] = useState(false);
+  const [certName, setCertName] = useState('');
+  const [showAddReminder, setShowAddReminder] = useState(false);
+  const [newReminderTime, setNewReminderTime] = useState('');
+  const avatarInputRef = useRef(null);
+  const certInputRef = useRef(null);
+  const reminderRef = useRef(null);
 
   useEffect(()=>{if(profile){setEditName(profile.name||'');setEditEmail(profile.email||'');setEditCompany(profile.company||'');}}, [profile]);
+  useEffect(()=>{ fetchCertificates(); fetchReminders(); }, []);
+
+  // Click outside to close reminder input
+  useEffect(() => {
+    const handler = (e) => {
+      if (reminderRef.current && !reminderRef.current.contains(e.target)) setShowAddReminder(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const saveProfile = async () => {
     try { await fetch('/api/settings/profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:editName,email:editEmail,company:editCompany})}); setProfile({...profile,name:editName,email:editEmail,company:editCompany}); setEditing(false); } catch(e){}
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result.split(',')[1];
+      try {
+        await fetch('/api/settings/avatar',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({avatar:reader.result})});
+        setProfile({...profile, avatar: reader.result});
+      } catch(e){}
+    };
+    reader.readAsDataURL(file);
+    if(avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+
+  const fetchCertificates = async () => {
+    try { const r = await fetch('/api/settings/certificates'); const d = await r.json(); setCertificates(d.certificates||[]); } catch(e){}
+  };
+
+  const handleCertUpload = async (e) => {
+    const file = e.target.files?.[0]; if(!file || !certName.trim()) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        await fetch('/api/settings/certificates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:certName,file:reader.result,mimeType:file.type})});
+        setCertName(''); setShowAddCert(false); fetchCertificates();
+      } catch(e){}
+    };
+    reader.readAsDataURL(file);
+    if(certInputRef.current) certInputRef.current.value = '';
+  };
+
+  const deleteCertificate = async (id) => {
+    try { await fetch(`/api/settings/certificates?id=${id}`,{method:'DELETE'}); fetchCertificates(); } catch(e){}
+  };
+
+  const fetchReminders = async () => {
+    try { const r = await fetch('/api/settings/reminders'); const d = await r.json(); setReminders(d.reminders||[]); } catch(e){}
+  };
+
+  const addReminder = async () => {
+    if(!newReminderTime) return;
+    try { await fetch('/api/settings/reminders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({time:newReminderTime})}); setNewReminderTime(''); setShowAddReminder(false); fetchReminders(); } catch(e){}
+  };
+
+  const deleteReminder = async (id) => {
+    try { await fetch(`/api/settings/reminders?id=${id}`,{method:'DELETE'}); fetchReminders(); } catch(e){}
+  };
+
+  const isImage = (mime) => mime && mime.startsWith('image/');
+
   return (
     <div className="px-6 max-w-xl mx-auto">
+      {/* Hidden file inputs */}
+      <input type="file" ref={avatarInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
+      <input type="file" ref={certInputRef} onChange={handleCertUpload} accept="image/*,.pdf,.doc,.docx" className="hidden" />
+
       {/* Profile Section */}
       <section className="flex flex-col items-center text-center mt-4 mb-12">
         <div className="relative group mb-6">
           <div className={`w-20 h-20 rounded-full border-2 ${darkMode ? 'border-white' : 'border-[#0c1e26]'} flex items-center justify-center overflow-hidden bg-[#44e571]/10`}>
-            <span className={`text-3xl font-black ${textP}`}>{profile?.name?.[0] || 'U'}</span>
+            {profile?.avatar ? (
+              <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className={`text-3xl font-black ${textP}`}>{profile?.name?.[0] || 'U'}</span>
+            )}
           </div>
-          <div className={`absolute bottom-0 -right-2 w-8 h-8 bg-[#44e571] rounded-full border-2 ${darkMode ? 'border-white' : 'border-[#0c1e26]'} flex items-center justify-center`}>
+          <button onClick={()=>avatarInputRef.current?.click()} className={`absolute bottom-0 -right-2 w-8 h-8 bg-[#44e571] rounded-full border-2 ${darkMode ? 'border-white' : 'border-[#0c1e26]'} flex items-center justify-center hover:scale-110 active:scale-95 transition-transform`}>
             <Icon name="camera_alt" className="text-xs" />
-          </div>
+          </button>
         </div>
 
         {editing ? (
@@ -783,36 +861,23 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
           <div className="w-full">
             <h2 className={`font-['Space_Grotesk'] font-black text-3xl tracking-tighter ${textP} mb-4`}>{profile?.name || 'Set your name'}</h2>
             <div className="flex flex-col gap-3 py-4">
-              <div className={`flex justify-between items-center border-b ${border} pb-2`}>
-                <span className={`text-xs font-bold uppercase tracking-widest ${textM}`}>Email</span>
-                <span className={`font-medium ${textP}`}>{profile?.email || 'Set email'}</span>
-              </div>
-              <div className={`flex justify-between items-center border-b ${border} pb-2`}>
-                <span className={`text-xs font-bold uppercase tracking-widest ${textM}`}>Company</span>
-                <span className={`font-medium ${textP}`}>{profile?.company || 'Set company'}</span>
-              </div>
+              <div className={`flex justify-between items-center border-b ${border} pb-2`}><span className={`text-xs font-bold uppercase tracking-widest ${textM}`}>Email</span><span className={`font-medium ${textP}`}>{profile?.email||'Set email'}</span></div>
+              <div className={`flex justify-between items-center border-b ${border} pb-2`}><span className={`text-xs font-bold uppercase tracking-widest ${textM}`}>Company</span><span className={`font-medium ${textP}`}>{profile?.company||'Set company'}</span></div>
             </div>
+            <button onClick={()=>setEditing(true)} className="text-[#006e2c] text-sm font-bold flex items-center gap-1"><span>Edit Profile</span><Icon name="arrow_forward" className="text-sm"/></button>
           </div>
         )}
       </section>
 
-      {/* Organization Details Card */}
+      {/* Organization Details - NO edit button */}
       <section className="relative mb-10">
         <div className={`${cardBg} p-6 rounded-2xl shadow-[0_8px_30px_rgba(12,30,38,0.04)] border ${border}`}>
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#006e2c] mb-1 block">Management</span>
-              <h3 className={`font-['Space_Grotesk'] font-bold text-xl ${textP}`}>Organization Details</h3>
-            </div>
-            <button onClick={()=>setEditing(true)} className={`bg-[#44e571] p-2 rounded-lg border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} active:scale-95 transition-transform`}>
-              <Icon name="edit" className="text-sm" />
-            </button>
+          <div className="mb-8">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#006e2c] mb-1 block">Management</span>
+            <h3 className={`font-['Space_Grotesk'] font-bold text-xl ${textP}`}>Organization Details</h3>
           </div>
           <div className="grid gap-6">
-            <div>
-              <label className={`text-[10px] font-bold ${textM} block mb-1`}>Company Name</label>
-              <p className={`font-bold text-lg ${textP}`}>{profile?.company || 'Set company'}</p>
-            </div>
+            <div><label className={`text-[10px] font-bold ${textM} block mb-1`}>Company Name</label><p className={`font-bold text-lg ${textP}`}>{profile?.company||'Set company'}</p></div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={`text-[10px] font-bold ${textM} block mb-1`}>TRN</label><p className={`font-medium ${textP}`}>10034455290003</p></div>
               <div><label className={`text-[10px] font-bold ${textM} block mb-1`}>VAT Quarters</label><p className={`font-medium ${textP}`}>Jan, Apr, Jul, Oct</p></div>
@@ -821,30 +886,62 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
         </div>
       </section>
 
-      {/* Certificates */}
+      {/* Certificates - with upload, view, delete */}
       <section className="mb-10">
         <span className={`text-[10px] font-black uppercase tracking-widest ${textM} mb-3 block px-2`}>Certificates</span>
         <div className="flex gap-4 overflow-x-auto pb-2" style={{scrollbarWidth:'none'}}>
-          <div className={`flex-none w-40 p-4 ${cardBg} border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-xl shadow-[2px_2px_0px_0px] ${darkMode ? 'shadow-white' : 'shadow-[#0c1e26]'} flex flex-col justify-between h-32`}>
-            <div className="flex justify-between items-start">
-              <Icon name="description" className={textM} />
-              <button className={`w-6 h-6 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}><Icon name="visibility" className="text-[14px]" /></button>
+          {certificates.map(cert => (
+            <div key={cert.id} className={`flex-none w-40 p-4 ${cardBg} border ${darkMode?'border-white':'border-[#0c1e26]'} rounded-xl shadow-[2px_2px_0px_0px] ${darkMode?'shadow-white':'shadow-[#0c1e26]'} flex flex-col justify-between h-32`}>
+              <div className="flex justify-between items-start">
+                <Icon name={isImage(cert.mimeType)?'image':'description'} className={textM} />
+                <div className="flex gap-1">
+                  <button onClick={()=>setShowCertView(cert)} className={`w-6 h-6 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode?'border-white':'border-[#0c1e26]'}`}><Icon name="visibility" className="text-[12px]"/></button>
+                  <button onClick={()=>deleteCertificate(cert.id)} className={`w-6 h-6 rounded-full bg-red-100 flex items-center justify-center border ${darkMode?'border-white':'border-[#0c1e26]'}`}><Icon name="close" className="text-[12px] text-red-600"/></button>
+                </div>
+              </div>
+              <p className={`text-xs font-bold truncate ${textP}`}>{cert.name}</p>
             </div>
-            <p className={`text-xs font-bold truncate ${textP}`}>VAT Certificate.pdf</p>
-          </div>
-          <div className={`flex-none w-40 p-4 ${cardBg} border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-xl shadow-[2px_2px_0px_0px] ${darkMode ? 'shadow-white' : 'shadow-[#0c1e26]'} flex flex-col justify-between h-32`}>
-            <div className="flex justify-between items-start">
-              <Icon name="image" className={textM} />
-              <button className={`w-6 h-6 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}><Icon name="visibility" className="text-[14px]" /></button>
+          ))}
+          {/* Add New Certificate */}
+          {showAddCert ? (
+            <div className={`flex-none w-48 p-4 border ${darkMode?'border-white':'border-[#0c1e26]'} rounded-xl flex flex-col justify-between h-32 gap-2 ${cardBg}`}>
+              <input value={certName} onChange={e=>setCertName(e.target.value)} placeholder="Certificate name..." className={`w-full bg-transparent border-b ${border} outline-none text-sm ${textP} font-bold pb-1`} autoFocus />
+              <div className="flex gap-2">
+                <button onClick={()=>{if(certName.trim()) certInputRef.current?.click();}} className="flex-1 bg-[#44e571] text-[#00531f] text-xs font-bold py-2 rounded-lg">Upload</button>
+                <button onClick={()=>{setShowAddCert(false);setCertName('');}} className={`px-3 py-2 text-xs font-bold border ${border} rounded-lg ${textP}`}>X</button>
+              </div>
             </div>
-            <p className={`text-xs font-bold truncate ${textP}`}>Trade License.png</p>
-          </div>
-          <div className={`flex-none w-40 p-4 border border-dashed ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-xl flex flex-col items-center justify-center h-32 gap-2 cursor-pointer hover:bg-[#44e571]/5 transition-colors`}>
-            <div className={`w-8 h-8 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}><Icon name="add" className="text-sm" /></div>
-            <span className={`text-[10px] font-black uppercase tracking-tight ${textP}`}>Add New</span>
-          </div>
+          ) : (
+            <button onClick={()=>setShowAddCert(true)} className={`flex-none w-40 p-4 border border-dashed ${darkMode?'border-white':'border-[#0c1e26]'} rounded-xl flex flex-col items-center justify-center h-32 gap-2 cursor-pointer hover:bg-[#44e571]/5 transition-colors`}>
+              <div className={`w-8 h-8 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode?'border-white':'border-[#0c1e26]'}`}><Icon name="add" className="text-sm"/></div>
+              <span className={`text-[10px] font-black uppercase tracking-tight ${textP}`}>Add New</span>
+            </button>
+          )}
         </div>
       </section>
+
+      {/* Certificate View Modal */}
+      {showCertView && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6" onClick={()=>setShowCertView(null)}>
+          <div className={`${cardBg} rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-auto shadow-2xl`} onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`font-['Space_Grotesk'] font-bold text-xl ${textP}`}>{showCertView.name}</h3>
+              <button onClick={()=>setShowCertView(null)} className={`w-10 h-10 rounded-full ${surfaceLow} flex items-center justify-center hover:bg-red-100 transition-colors`}><Icon name="close" className={textP}/></button>
+            </div>
+            <div className={`border ${border} rounded-xl overflow-hidden`}>
+              {isImage(showCertView.mimeType) ? (
+                <img src={showCertView.file} alt={showCertView.name} className="w-full h-auto" />
+              ) : (
+                <div className="p-12 text-center">
+                  <Icon name="description" className={`text-6xl ${textM} mb-4`} />
+                  <p className={`${textS} text-sm`}>PDF document preview not available.</p>
+                  <p className={`${textM} text-xs mt-2`}>File uploaded: {showCertView.name}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notifications & Reminders */}
       <section className="mb-10 space-y-6">
@@ -853,24 +950,31 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
             <Icon name="notifications_active" className={textP} />
             <span className={`font-bold text-sm tracking-tight ${textP}`}>Daily Reminders</span>
           </div>
-          <button onClick={()=>setNotifications(!notifications)} className={`w-11 h-6 rounded-full relative border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} transition-colors ${notifications ? 'bg-[#44e571]' : darkMode ? 'bg-white/10' : 'bg-black/10'}`}>
-            <div className={`absolute top-[2px] w-5 h-5 bg-white border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-full transition-transform ${notifications ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+          <button onClick={()=>setNotifications(!notifications)} className={`w-11 h-6 rounded-full relative border ${darkMode?'border-white':'border-[#0c1e26]'} transition-colors ${notifications?'bg-[#44e571]':darkMode?'bg-white/10':'bg-black/10'}`}>
+            <div className={`absolute top-[2px] w-5 h-5 bg-white border ${darkMode?'border-white':'border-[#0c1e26]'} rounded-full transition-transform ${notifications?'translate-x-[22px]':'translate-x-[2px]'}`}/>
           </button>
         </div>
 
         {notifications && (
           <div className="px-2">
             <span className={`text-[10px] font-black uppercase tracking-widest ${textM} mb-3 block`}>Reminder Times</span>
-            <div className="flex gap-3 items-center">
-              <div className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-white text-black' : 'bg-[#0c1e26] text-white'} rounded-full text-xs font-bold shadow-lg`}>
-                <span>10:00 AM</span><Icon name="close" className="text-[14px]" />
-              </div>
-              <div className={`flex items-center gap-2 px-4 py-2 border ${darkMode ? 'border-white' : 'border-[#0c1e26]'} rounded-full text-xs font-bold ${textP}`}>
-                <span>06:00 PM</span><Icon name="close" className="text-[14px]" />
-              </div>
-              <button className={`w-8 h-8 flex items-center justify-center rounded-full bg-[#44e571] border ${darkMode ? 'border-white' : 'border-[#0c1e26]'}`}>
-                <Icon name="add" className="text-sm" />
-              </button>
+            <div className="flex gap-3 items-center flex-wrap" ref={reminderRef}>
+              {reminders.map(r => (
+                <div key={r.id} className={`flex items-center gap-2 px-4 py-2 ${darkMode?'bg-white text-black':'bg-[#0c1e26] text-white'} rounded-full text-xs font-bold shadow-lg`}>
+                  <span>{r.label}</span>
+                  <button onClick={()=>deleteReminder(r.id)} className="hover:opacity-60 transition"><Icon name="close" className="text-[14px]"/></button>
+                </div>
+              ))}
+              {showAddReminder ? (
+                <div className="flex items-center gap-2">
+                  <input type="time" value={newReminderTime} onChange={e=>setNewReminderTime(e.target.value)} className={`${surfaceLow} ${textP} rounded-full px-4 py-2 border ${border} outline-none text-sm font-bold focus:border-[#44e571]`} autoFocus />
+                  <button onClick={addReminder} disabled={!newReminderTime} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#44e571] border border-[#0c1e26] disabled:opacity-30"><Icon name="check" className="text-sm"/></button>
+                </div>
+              ) : (
+                <button onClick={()=>setShowAddReminder(true)} className={`w-8 h-8 flex items-center justify-center rounded-full bg-[#44e571] border ${darkMode?'border-white':'border-[#0c1e26]'} hover:scale-110 active:scale-95 transition-transform`}>
+                  <Icon name="add" className="text-sm" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -878,31 +982,21 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
 
       {/* Menu Items */}
       <section className="space-y-2 mb-10">
-        {[
-          { icon: 'security', label: 'Privacy & Security', sub: null },
-          { icon: 'language', label: 'Language', sub: 'English (US) / Arabic' },
-          { icon: 'chat_bubble', label: 'Help & Support', sub: null },
-        ].map((item, i) => (
-          <div key={i} className={`group flex items-center justify-between p-4 ${darkMode ? 'hover:bg-white/5' : 'hover:bg-[#f3f3f4]'} transition-colors cursor-pointer rounded-xl`}>
+        {[{icon:'security',label:'Privacy & Security',sub:null},{icon:'language',label:'Language',sub:'English (US) / Arabic'},{icon:'chat_bubble',label:'Help & Support',sub:null}].map((item,i)=>(
+          <div key={i} className={`group flex items-center justify-between p-4 ${darkMode?'hover:bg-white/5':'hover:bg-[#f3f3f4]'} transition-colors cursor-pointer rounded-xl`}>
             <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 flex items-center justify-center rounded-xl ${cardBg} shadow-sm border ${border} group-hover:border-[#0c1e26] transition-all`}>
-                <Icon name={item.icon} className={textP} />
-              </div>
-              <div>
-                <span className={`font-bold text-sm ${textP}`}>{item.label}</span>
-                {item.sub && <span className="block text-[10px] font-bold text-[#006e2c]">{item.sub}</span>}
-              </div>
+              <div className={`w-10 h-10 flex items-center justify-center rounded-xl ${cardBg} shadow-sm border ${border} group-hover:${darkMode?'border-white':'border-[#0c1e26]'} transition-all`}><Icon name={item.icon} className={textP}/></div>
+              <div><span className={`font-bold text-sm ${textP}`}>{item.label}</span>{item.sub && <span className="block text-[10px] font-bold text-[#006e2c]">{item.sub}</span>}</div>
             </div>
-            <Icon name="chevron_right" className={`${textM} group-hover:translate-x-1 transition-transform text-sm`} />
+            <Icon name="chevron_right" className={`${textM} group-hover:translate-x-1 transition-transform text-sm`}/>
           </div>
         ))}
       </section>
 
-      {/* Logout Button */}
+      {/* Logout */}
       <section className="flex justify-center pb-8 w-full">
-        <button className={`w-full flex items-center justify-center gap-3 bg-[#44e571] text-black h-14 px-6 rounded-2xl border ${darkMode ? 'border-white' : 'border-black'} shadow-[4px_4px_0px_0px] ${darkMode ? 'shadow-white' : 'shadow-black'} hover:shadow-[2px_2px_0px_0px] hover:scale-[1.02] transition-all duration-200 active:scale-95`}>
-          <Icon name="logout" className="font-bold" />
-          <span className="font-['Space_Grotesk'] font-black uppercase text-sm tracking-tight">Logout</span>
+        <button className={`w-full flex items-center justify-center gap-3 bg-[#44e571] text-black h-14 px-6 rounded-2xl border ${darkMode?'border-white':'border-black'} shadow-[4px_4px_0px_0px] ${darkMode?'shadow-white':'shadow-black'} hover:shadow-[2px_2px_0px_0px] hover:scale-[1.02] transition-all duration-200 active:scale-95`}>
+          <Icon name="logout" className="font-bold"/><span className="font-['Space_Grotesk'] font-black uppercase text-sm tracking-tight">Logout</span>
         </button>
       </section>
     </div>

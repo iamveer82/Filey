@@ -58,6 +58,13 @@ async function handler(request, { params }) {
     if (routePath === 'team/activity' && method === 'GET') return getTeamActivity(request);
     if (routePath === 'settings/profile' && method === 'GET') return getProfile(request);
     if (routePath === 'settings/profile' && method === 'PUT') return updateProfile(request);
+    if (routePath === 'settings/avatar' && method === 'PUT') return updateAvatar(request);
+    if (routePath === 'settings/certificates' && method === 'GET') return getCertificates(request);
+    if (routePath === 'settings/certificates' && method === 'POST') return addCertificate(request);
+    if (routePath === 'settings/certificates' && method === 'DELETE') return deleteCertificate(request);
+    if (routePath === 'settings/reminders' && method === 'GET') return getReminders(request);
+    if (routePath === 'settings/reminders' && method === 'POST') return addReminder(request);
+    if (routePath === 'settings/reminders' && method === 'DELETE') return deleteReminder(request);
 
     // ============ FILES VAULT ============
     if (routePath === 'files' && method === 'GET') return getFiles(request);
@@ -466,6 +473,83 @@ async function updateProfile(request) {
 
   await db.collection('profiles').updateOne({ orgId }, { $set: updateData }, { upsert: true });
   return jsonResponse({ message: 'Profile updated!' });
+}
+
+// ============ AVATAR ============
+async function updateAvatar(request) {
+  const body = await request.json();
+  const db = await getDb();
+  const { orgId = 'default', avatar } = body;
+  if (!avatar) return jsonResponse({ error: 'avatar (base64) required' }, 400);
+  await db.collection('profiles').updateOne({ orgId }, { $set: { avatar, updatedAt: new Date().toISOString() } }, { upsert: true });
+  return jsonResponse({ message: 'Avatar updated!' });
+}
+
+// ============ CERTIFICATES ============
+async function getCertificates(request) {
+  const db = await getDb();
+  const { searchParams } = new URL(request.url);
+  const orgId = searchParams.get('orgId') || 'default';
+  const certs = await db.collection('certificates').find({ orgId }).sort({ createdAt: -1 }).toArray();
+  return jsonResponse({ certificates: certs });
+}
+
+async function addCertificate(request) {
+  const body = await request.json();
+  const db = await getDb();
+  const { orgId = 'default', name, file, mimeType = 'application/pdf' } = body;
+  if (!name || !file) return jsonResponse({ error: 'name and file (base64) required' }, 400);
+  const cert = { id: uuidv4(), orgId, name, file, mimeType, createdAt: new Date().toISOString() };
+  await db.collection('certificates').insertOne(cert);
+  return jsonResponse({ certificate: { id: cert.id, name: cert.name, mimeType: cert.mimeType, createdAt: cert.createdAt } });
+}
+
+async function deleteCertificate(request) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const db = await getDb();
+  await db.collection('certificates').deleteOne({ id });
+  return jsonResponse({ message: 'Certificate deleted' });
+}
+
+// ============ REMINDERS ============
+async function getReminders(request) {
+  const db = await getDb();
+  const { searchParams } = new URL(request.url);
+  const orgId = searchParams.get('orgId') || 'default';
+  let reminders = await db.collection('reminders').find({ orgId }).sort({ time: 1 }).toArray();
+  if (reminders.length === 0) {
+    const defaults = [
+      { id: uuidv4(), orgId, time: '10:00', label: '10:00 AM', createdAt: new Date().toISOString() },
+      { id: uuidv4(), orgId, time: '18:00', label: '06:00 PM', createdAt: new Date().toISOString() },
+    ];
+    await db.collection('reminders').insertMany(defaults);
+    reminders = defaults;
+  }
+  return jsonResponse({ reminders });
+}
+
+async function addReminder(request) {
+  const body = await request.json();
+  const db = await getDb();
+  const { orgId = 'default', time } = body;
+  if (!time) return jsonResponse({ error: 'time required (HH:MM)' }, 400);
+  const [h, m] = time.split(':');
+  const hour = parseInt(h);
+  const label = `${hour > 12 ? String(hour - 12).padStart(2, '0') : h}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+  const reminder = { id: uuidv4(), orgId, time, label, createdAt: new Date().toISOString() };
+  await db.collection('reminders').insertOne(reminder);
+  return jsonResponse({ reminder });
+}
+
+async function deleteReminder(request) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const db = await getDb();
+  await db.collection('reminders').deleteOne({ id });
+  return jsonResponse({ message: 'Reminder deleted' });
 }
 
 // ============ FILES VAULT ============
