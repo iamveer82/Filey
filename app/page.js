@@ -855,12 +855,29 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
   };
 
   const isImage = (mime) => mime && mime.startsWith('image/');
+  const isPdf = (mime) => mime && mime.includes('pdf');
+  const getFileIcon = (mime) => {
+    if (!mime) return 'description';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.includes('pdf')) return 'picture_as_pdf';
+    if (mime.includes('word') || mime.includes('doc')) return 'article';
+    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return 'table_chart';
+    if (mime.includes('presentation') || mime.includes('ppt')) return 'slideshow';
+    if (mime.includes('zip') || mime.includes('rar')) return 'folder_zip';
+    if (mime.includes('text')) return 'text_snippet';
+    return 'description';
+  };
+  const getFileExt = (name) => {
+    if (!name) return '';
+    const parts = name.split('.');
+    return parts.length > 1 ? parts.pop().toUpperCase() : '';
+  };
 
   return (
     <div className="px-6 max-w-xl mx-auto">
       {/* Hidden file inputs */}
       <input type="file" ref={avatarInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
-      <input type="file" ref={certInputRef} onChange={handleCertUpload} accept="image/*,.pdf,.doc,.docx" className="hidden" />
+      <input type="file" ref={certInputRef} onChange={handleCertUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.rtf,.ppt,.pptx,.zip" className="hidden" />
 
       {/* Profile Section */}
       <section className="flex flex-col items-center text-center mt-4 mb-12">
@@ -920,7 +937,10 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
           {certificates.map(cert => (
             <div key={cert.id} className={`flex-none w-40 p-4 ${cardBg} border ${darkMode?'border-white':'border-[#0c1e26]'} rounded-xl shadow-[2px_2px_0px_0px] ${darkMode?'shadow-white':'shadow-[#0c1e26]'} flex flex-col justify-between h-32`}>
               <div className="flex justify-between items-start">
-                <Icon name={isImage(cert.mimeType)?'image':'description'} className={textM} />
+                <div className="relative">
+                  <Icon name={getFileIcon(cert.mimeType)} className={textM} />
+                  {getFileExt(cert.name) && <span className={`absolute -bottom-1 -right-2 text-[7px] font-black px-1 rounded ${isPdf(cert.mimeType)?'bg-red-100 text-red-600':isImage(cert.mimeType)?'bg-blue-100 text-blue-600':'bg-gray-100 text-gray-600'}`}>{getFileExt(cert.name)}</span>}
+                </div>
                 <div className="flex gap-1">
                   <button onClick={()=>setShowCertView(cert)} className={`w-6 h-6 rounded-full bg-[#44e571] flex items-center justify-center border ${darkMode?'border-white':'border-[#0c1e26]'}`}><Icon name="visibility" className="text-[12px]"/></button>
                   <button onClick={()=>deleteCertificate(cert.id)} className={`w-6 h-6 rounded-full bg-red-100 flex items-center justify-center border ${darkMode?'border-white':'border-[#0c1e26]'}`}><Icon name="close" className="text-[12px] text-red-600"/></button>
@@ -952,17 +972,29 @@ function SettingsTab({ profile, setProfile, textP, textS, textM, cardBg, surface
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6" onClick={()=>setShowCertView(null)}>
           <div className={`${cardBg} rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-auto shadow-2xl`} onClick={e=>e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className={`font-['Space_Grotesk'] font-bold text-xl ${textP}`}>{showCertView.name}</h3>
+              <div className="flex items-center gap-3">
+                <Icon name={getFileIcon(showCertView.mimeType)} className="text-[#44e571]" />
+                <h3 className={`font-['Space_Grotesk'] font-bold text-xl ${textP}`}>{showCertView.name}</h3>
+              </div>
               <button onClick={()=>setShowCertView(null)} className={`w-10 h-10 rounded-full ${surfaceLow} flex items-center justify-center hover:bg-red-100 transition-colors`}><Icon name="close" className={textP}/></button>
             </div>
             <div className={`border ${border} rounded-xl overflow-hidden`}>
               {isImage(showCertView.mimeType) ? (
                 <img src={showCertView.file} alt={showCertView.name} className="w-full h-auto" />
+              ) : isPdf(showCertView.mimeType) ? (
+                <div className="w-full" style={{minHeight:'500px'}}>
+                  <iframe src={showCertView.file} className="w-full h-[500px] border-0" title={showCertView.name} />
+                </div>
               ) : (
                 <div className="p-12 text-center">
-                  <Icon name="description" className={`text-6xl ${textM} mb-4`} />
-                  <p className={`${textS} text-sm`}>PDF document preview not available.</p>
-                  <p className={`${textM} text-xs mt-2`}>File uploaded: {showCertView.name}</p>
+                  <Icon name={getFileIcon(showCertView.mimeType)} className={`text-6xl ${textM} mb-4`} />
+                  <p className={`${textP} font-bold text-lg mb-2`}>{showCertView.name}</p>
+                  <p className={`${textS} text-sm mb-4`}>File type: {showCertView.mimeType || 'Unknown'}</p>
+                  {showCertView.file && (
+                    <a href={showCertView.file} download={showCertView.name} className="inline-flex items-center gap-2 bg-[#44e571] text-[#00531f] font-bold px-6 py-3 rounded-full hover:opacity-90 transition">
+                      <Icon name="download" className="text-sm" /> Download File
+                    </a>
+                  )}
                 </div>
               )}
             </div>
