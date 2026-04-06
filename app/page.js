@@ -221,8 +221,13 @@ export default function App() {
 // ============ HOME TAB ============
 function HomeTab({ d, textP, textS, textM, cardBg, surfaceLow, border, darkMode }) {
   const data = d || {};
-  const greeting = new Date().getHours()<12?'Morning':new Date().getHours()<17?'Afternoon':'Evening';
+  const [greeting, setGreeting] = useState('');
   const streak = Math.min(data.transactionCount || 0, 3);
+
+  useEffect(() => {
+    const h = new Date().getHours();
+    setGreeting(h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening');
+  }, []);
 
   return (
     <div className="px-6 max-w-7xl mx-auto">
