@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Switch, Image } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Switch, Image, Alert, Modal, ActivityIndicator, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { Colors } from '../theme/colors';
 import api from '../api/client';
 
@@ -13,10 +16,20 @@ export default function SettingsScreen({ darkMode }) {
   const [editCompany, setEditCompany] = useState('');
   const [notifications, setNotifications] = useState(true);
 
-  useEffect(() => { fetchProfile(); }, []);
+  const [certificates, setCertificates] = useState([]);
+  const [certName, setCertName] = useState('');
+  const [showAddCert, setShowAddCert] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [showCertView, setShowCertView] = useState(null);
+
+  useEffect(() => { fetchProfile(); fetchCertificates(); }, []);
 
   const fetchProfile = async () => {
     try { const d = await api.getProfile(); setProfile(d.profile); } catch(e) {}
+  };
+
+  const fetchCertificates = async () => {
+    try { const d = await api.getCertificates(); setCertificates(d.certificates || []); } catch(e) {}
   };
 
   useEffect(() => {
@@ -29,6 +42,93 @@ export default function SettingsScreen({ darkMode }) {
       setProfile({ ...profile, name: editName, email: editEmail, company: editCompany });
       setEditing(false);
     } catch(e) {}
+  };
+
+  const pickAndUpload = () => {
+    if (!certName.trim()) {
+      Alert.alert('Name required', 'Please enter a certificate name first.');
+      return;
+    }
+    Alert.alert('Add Certificate', 'Choose file source', [
+      { text: 'Photo Library', onPress: pickFromPhotos },
+      { text: 'Files (PDF, Docs…)', onPress: pickFromFiles },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const pickFromPhotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow access to your photo library to upload certificates.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || 'image/jpeg';
+      await uploadCert(`data:${mimeType};base64,${asset.base64}`, mimeType);
+    }
+  };
+
+  const pickFromFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      try {
+        const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const mimeType = asset.mimeType || 'application/octet-stream';
+        await uploadCert(`data:${mimeType};base64,${base64}`, mimeType);
+      } catch(e) { Alert.alert('Error', 'Could not read the selected file.'); }
+    }
+  };
+
+  const uploadCert = async (fileData, mimeType) => {
+    setUploading(true);
+    try {
+      await api.uploadCertificate({ name: certName, file: fileData, mimeType });
+      setCertName('');
+      setShowAddCert(false);
+      fetchCertificates();
+    } catch(e) {
+      Alert.alert('Upload failed', 'Could not upload the certificate. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const deleteCertificate = (id) => {
+    Alert.alert('Delete Certificate', 'Are you sure you want to delete this certificate?', [
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await api.deleteCertificate(id); fetchCertificates(); } catch(e) {}
+      }},
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const openCert = async (cert) => {
+    if (!cert.file) return;
+    if (cert.mimeType?.startsWith('image/')) {
+      setShowCertView(cert);
+      return;
+    }
+    try {
+      const ext = cert.name.includes('.') ? cert.name.split('.').pop() : 'pdf';
+      const path = `${FileSystem.cacheDirectory}cert_${cert.id}.${ext}`;
+      const base64 = cert.file.includes(',') ? cert.file.split(',')[1] : cert.file;
+      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Linking.openURL(path);
+    } catch(e) {
+      Alert.alert('Cannot open file', 'No app available to open this file type.');
+    }
+  };
+
+  const getFileIcon = (mimeType, name) => {
+    if (mimeType?.startsWith('image/')) return 'image-outline';
+    if (mimeType?.includes('pdf')) return 'document-text-outline';
+    if (mimeType?.includes('word') || name?.endsWith('.doc') || name?.endsWith('.docx')) return 'document-outline';
+    if (mimeType?.includes('sheet') || mimeType?.includes('excel') || name?.endsWith('.xlsx')) return 'grid-outline';
+    return 'document-text-outline';
   };
 
   return (
@@ -123,35 +223,63 @@ export default function SettingsScreen({ darkMode }) {
       <View style={{ marginTop: 24 }}>
         <Text style={[styles.sectionLabel, { color: c.textMuted, paddingHorizontal: 24 }]}>CERTIFICATES</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingVertical: 4 }}>
-          {/* Certificate Card 1 */}
-          <View style={[styles.certCard, { backgroundColor: c.card, borderColor: c.text }]}>
-            <View style={styles.certCardHeader}>
-              <Ionicons name="document-text-outline" size={22} color={c.textMuted} />
-              <TouchableOpacity style={[styles.certViewBtn, { borderColor: c.text }]}>
-                <Ionicons name="eye-outline" size={14} color={c.text} />
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.certName, { color: c.text }]} numberOfLines={1}>VAT Certificate.pdf</Text>
-          </View>
 
-          {/* Certificate Card 2 */}
-          <View style={[styles.certCard, { backgroundColor: c.card, borderColor: c.text }]}>
-            <View style={styles.certCardHeader}>
-              <Ionicons name="image-outline" size={22} color={c.textMuted} />
-              <TouchableOpacity style={[styles.certViewBtn, { borderColor: c.text }]}>
-                <Ionicons name="eye-outline" size={14} color={c.text} />
-              </TouchableOpacity>
+          {/* Dynamic certificate cards */}
+          {certificates.map(cert => (
+            <View key={cert.id} style={[styles.certCard, { backgroundColor: c.card, borderColor: c.text }]}>
+              <View style={styles.certCardHeader}>
+                <Ionicons name={getFileIcon(cert.mimeType, cert.name)} size={22} color={c.textMuted} />
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <TouchableOpacity onPress={() => openCert(cert)} style={[styles.certViewBtn, { borderColor: c.text }]}>
+                    <Ionicons name="eye-outline" size={14} color={c.text} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteCertificate(cert.id)} style={[styles.certViewBtn, { borderColor: c.text, backgroundColor: '#fee2e2' }]}>
+                    <Ionicons name="close" size={14} color="#dc2626" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <Text style={[styles.certName, { color: c.text }]} numberOfLines={1}>{cert.name}</Text>
             </View>
-            <Text style={[styles.certName, { color: c.text }]} numberOfLines={1}>Trade License.png</Text>
-          </View>
+          ))}
 
-          {/* Add New */}
-          <TouchableOpacity style={[styles.certAddCard, { borderColor: c.text }]}>
-            <View style={[styles.certAddIcon, { borderColor: c.text }]}>
-              <Ionicons name="add" size={18} color={c.text} />
+          {/* Add New — inline form or trigger button */}
+          {showAddCert ? (
+            <View style={[styles.certAddCard, { borderStyle: 'solid', backgroundColor: c.card, borderColor: c.text, width: 200, justifyContent: 'space-between' }]}>
+              <TextInput
+                value={certName}
+                onChangeText={setCertName}
+                placeholder="Certificate name..."
+                placeholderTextColor={c.textMuted}
+                style={[styles.certName, { color: c.text, borderBottomWidth: 1, borderColor: c.border, paddingBottom: 4 }]}
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={pickAndUpload}
+                  disabled={uploading}
+                  style={{ flex: 1, backgroundColor: '#44e571', borderRadius: 8, paddingVertical: 8, alignItems: 'center' }}
+                >
+                  {uploading
+                    ? <ActivityIndicator size="small" color="#00531f" />
+                    : <Text style={{ color: '#00531f', fontWeight: '800', fontSize: 11 }}>UPLOAD</Text>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { setShowAddCert(false); setCertName(''); }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: c.border }}
+                >
+                  <Text style={{ color: c.text, fontWeight: '700', fontSize: 11 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={[styles.certAddText, { color: c.text }]}>ADD NEW</Text>
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => setShowAddCert(true)} style={[styles.certAddCard, { borderColor: c.text }]}>
+              <View style={[styles.certAddIcon, { borderColor: c.text }]}>
+                <Ionicons name="add" size={18} color={c.text} />
+              </View>
+              <Text style={[styles.certAddText, { color: c.text }]}>ADD NEW</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
 
@@ -220,6 +348,30 @@ export default function SettingsScreen({ darkMode }) {
           <Text style={styles.logoutText}>LOGOUT</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Certificate Image View Modal */}
+      <Modal visible={!!showCertView} transparent animationType="fade" onRequestClose={() => setShowCertView(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: c.card, borderRadius: 16, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
+              <Text style={{ color: c.text, fontWeight: '700', flex: 1, marginRight: 8 }} numberOfLines={1}>
+                {showCertView?.name}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCertView(null)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={c.text} />
+              </TouchableOpacity>
+            </View>
+            {showCertView && (
+              <Image
+                source={{ uri: showCertView.file }}
+                style={{ width: '100%', height: 400 }}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
