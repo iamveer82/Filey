@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../theme/colors';
@@ -17,6 +17,10 @@ export default function ChatScreen({ darkMode }) {
   const [sessionId, setSessionId] = useState(generateId());
   const [sessions, setSessions] = useState([]);
   const [pendingTxn, setPendingTxn] = useState(null);
+  const [editingTxn, setEditingTxn] = useState(null);
+  const [editMerchant, setEditMerchant] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editCategory, setEditCategory] = useState('');
   const scrollRef = useRef();
 
   useEffect(() => { fetchSessions(); }, []);
@@ -111,6 +115,20 @@ export default function ChatScreen({ darkMode }) {
       } catch(e) {}
       setLoading(false);
     }
+  };
+
+  const openEditTxn = (txn) => {
+    setEditMerchant(txn.merchant || '');
+    setEditAmount(String(txn.amount || ''));
+    setEditCategory(txn.category || 'General');
+    setEditingTxn(txn);
+  };
+
+  const confirmEditTxn = () => {
+    if (!editMerchant.trim() || !editAmount.trim()) { Alert.alert('Missing fields', 'Please fill in merchant and amount.'); return; }
+    const updated = { ...editingTxn, merchant: editMerchant, amount: parseFloat(editAmount) || editingTxn.amount, category: editCategory, vat: ((parseFloat(editAmount) || editingTxn.amount) * 0.05).toFixed(2) };
+    setPendingTxn(updated);
+    setEditingTxn(null);
   };
 
   const verifyTransaction = async (txn) => {
@@ -208,7 +226,7 @@ export default function ChatScreen({ darkMode }) {
                             <Text style={styles.verifyBtnText}>Verify</Text>
                             <Ionicons name="arrow-forward" size={16} color="#00531f" />
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => setPendingTxn(null)} style={[styles.editBtn, { borderColor: c.border }]}>
+                          <TouchableOpacity onPress={() => openEditTxn(msg.extractedTransaction)} style={[styles.editBtn, { borderColor: c.border }]}>
                             <Text style={[styles.editBtnText, { color: c.text }]}>Edit</Text>
                           </TouchableOpacity>
                         </View>
@@ -234,6 +252,41 @@ export default function ChatScreen({ darkMode }) {
           </View>
         )}
       </ScrollView>
+
+      {/* Edit Transaction Modal */}
+      <Modal visible={!!editingTxn} transparent animationType="slide" onRequestClose={() => setEditingTxn(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: c.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
+            <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.5 }}>Edit Transaction</Text>
+            <View>
+              <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 6 }}>MERCHANT</Text>
+              <TextInput value={editMerchant} onChangeText={setEditMerchant} style={{ backgroundColor: c.surfaceLow, color: c.text, borderRadius: 12, padding: 14, fontSize: 15, borderWidth: 1, borderColor: c.border }} />
+            </View>
+            <View>
+              <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 6 }}>AMOUNT (AED)</Text>
+              <TextInput value={editAmount} onChangeText={setEditAmount} keyboardType="decimal-pad" style={{ backgroundColor: c.surfaceLow, color: c.text, borderRadius: 12, padding: 14, fontSize: 15, borderWidth: 1, borderColor: c.border }} />
+            </View>
+            <View>
+              <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 }}>CATEGORY</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {['Food','Transport','Shopping','Office','Utilities','Entertainment','Health','Travel','Banking','General'].map(cat => (
+                  <TouchableOpacity key={cat} onPress={() => setEditCategory(cat)} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: editCategory === cat ? '#44e571' : c.surfaceLow, borderWidth: 1, borderColor: editCategory === cat ? '#44e571' : c.border }}>
+                    <Text style={{ color: editCategory === cat ? '#00531f' : c.textSecondary, fontWeight: '700', fontSize: 12 }}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+              <TouchableOpacity onPress={confirmEditTxn} style={{ flex: 1, backgroundColor: '#44e571', borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}>
+                <Text style={{ color: '#00531f', fontWeight: '800', fontSize: 15 }}>Save Changes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEditingTxn(null)} style={{ flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: c.border }}>
+                <Text style={{ color: c.text, fontWeight: '700', fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Input Bar */}
       <View style={[styles.inputBar, { backgroundColor: c.card, borderColor: c.border }]}>

@@ -93,6 +93,16 @@ export default function FilesScreen({ darkMode }) {
 
         <Text style={[styles.totalText, { color: c.textMuted }]}>{filtered.length} files</Text>
 
+        {/* Empty state */}
+        {filtered.length === 0 && (
+          <View style={[styles.emptyState, { backgroundColor: c.surfaceLow }]}>
+            <Ionicons name="folder-open-outline" size={48} color={c.textMuted} />
+            <Text style={[styles.emptyStateText, { color: c.textSecondary }]}>
+              {filter === 'all' ? 'No files yet. Start scanning receipts in Chat!' : `No ${filter} files found.`}
+            </Text>
+          </View>
+        )}
+
         {/* File Cards */}
         {filtered.map((file, i) => {
           const isEditing = editingFile === file.id;
@@ -289,4 +299,6 @@ const styles = StyleSheet.create({
   grandLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 2 },
   grandValue: { fontSize: 28, fontWeight: '900' },
   closeBtn: { marginTop: 20, marginBottom: 40, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  emptyState: { padding: 40, borderRadius: 16, alignItems: 'center', gap: 12, marginTop: 8 },
+  emptyStateText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
 });

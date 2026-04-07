@@ -9,6 +9,7 @@ class ApiClient {
       if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
     });
     const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
     return res.json();
   }
 
@@ -18,6 +19,7 @@ class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
     return res.json();
   }
 
@@ -27,11 +29,13 @@ class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`);
     return res.json();
   }
 
   async delete(path) {
     const res = await fetch(`${API_BASE}/${path}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`);
     return res.json();
   }
 
@@ -63,9 +67,13 @@ class ApiClient {
   // Settings
   getProfile() { return this.get('settings/profile'); }
   updateProfile(data) { return this.put('settings/profile', data); }
+  updateAvatar(data) { return this.put('settings/avatar', data); }
   getCertificates() { return this.get('settings/certificates'); }
   uploadCertificate(data) { return this.post('settings/certificates', data); }
   deleteCertificate(id) { return this.delete(`settings/certificates?id=${id}`); }
+  getReminders() { return this.get('settings/reminders'); }
+  addReminder(data) { return this.post('settings/reminders', data); }
+  deleteReminder(id) { return this.delete(`settings/reminders?id=${id}`); }
 }
 
 export default new ApiClient();

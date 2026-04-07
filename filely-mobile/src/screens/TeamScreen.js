@@ -107,7 +107,7 @@ export default function TeamScreen({ darkMode }) {
               return (
                 <View key={i} style={[styles.chatMsg, isMe && { alignSelf: 'flex-end', flexDirection: 'row-reverse' }]}>
                   <View style={[styles.chatAvatar, { backgroundColor: isMe ? c.lime : c.dark }]}>
-                    <Text style={[styles.chatAvatarText, { color: isMe ? '#00531f' : '#fff' }]}>{m.userName?.[0]}</Text>
+                    <Text style={[styles.chatAvatarText, { color: isMe ? '#00531f' : darkMode ? '#000' : '#fff' }]}>{m.userName?.[0]}</Text>
                   </View>
                   <View>
                     <Text style={[styles.chatSender, { color: c.textMuted }]}>{m.userName}</Text>

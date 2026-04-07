@@ -92,10 +92,10 @@ export default function HomeScreen({ darkMode }) {
       </View>
 
       {/* Recent Transactions */}
-      <Text style={[styles.sectionTitle, { color: c.text }]}>
+      <View style={styles.sectionTitleRow}>
         <View style={[styles.sectionLine, { backgroundColor: c.lime }]} />
-        {'  '}Recent Transactions
-      </Text>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Recent Transactions</Text>
+      </View>
 
       {(d.recentTransactions || []).length === 0 && (
         <View style={[styles.emptyCard, { backgroundColor: c.surfaceLow }]}>
@@ -144,8 +144,9 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: '#44e571', borderRadius: 3 },
   vatBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, marginTop: 16, gap: 4 },
   vatBadgeText: { fontSize: 12, fontWeight: '700' },
-  sectionTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5, marginBottom: 16, flexDirection: 'row', alignItems: 'center' },
-  sectionLine: { width: 32, height: 2, borderRadius: 1, marginRight: 8 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  sectionTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  sectionLine: { width: 32, height: 2, borderRadius: 1 },
   emptyCard: { padding: 32, borderRadius: 16, alignItems: 'center', gap: 8 },
   emptyText: { fontSize: 13, textAlign: 'center' },
   txnCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 8, gap: 12 },
