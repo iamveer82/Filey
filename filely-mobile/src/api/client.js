@@ -30,6 +30,11 @@ class ApiClient {
     return res.json();
   }
 
+  async delete(path) {
+    const res = await fetch(`${API_BASE}/${path}`, { method: 'DELETE' });
+    return res.json();
+  }
+
   // Dashboard
   getDashboard() { return this.get('dashboard'); }
 
@@ -58,6 +63,9 @@ class ApiClient {
   // Settings
   getProfile() { return this.get('settings/profile'); }
   updateProfile(data) { return this.put('settings/profile', data); }
+  getCertificates() { return this.get('settings/certificates'); }
+  uploadCertificate(data) { return this.post('settings/certificates', data); }
+  deleteCertificate(id) { return this.delete(`settings/certificates?id=${id}`); }
 }
 
 export default new ApiClient();
