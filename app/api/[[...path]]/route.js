@@ -83,66 +83,101 @@ async function handler(request, { params }) {
   }
 }
 
-// System prompt - built dynamically with transaction context
+// System prompt - built dynamically with full transaction context
 async function buildSystemPrompt(db, orgId) {
-  const recentTxns = await db.collection('transactions')
-    .find({ orgId }).sort({ createdAt: -1 }).limit(20).toArray();
+  const allTxns = await db.collection('transactions')
+    .find({ orgId }).sort({ createdAt: -1 }).limit(100).toArray();
 
-  const categoryLatest = {};
-  recentTxns.forEach(t => {
-    const cat = t.category || 'General';
-    if (!categoryLatest[cat]) {
-      categoryLatest[cat] = { merchant: t.customName || t.merchant, amount: t.amount, date: t.date, vat: t.vat, payment_method: t.payment_method, txnType: t.txnType || 'expense' };
-    }
-  });
-
-  const txnContext = Object.entries(categoryLatest).map(([cat, t]) =>
-    `${cat}: ${t.merchant} - ${t.amount} AED (${t.txnType}) on ${t.date}`
-  ).join('\n');
-
-  const allTxnList = recentTxns.slice(0, 10).map(t =>
-    `- ${t.customName || t.merchant}: ${t.amount} AED, ${t.category}, ${t.txnType || 'expense'}, ${t.date}`
-  ).join('\n');
-
-  // Calculate balance
-  const expenses = recentTxns.filter(t => (t.txnType || 'expense') === 'expense');
-  const incomes = recentTxns.filter(t => t.txnType === 'income');
+  // Overall totals
+  const expenses = allTxns.filter(t => (t.txnType || 'expense') === 'expense');
+  const incomes = allTxns.filter(t => t.txnType === 'income');
   const totalExpenses = expenses.reduce((s, t) => s + (t.amount || 0), 0);
   const totalIncome = incomes.reduce((s, t) => s + (t.amount || 0), 0);
   const cashReceived = incomes.filter(t => t.incomeMode === 'cash').reduce((s, t) => s + (t.amount || 0), 0);
   const accountReceived = incomes.filter(t => t.incomeMode === 'account').reduce((s, t) => s + (t.amount || 0), 0);
 
-  return `You are Filely AI, a UAE finance assistant. Track expenses AND income in AED with 5% VAT on expenses.
+  // This month
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthlyTxns = allTxns.filter(t => t.date && t.date.startsWith(currentMonth));
+  const monthlyExpense = monthlyTxns.filter(t => (t.txnType || 'expense') === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+  const monthlyIncome = monthlyTxns.filter(t => t.txnType === 'income').reduce((s, t) => s + (t.amount || 0), 0);
 
-EXPENSES: When user describes spending/paying, respond with:
+  // By category totals
+  const byCategory = {};
+  allTxns.forEach(t => {
+    const cat = t.category || 'General';
+    if (!byCategory[cat]) byCategory[cat] = { total: 0, count: 0 };
+    byCategory[cat].total += t.amount || 0;
+    byCategory[cat].count++;
+  });
+  const categorySummary = Object.entries(byCategory)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([cat, d]) => `${cat}: ${Math.round(d.total * 100) / 100} AED (${d.count} transactions)`)
+    .join('\n');
+
+  // By merchant totals (top 20)
+  const byMerchant = {};
+  allTxns.forEach(t => {
+    const name = t.customName || t.merchant || 'Unknown';
+    if (!byMerchant[name]) byMerchant[name] = { total: 0, count: 0, lastDate: t.date };
+    byMerchant[name].total += t.amount || 0;
+    byMerchant[name].count++;
+  });
+  const merchantSummary = Object.entries(byMerchant)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 20)
+    .map(([name, d]) => `${name}: ${Math.round(d.total * 100) / 100} AED (${d.count}x, last: ${d.lastDate})`)
+    .join('\n');
+
+  // Recent 30 transactions — full detail for Q&A
+  const recentList = allTxns.slice(0, 30).map(t => {
+    const name = t.customName || t.merchant;
+    const arrow = t.txnType === 'income' ? 'IN' : 'OUT';
+    return `[${arrow}] ${t.date} | ${name} | ${t.amount} AED | ${t.category} | ${t.payment_method || '-'}`;
+  }).join('\n');
+
+  return `You are Filey AI, a smart personal finance assistant for UAE. You know the user's full transaction history and can answer any question about their spending, income, receipts, and saved records.
+
+Today is ${new Date().toISOString().split('T')[0]}.
+
+━━━━ FINANCIAL MEMORY ━━━━
+
+OVERALL (last 100 records):
+• Expenses: ${Math.round(totalExpenses * 100) / 100} AED | Income: ${Math.round(totalIncome * 100) / 100} AED (Cash: ${Math.round(cashReceived * 100) / 100}, Bank: ${Math.round(accountReceived * 100) / 100}) | Net: ${Math.round((totalIncome - totalExpenses) * 100) / 100} AED
+
+THIS MONTH (${currentMonth}):
+• Spent: ${Math.round(monthlyExpense * 100) / 100} AED | Received: ${Math.round(monthlyIncome * 100) / 100} AED
+
+BY CATEGORY:
+${categorySummary || 'No data yet.'}
+
+BY MERCHANT / RECIPIENT:
+${merchantSummary || 'No data yet.'}
+
+RECENT TRANSACTIONS:
+${recentList || 'No transactions yet.'}
+
+━━━━ HOW TO RESPOND ━━━━
+
+1. QUESTIONS about finances → Use the data above to give accurate, specific answers. Be conversational and natural.
+
+2. RECORDING AN EXPENSE → Include this JSON then a short friendly confirmation:
 \`\`\`json
 {"type":"transaction","txnType":"expense","merchant":"","date":"","amount":0,"currency":"AED","vat":0,"category":"","payment_method":"","description":"","tagged_person":""}
 \`\`\`
 
-INCOME/RECEIVED: When user says they RECEIVED money, got paid, or someone paid them, respond with:
+3. RECORDING INCOME → Include this JSON then a short confirmation:
 \`\`\`json
 {"type":"transaction","txnType":"income","merchant":"","date":"","amount":0,"currency":"AED","vat":0,"category":"Income","payment_method":"","incomeMode":"cash","description":"","tagged_person":""}
 \`\`\`
-incomeMode must be "cash" or "account" based on context. If user says "received in cash" → cash. "bank transfer"/"account"/"deposited" → account. Default to "account" if unclear.
+incomeMode: "cash" if received in cash, "account" if bank transfer/deposited. Default "account" if unclear.
 
-Categories for expenses: Food, Transport, Office, Utilities, Entertainment, Shopping, Health, Travel, Banking, General
-Category for income: Income
-VAT = amount * 0.05 (only on expenses, vat=0 for income). Today is ${new Date().toISOString().split('T')[0]}.
+Expense categories: Food, Transport, Office, Utilities, Entertainment, Shopping, Health, Travel, Banking, General
+VAT = amount × 0.05 (expenses only; vat = 0 for income).
+Use today's date if no date is mentioned.
 
-LOOKUPS: When user asks about specific category/bill, look up data below. No JSON for lookups.
-
-BALANCE CONTEXT:
-- Total Expenses: ${totalExpenses} AED
-- Total Income: ${totalIncome} AED (Cash: ${cashReceived}, Account: ${accountReceived})
-- Net Balance: ${totalIncome - totalExpenses} AED
-
-=== LATEST PER CATEGORY ===
-${txnContext || 'No transactions yet.'}
-
-=== RECENT ===
-${allTxnList || 'No transactions yet.'}
-
-Be brief and friendly with emojis.`;
+Keep responses warm, natural, and to the point. Use emojis where they feel natural. Refer back to context from earlier in the conversation when relevant.`;
 }
 
 // ============ CHAT ============
@@ -161,10 +196,10 @@ async function handleChat(request) {
     role: 'user', content: message, timestamp: new Date().toISOString(),
   });
 
-  // Get history
+  // Get history (last 20 messages for better context continuity)
   const history = await db.collection('messages')
     .find({ sessionId: chatSessionId })
-    .sort({ timestamp: 1 }).limit(10).toArray();
+    .sort({ timestamp: 1 }).limit(20).toArray();
 
   try {
     const genAI = getGemini();
@@ -181,7 +216,7 @@ async function handleChat(request) {
     const chat = model.startChat({
       history: [
         { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'Ready to track your UAE finances! Send me expenses or receipts.' }] },
+        { role: 'model', parts: [{ text: "Hey! I'm Filey, your finance assistant. I know your full transaction history — just ask me anything or tell me about a new expense. 💬" }] },
         ...chatHistory,
       ],
     });
