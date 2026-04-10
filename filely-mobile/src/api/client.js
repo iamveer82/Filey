@@ -1,6 +1,5 @@
-// API Configuration
-// IMPORTANT: Update this URL to your deployed backend
-const API_BASE = 'https://vat-tracker-ae.preview.emergentagent.com/api';
+// API Configuration — points to local Next.js server on your network
+const API_BASE = 'http://192.168.1.59:3000/api';
 
 class ApiClient {
   async get(path, params = {}) {
