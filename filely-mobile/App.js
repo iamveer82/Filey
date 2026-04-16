@@ -5,13 +5,32 @@ import 'react-native-url-polyfill/auto';
 // Gesture handler must be imported before navigation
 import 'react-native-gesture-handler';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { View, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
+import {
+  View,
+  ActivityIndicator,
+  Platform,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+  Pressable,
+} from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  interpolate,
+  Easing,
+  FadeIn,
+  FadeOut,
+  SlideInUp,
+} from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
@@ -25,6 +44,9 @@ import ComplianceVault from './src/screens/ComplianceVault';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ─── Themes ────────────────────────────────────────────────────────────────────
 
 const FilelyLightTheme = {
   ...DefaultTheme,
@@ -50,18 +72,283 @@ const FilelyDarkTheme = {
   },
 };
 
-// Tab icon config
+// ─── Tab icon config ───────────────────────────────────────────────────────────
+
 const TAB_ICONS = {
-  Home:     { active: 'home',              inactive: 'home-outline'              },
-  Chat:     { active: 'chatbubbles',       inactive: 'chatbubbles-outline'       },
-  Vault:    { active: 'shield-checkmark',  inactive: 'shield-checkmark-outline'  },
-  Team:     { active: 'people',            inactive: 'people-outline'            },
-  Settings: { active: 'settings',          inactive: 'settings-outline'          },
+  Home:     { active: 'home',             inactive: 'home-outline'             },
+  Chat:     { active: 'chatbubbles',      inactive: 'chatbubbles-outline'      },
+  Vault:    { active: 'shield-checkmark', inactive: 'shield-checkmark-outline' },
+  Team:     { active: 'people',           inactive: 'people-outline'           },
+  Settings: { active: 'settings',         inactive: 'settings-outline'         },
 };
+
+const TAB_KEYS = ['Home', 'Chat', 'Vault', 'Team', 'Settings'];
+
+// ─── Spring configs ────────────────────────────────────────────────────────────
+
+const SPRING_CONFIG = {
+  damping: 15,
+  stiffness: 150,
+  mass: 0.8,
+  overshootClamping: false,
+  restDisplacementThreshold: 0.01,
+  restSpeedThreshold: 0.01,
+};
+
+const BOUNCE_SPRING = {
+  damping: 10,
+  stiffness: 200,
+  mass: 0.6,
+};
+
+// ─── Animated Tab Icon ─────────────────────────────────────────────────────────
+
+function AnimatedTabIcon({ routeName, focused, darkMode }) {
+  const scale = useSharedValue(focused ? 1 : 0.85);
+  const pillScale = useSharedValue(focused ? 1 : 0);
+  const pillOpacity = useSharedValue(focused ? 1 : 0);
+  const iconTranslateY = useSharedValue(focused ? -2 : 0);
+
+  useEffect(() => {
+    if (focused) {
+      // Animate in: bounce scale + pill grows
+      scale.value = withSpring(1.15, BOUNCE_SPRING, () => {
+        scale.value = withSpring(1, SPRING_CONFIG);
+      });
+      pillScale.value = withSpring(1, SPRING_CONFIG);
+      pillOpacity.value = withTiming(1, { duration: 200 });
+      iconTranslateY.value = withSpring(-2, SPRING_CONFIG);
+    } else {
+      scale.value = withSpring(0.85, SPRING_CONFIG);
+      pillScale.value = withSpring(0, { ...SPRING_CONFIG, stiffness: 200 });
+      pillOpacity.value = withTiming(0, { duration: 150 });
+      iconTranslateY.value = withSpring(0, SPRING_CONFIG);
+    }
+  }, [focused]);
+
+  const animatedIconStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateY: iconTranslateY.value },
+    ],
+  }));
+
+  const animatedPillStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pillScale.value }],
+    opacity: pillOpacity.value,
+  }));
+
+  const icons = TAB_ICONS[routeName];
+  const iconName = focused ? icons.active : icons.inactive;
+  const inactiveColor = darkMode ? 'rgba(255,255,255,0.35)' : '#94A3B8';
+
+  return (
+    <View style={tabIconStyles.wrapper}>
+      {/* Lime pill background */}
+      <Animated.View style={[tabIconStyles.pill, animatedPillStyle]}>
+        <View style={tabIconStyles.pillInner} />
+      </Animated.View>
+      {/* Icon */}
+      <Animated.View style={[tabIconStyles.iconContainer, animatedIconStyle]}>
+        <Ionicons
+          name={iconName}
+          size={focused ? 22 : 24}
+          color={focused ? '#003516' : inactiveColor}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+const tabIconStyles = StyleSheet.create({
+  wrapper: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pill: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#44e571',
+    shadowColor: '#44e571',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+// ─── Custom Tab Bar ────────────────────────────────────────────────────────────
+
+function CustomTabBar({ state, descriptors, navigation, darkMode }) {
+  const barBg = darkMode
+    ? 'rgba(14, 19, 35, 0.88)'
+    : 'rgba(255, 255, 255, 0.82)';
+  const barBorder = darkMode
+    ? 'rgba(255,255,255,0.06)'
+    : 'rgba(15,23,42,0.06)';
+  const barShadowColor = darkMode ? '#4F8EFF' : '#000000';
+
+  return (
+    <View style={[
+      customBarStyles.outer,
+      {
+        shadowColor: barShadowColor,
+        shadowOpacity: darkMode ? 0.25 : 0.12,
+      },
+    ]}>
+      <View style={[
+        customBarStyles.container,
+        {
+          backgroundColor: barBg,
+          borderColor: barBorder,
+        },
+      ]}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
+          };
+
+          const onLongPress = () => {
+            navigation.emit({
+              type: 'tabLongPress',
+              target: route.key,
+            });
+          };
+
+          return (
+            <Pressable
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={customBarStyles.tab}
+              android_ripple={{ color: 'rgba(68,229,113,0.15)', borderless: true }}
+            >
+              <AnimatedTabIcon
+                routeName={route.name}
+                focused={isFocused}
+                darkMode={darkMode}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const customBarStyles = StyleSheet.create({
+  outer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 28 : 18,
+    left: 16,
+    right: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 30,
+    elevation: 24,
+  },
+  container: {
+    flexDirection: 'row',
+    borderRadius: 32,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderWidth: 1,
+    // Frosted glass reinforcement: inner shadow via overlapping borders
+    overflow: 'hidden',
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 72,
+  },
+});
+
+// ─── Header dark/light toggle button ──────────────────────────────────────────
+
+function DarkModeToggle({ darkMode, onToggle }) {
+  const rotation = useSharedValue(darkMode ? 0 : 1);
+
+  useEffect(() => {
+    rotation.value = withSpring(darkMode ? 0 : 1, {
+      damping: 12,
+      stiffness: 100,
+    });
+  }, [darkMode]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { rotate: `${interpolate(rotation.value, [0, 1], [0, 180])}deg` },
+    ],
+  }));
+
+  const mutedColor = darkMode ? 'rgba(255,255,255,0.45)' : '#94A3B8';
+
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      style={toggleStyles.button}
+      accessibilityRole="button"
+      accessibilityLabel={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      <Animated.View style={animatedStyle}>
+        <Ionicons
+          name={darkMode ? 'sunny' : 'moon'}
+          size={20}
+          color={mutedColor}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+const toggleStyles = StyleSheet.create({
+  button: {
+    marginRight: 16,
+    padding: 6,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+  },
+});
+
+// ─── Main App Content ──────────────────────────────────────────────────────────
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
-  const [darkMode, setDarkMode]     = useState(true);   // default dark – matches navy theme
+  const [darkMode, setDarkMode]     = useState(true);   // default dark -- matches navy theme
   const [aiReady, setAiReady]       = useState(true);   // demo mode: skip download
   const [checkingAi]                = useState(false);
 
@@ -82,90 +369,71 @@ function AppContent() {
     accent:    '#4F8EFF',
   };
 
+  // ── Auth flow gates ─────────────────────────────────────────────────────────
+
   if (loading || checkingAi) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg }}>
+      <View style={[gateStyles.center, { backgroundColor: c.bg }]}>
         <ActivityIndicator size="large" color="#44e571" />
       </View>
     );
   }
 
   if (!user) {
-    return <LoginScreen darkMode={darkMode} onNavigateToCompanySetup={() => setShowCompanySetup(true)} />;
+    return (
+      <LoginScreen
+        darkMode={darkMode}
+        onNavigateToCompanySetup={() => setShowCompanySetup(true)}
+      />
+    );
   }
 
   if (showCompanySetup) {
     return (
       <CompanySetupScreen
         darkMode={darkMode}
-        onComplete={() => { setShowCompanySetup(false); setShowOnboarding(true); }}
+        onComplete={() => {
+          setShowCompanySetup(false);
+          setShowOnboarding(true);
+        }}
       />
     );
   }
 
   if (showOnboarding) {
-    return <OnboardingScreen darkMode={darkMode} onComplete={() => setShowOnboarding(false)} />;
+    return (
+      <OnboardingScreen
+        darkMode={darkMode}
+        onComplete={() => setShowOnboarding(false)}
+      />
+    );
   }
 
   if (!aiReady && Platform.OS !== 'web') {
-    return <AIInitializationScreen darkMode={darkMode} onComplete={() => setAiReady(true)} />;
+    return (
+      <AIInitializationScreen
+        darkMode={darkMode}
+        onComplete={() => setAiReady(true)}
+      />
+    );
   }
+
+  // ── Main tab navigator ──────────────────────────────────────────────────────
 
   return (
     <SafeAreaProvider>
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <NavigationContainer theme={theme}>
         <Tab.Navigator
-          screenOptions={({ route }) => ({
-            tabBarIcon: ({ focused, color }) => {
-              const icons = TAB_ICONS[route.name];
-              const iconName = focused ? icons.active : icons.inactive;
-
-              if (focused) {
-                return (
-                  <View style={{
-                    backgroundColor: '#44e571',
-                    borderRadius: 24,
-                    width: 48,
-                    height: 48,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#44e571',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 12,
-                    elevation: 6,
-                  }}>
-                    <Ionicons name={iconName} size={22} color="#003516" />
-                  </View>
-                );
-              }
-              return <Ionicons name={iconName} size={24} color={color} />;
-            },
-            tabBarActiveTintColor:   '#44e571',
-            tabBarInactiveTintColor: c.textMuted,
-            tabBarShowLabel: false,
-            tabBarStyle: {
-              position: 'absolute',
-              bottom: 20,
-              left: 20,
-              right: 20,
-              borderRadius: 30,
-              height: 70,
-              backgroundColor: c.navBg,
-              borderTopWidth: 0,
-              shadowColor: darkMode ? '#4F8EFF' : '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: darkMode ? 0.20 : 0.10,
-              shadowRadius: 24,
-              elevation: 20,
-              paddingBottom: 0,
-            },
+          tabBar={(props) => (
+            <CustomTabBar {...props} darkMode={darkMode} />
+          )}
+          screenOptions={{
             headerStyle: {
               backgroundColor: c.headerBg,
               shadowColor: 'transparent',
               elevation: 0,
-              borderBottomWidth: 1,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: c.border,
             },
             headerTitleStyle: {
@@ -175,102 +443,126 @@ function AppContent() {
               color: c.text,
             },
             headerTintColor: c.text,
-          })}
+            // Extra bottom padding so content doesn't hide behind floating bar
+            contentStyle: {
+              paddingBottom: 0,
+            },
+          }}
         >
+          {/* ── Home ──────────────────────────────────────────────────── */}
           <Tab.Screen
             name="Home"
             options={{
               headerTitle: 'Filey',
               headerLeft: () => (
-                <View style={{ marginLeft: 16 }}>
+                <View style={headerStyles.iconLeft}>
                   <Ionicons name="wallet" size={22} color="#44e571" />
                 </View>
               ),
               headerRight: () => (
-                <TouchableOpacity
-                  onPress={toggleDarkMode}
-                  style={{ marginRight: 16, padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
-                  accessibilityRole="button"
-                  accessibilityLabel={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                >
-                  <Ionicons name={darkMode ? 'sunny' : 'moon'} size={22} color={c.textMuted} />
-                </TouchableOpacity>
+                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
               ),
             }}
           >
             {(props) => <HomeScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
+          {/* ── Chat ──────────────────────────────────────────────────── */}
           <Tab.Screen
             name="Chat"
             options={{
               headerTitle: 'AI Hub',
               headerLeft: () => (
-                <View style={{ marginLeft: 16 }}>
+                <View style={headerStyles.iconLeft}>
                   <Ionicons name="sparkles" size={22} color="#4F8EFF" />
                 </View>
+              ),
+              headerRight: () => (
+                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
               ),
             }}
           >
             {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
+          {/* ── Vault ─────────────────────────────────────────────────── */}
           <Tab.Screen
             name="Vault"
             options={{
               headerTitle: '5-Year Vault',
               headerLeft: () => (
-                <View style={{ marginLeft: 16 }}>
+                <View style={headerStyles.iconLeft}>
                   <Ionicons name="shield-checkmark" size={22} color="#44e571" />
                 </View>
+              ),
+              headerRight: () => (
+                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
               ),
             }}
           >
             {(props) => <ComplianceVault {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
+          {/* ── Team ──────────────────────────────────────────────────── */}
           <Tab.Screen
             name="Team"
             options={{
               headerTitle: 'Team Hub',
               headerLeft: () => (
-                <View style={{ marginLeft: 16 }}>
+                <View style={headerStyles.iconLeft}>
                   <Ionicons name="people" size={22} color="#4F8EFF" />
                 </View>
+              ),
+              headerRight: () => (
+                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
               ),
             }}
           >
             {(props) => <TeamScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
+          {/* ── Settings ──────────────────────────────────────────────── */}
           <Tab.Screen
             name="Settings"
             options={{
               headerTitle: 'Settings',
               headerLeft: () => (
-                <View style={{ marginLeft: 16 }}>
+                <View style={headerStyles.iconLeft}>
                   <Ionicons name="settings" size={22} color={c.textMuted} />
                 </View>
               ),
               headerRight: () => (
-                <TouchableOpacity
-                  onPress={toggleDarkMode}
-                  style={{ marginRight: 16, padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
-                  accessibilityRole="button"
-                  accessibilityLabel={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                >
-                  <Ionicons name={darkMode ? 'sunny' : 'moon'} size={22} color={c.textMuted} />
-                </TouchableOpacity>
+                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
               ),
             }}
           >
-            {(props) => <SettingsScreen {...props} darkMode={darkMode} onLogout={signOut} />}
+            {(props) => (
+              <SettingsScreen {...props} darkMode={darkMode} onLogout={signOut} />
+            )}
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
   );
 }
+
+// ─── Shared styles ─────────────────────────────────────────────────────────────
+
+const gateStyles = StyleSheet.create({
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
+const headerStyles = StyleSheet.create({
+  iconLeft: {
+    marginLeft: 16,
+  },
+});
+
+// ─── Root ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
