@@ -84,6 +84,16 @@ agenthub/agents/youtube/db
 
 memory/test_credentials.md
 
+# Claude / AI tools
+.claude/
+.agents/
+.trae/
+.mcp.json
+skills/
+skills-lock.json
+.cursorrules
+.windsurfrules
+
 # Expo
 .expo/
 
