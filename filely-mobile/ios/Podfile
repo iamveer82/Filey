@@ -1,0 +1,55 @@
+# Podfile for Filely iOS native modules
+# Install with: cd ios && pod install
+
+require 'json'
+
+platform :ios, '15.0'
+
+# Read package.json for version info
+package = JSON.parse(File.read('../package.json'))
+
+target 'Filely' do
+  # React Native
+  pod 'React-Core', :path => '../node_modules/react-native'
+
+  # Vision OCR dependencies
+  # Vision framework is built into iOS 10.3+
+
+  # Gemma Inference dependencies (TensorFlow Lite)
+  # Uncomment these when ready to use on-device inference:
+  # pod 'TensorFlowLiteC', '~> 2.16.1'
+  # pod 'TensorFlowLiteC/ExtraOps', '~> 2.16.1'
+
+  # Alternative: Use pre-compiled XCFramework
+  # Download from: https://github.com/tensorflow/tensorflow/releases
+  # and add to project manually
+
+end
+
+# React Native dependencies
+def flipper_configuration
+  {
+    'Flipper' => '0.201.0',
+    'Flipper-DoubleConversion' => '3.2.0.1',
+    'Flipper-Folly' => '2.6.10',
+    'Flipper-Glog' => '0.5.0.5',
+    'Flipper-PeerTalk' => '0.0.4',
+    'Flipper-RSocket' => '1.4.3',
+    'FlipperKit' => '0.201.0',
+    'FlipperKit/Core' => '0.201.0',
+    'FlipperKit/FBNetworkTrafficDiscovery' => '0.201.0',
+    'FlipperKit/SKIOSNetworkPlugin' => '0.201.0',
+    'FlipperKit/FlipperKitLayoutPlugin' => '0.201.0',
+    'FlipperKit/FlipperKitLayoutCppBridge' => '0.201.0',
+    'FlipperKit/FlipperKitNetworkPlugin' => '0.201.0',
+  }
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+    end
+  end
+end

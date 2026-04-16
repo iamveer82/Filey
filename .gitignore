@@ -31,6 +31,12 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
+.env
+.env.local
+.env.production
+.env.development
+filely-mobile/.env
+filely-mobile/.env.local
 *token.json*
 *credentials.json*
 
@@ -71,11 +77,15 @@ agenthub/agents/youtube/db
 *.pack
 *.deb
 *.dylib
+*.litertlm
 
 # Build caches
 .cache/
 
 memory/test_credentials.md
+
+# Expo
+.expo/
 
 # Mobile development
 android-sdk/node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node

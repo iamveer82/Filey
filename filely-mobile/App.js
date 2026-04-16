@@ -1,15 +1,27 @@
+// SharedArrayBuffer polyfill - MUST be first (fixes whatwg-url crash in Hermes)
+import './src/lib/polyfills';
+// React Native URL polyfill - second
+import 'react-native-url-polyfill/auto';
+// Gesture handler must be imported before navigation
+import 'react-native-gesture-handler';
+
 import React, { useState, useCallback } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { View, useColorScheme } from 'react-native';
+import { View, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import LoginScreen from './src/screens/LoginScreen';
+import AIInitializationScreen from './src/screens/AIInitializationScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import CompanySetupScreen from './src/screens/CompanySetupScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import ChatScreen from './src/screens/ChatScreen';
+import AIMessagingHub from './src/screens/AIMessagingHub';
 import TeamScreen from './src/screens/TeamScreen';
-import FilesScreen from './src/screens/FilesScreen';
+import ComplianceVault from './src/screens/ComplianceVault';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -18,10 +30,10 @@ const FilelyLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: '#f9f9f9',
-    card: '#ffffff',
-    text: '#0c1e26',
-    border: 'rgba(12,30,38,0.1)',
+    background: '#F8FAFC',
+    card: '#FFFFFF',
+    text: '#0F172A',
+    border: 'rgba(15,23,42,0.08)',
     primary: '#44e571',
   },
 };
@@ -30,21 +42,74 @@ const FilelyDarkTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    background: '#0a0a0a',
-    card: '#1a1a1a',
-    text: '#ffffff',
-    border: 'rgba(255,255,255,0.1)',
+    background: '#0B0F1E',
+    card: '#141B2D',
+    text: '#FFFFFF',
+    border: 'rgba(255,255,255,0.08)',
     primary: '#44e571',
   },
 };
 
-export default function App() {
-  const systemScheme = useColorScheme();
-  const [darkMode, setDarkMode] = useState(systemScheme === 'dark');
+// Tab icon config
+const TAB_ICONS = {
+  Home:     { active: 'home',              inactive: 'home-outline'              },
+  Chat:     { active: 'chatbubbles',       inactive: 'chatbubbles-outline'       },
+  Vault:    { active: 'shield-checkmark',  inactive: 'shield-checkmark-outline'  },
+  Team:     { active: 'people',            inactive: 'people-outline'            },
+  Settings: { active: 'settings',          inactive: 'settings-outline'          },
+};
 
-  const toggleDarkMode = useCallback(() => setDarkMode(prev => !prev), []);
+function AppContent() {
+  const { user, loading, signOut } = useAuth();
+  const [darkMode, setDarkMode]     = useState(true);   // default dark – matches navy theme
+  const [aiReady, setAiReady]       = useState(true);   // demo mode: skip download
+  const [checkingAi]                = useState(false);
 
+  const [showOnboarding,   setShowOnboarding]   = useState(false);
+  const [showCompanySetup, setShowCompanySetup] = useState(false);
+
+  const toggleDarkMode = useCallback(() => setDarkMode(p => !p), []);
   const theme = darkMode ? FilelyDarkTheme : FilelyLightTheme;
+
+  const c = {
+    bg:        darkMode ? '#0B0F1E'                 : '#F8FAFC',
+    navBg:     darkMode ? 'rgba(11,15,30,0.97)'     : 'rgba(255,255,255,0.95)',
+    headerBg:  darkMode ? 'rgba(20,27,45,0.98)'     : 'rgba(255,255,255,0.98)',
+    text:      darkMode ? '#FFFFFF'                 : '#0F172A',
+    textMuted: darkMode ? 'rgba(255,255,255,0.35)'  : '#94A3B8',
+    border:    darkMode ? 'rgba(255,255,255,0.08)'  : 'rgba(15,23,42,0.08)',
+    lime:      '#44e571',
+    accent:    '#4F8EFF',
+  };
+
+  if (loading || checkingAi) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg }}>
+        <ActivityIndicator size="large" color="#44e571" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen darkMode={darkMode} onNavigateToCompanySetup={() => setShowCompanySetup(true)} />;
+  }
+
+  if (showCompanySetup) {
+    return (
+      <CompanySetupScreen
+        darkMode={darkMode}
+        onComplete={() => { setShowCompanySetup(false); setShowOnboarding(true); }}
+      />
+    );
+  }
+
+  if (showOnboarding) {
+    return <OnboardingScreen darkMode={darkMode} onComplete={() => setShowOnboarding(false)} />;
+  }
+
+  if (!aiReady && Platform.OS !== 'web') {
+    return <AIInitializationScreen darkMode={darkMode} onComplete={() => setAiReady(true)} />;
+  }
 
   return (
     <SafeAreaProvider>
@@ -52,13 +117,9 @@ export default function App() {
       <NavigationContainer theme={theme}>
         <Tab.Navigator
           screenOptions={({ route }) => ({
-            tabBarIcon: ({ focused, color, size }) => {
-              let iconName;
-              if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
-              else if (route.name === 'Chat') iconName = focused ? 'chatbubble' : 'chatbubble-outline';
-              else if (route.name === 'Team') iconName = focused ? 'people' : 'people-outline';
-              else if (route.name === 'Files') iconName = focused ? 'folder-open' : 'folder-open-outline';
-              else if (route.name === 'Settings') iconName = focused ? 'settings' : 'settings-outline';
+            tabBarIcon: ({ focused, color }) => {
+              const icons = TAB_ICONS[route.name];
+              const iconName = focused ? icons.active : icons.inactive;
 
               if (focused) {
                 return (
@@ -69,15 +130,20 @@ export default function App() {
                     height: 48,
                     alignItems: 'center',
                     justifyContent: 'center',
+                    shadowColor: '#44e571',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 12,
+                    elevation: 6,
                   }}>
-                    <Ionicons name={iconName} size={22} color="#00531f" />
+                    <Ionicons name={iconName} size={22} color="#003516" />
                   </View>
                 );
               }
               return <Ionicons name={iconName} size={24} color={color} />;
             },
-            tabBarActiveTintColor: '#44e571',
-            tabBarInactiveTintColor: darkMode ? 'rgba(255,255,255,0.4)' : '#94a3b8',
+            tabBarActiveTintColor:   '#44e571',
+            tabBarInactiveTintColor: c.textMuted,
             tabBarShowLabel: false,
             tabBarStyle: {
               position: 'absolute',
@@ -86,46 +152,49 @@ export default function App() {
               right: 20,
               borderRadius: 30,
               height: 70,
-              backgroundColor: darkMode ? 'rgba(26,26,26,0.9)' : 'rgba(255,255,255,0.85)',
+              backgroundColor: c.navBg,
               borderTopWidth: 0,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 20 },
-              shadowOpacity: 0.12,
-              shadowRadius: 30,
+              shadowColor: darkMode ? '#4F8EFF' : '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: darkMode ? 0.20 : 0.10,
+              shadowRadius: 24,
               elevation: 20,
               paddingBottom: 0,
             },
             headerStyle: {
-              backgroundColor: darkMode ? 'rgba(26,26,26,0.9)' : 'rgba(255,255,255,0.85)',
+              backgroundColor: c.headerBg,
               shadowColor: 'transparent',
               elevation: 0,
+              borderBottomWidth: 1,
+              borderBottomColor: c.border,
             },
             headerTitleStyle: {
-              fontWeight: '700',
-              fontSize: 24,
+              fontWeight: '800',
+              fontSize: 20,
               letterSpacing: -0.5,
+              color: c.text,
             },
-            headerTintColor: darkMode ? '#fff' : '#0c1e26',
+            headerTintColor: c.text,
           })}
         >
           <Tab.Screen
             name="Home"
             options={{
-              headerTitle: 'Filely',
+              headerTitle: 'Filey',
               headerLeft: () => (
                 <View style={{ marginLeft: 16 }}>
-                  <Ionicons name="wallet" size={24} color="#44e571" />
+                  <Ionicons name="wallet" size={22} color="#44e571" />
                 </View>
               ),
               headerRight: () => (
-                <View style={{ marginRight: 16 }}>
-                  <Ionicons
-                    name={darkMode ? 'sunny' : 'moon'}
-                    size={22}
-                    color={darkMode ? '#fff' : '#94a3b8'}
-                    onPress={toggleDarkMode}
-                  />
-                </View>
+                <TouchableOpacity
+                  onPress={toggleDarkMode}
+                  style={{ marginRight: 16, padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  <Ionicons name={darkMode ? 'sunny' : 'moon'} size={22} color={c.textMuted} />
+                </TouchableOpacity>
               ),
             }}
           >
@@ -135,15 +204,29 @@ export default function App() {
           <Tab.Screen
             name="Chat"
             options={{
-              headerTitle: 'Filely AI',
+              headerTitle: 'AI Hub',
               headerLeft: () => (
                 <View style={{ marginLeft: 16 }}>
-                  <Ionicons name="wallet" size={24} color="#44e571" />
+                  <Ionicons name="sparkles" size={22} color="#4F8EFF" />
                 </View>
               ),
             }}
           >
-            {(props) => <ChatScreen {...props} darkMode={darkMode} />}
+            {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
+          </Tab.Screen>
+
+          <Tab.Screen
+            name="Vault"
+            options={{
+              headerTitle: '5-Year Vault',
+              headerLeft: () => (
+                <View style={{ marginLeft: 16 }}>
+                  <Ionicons name="shield-checkmark" size={22} color="#44e571" />
+                </View>
+              ),
+            }}
+          >
+            {(props) => <ComplianceVault {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -152,7 +235,7 @@ export default function App() {
               headerTitle: 'Team Hub',
               headerLeft: () => (
                 <View style={{ marginLeft: 16 }}>
-                  <Ionicons name="wallet" size={24} color="#44e571" />
+                  <Ionicons name="people" size={22} color="#4F8EFF" />
                 </View>
               ),
             }}
@@ -161,44 +244,38 @@ export default function App() {
           </Tab.Screen>
 
           <Tab.Screen
-            name="Files"
-            options={{
-              headerTitle: 'Files Vault',
-              headerLeft: () => (
-                <View style={{ marginLeft: 16 }}>
-                  <Ionicons name="wallet" size={24} color="#44e571" />
-                </View>
-              ),
-            }}
-          >
-            {(props) => <FilesScreen {...props} darkMode={darkMode} />}
-          </Tab.Screen>
-
-          <Tab.Screen
             name="Settings"
             options={{
               headerTitle: 'Settings',
               headerLeft: () => (
                 <View style={{ marginLeft: 16 }}>
-                  <Ionicons name="wallet" size={24} color="#44e571" />
+                  <Ionicons name="settings" size={22} color={c.textMuted} />
                 </View>
               ),
               headerRight: () => (
-                <View style={{ marginRight: 16 }}>
-                  <Ionicons
-                    name={darkMode ? 'sunny' : 'moon'}
-                    size={22}
-                    color={darkMode ? '#fff' : '#94a3b8'}
-                    onPress={toggleDarkMode}
-                  />
-                </View>
+                <TouchableOpacity
+                  onPress={toggleDarkMode}
+                  style={{ marginRight: 16, padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  <Ionicons name={darkMode ? 'sunny' : 'moon'} size={22} color={c.textMuted} />
+                </TouchableOpacity>
               ),
             }}
           >
-            {(props) => <SettingsScreen {...props} darkMode={darkMode} />}
+            {(props) => <SettingsScreen {...props} darkMode={darkMode} onLogout={signOut} />}
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

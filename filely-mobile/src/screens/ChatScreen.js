@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../theme/colors';
+import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '../theme/tokens';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { scanReceipt, parseExpenseText } from '../services/receiptPipeline';
 
 function generateId() {
   return 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
@@ -11,6 +13,7 @@ function generateId() {
 
 export default function ChatScreen({ darkMode }) {
   const c = darkMode ? Colors.dark : Colors.light;
+  const { profile, orgId, userId } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,23 +21,53 @@ export default function ChatScreen({ darkMode }) {
   const [sessions, setSessions] = useState([]);
   const [pendingTxn, setPendingTxn] = useState(null);
   const scrollRef = useRef();
+  const isWeb = Platform.OS === 'web';
 
   useEffect(() => { fetchSessions(); }, []);
   useEffect(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, [messages]);
 
   const fetchSessions = async () => {
-    try { const d = await api.getChatSessions(); setSessions(d.sessions || []); } catch(e) {}
+    try {
+      // Try Supabase first (native), fall back to API (web/legacy)
+      if (!isWeb && orgId && orgId !== 'default') {
+        const { db } = require('../lib/supabase');
+        const { data } = await db.getChatSessions(orgId);
+        setSessions((data || []).map(s => ({ ...s, sessionId: s.id })));
+      } else {
+        const d = await api.getChatSessions();
+        setSessions(d.sessions || []);
+      }
+    } catch(e) {
+      try { const d = await api.getChatSessions(); setSessions(d.sessions || []); } catch(e2) {}
+    }
   };
 
   const loadSession = async (sid) => {
     setSessionId(sid);
     try {
-      const d = await api.getChatMessages(sid);
-      setMessages((d.messages || []).map(m => ({
-        id: m.id, role: m.role, content: m.content,
-        extractedTransaction: m.extractedTransaction, hasImage: m.hasImage,
-      })));
-    } catch(e) {}
+      if (!isWeb && orgId && orgId !== 'default') {
+        const { db } = require('../lib/supabase');
+        const { data } = await db.getChatMessages(sid);
+        setMessages((data || []).map(m => ({
+          id: m.id, role: m.role, content: m.content,
+          extractedTransaction: m.extractedTransaction, hasImage: m.hasImage,
+        })));
+      } else {
+        const d = await api.getChatMessages(sid);
+        setMessages((d.messages || []).map(m => ({
+          id: m.id, role: m.role, content: m.content,
+          extractedTransaction: m.extractedTransaction, hasImage: m.hasImage,
+        })));
+      }
+    } catch(e) {
+      try {
+        const d = await api.getChatMessages(sid);
+        setMessages((d.messages || []).map(m => ({
+          id: m.id, role: m.role, content: m.content,
+          extractedTransaction: m.extractedTransaction, hasImage: m.hasImage,
+        })));
+      } catch(e2) {}
+    }
   };
 
   const startNewChat = () => { setSessionId(generateId()); setMessages([]); setPendingTxn(null); };
@@ -45,6 +78,22 @@ export default function ChatScreen({ darkMode }) {
     setMessages(prev => [...prev, { id: generateId(), role: 'user', content: msg }]);
 
     try {
+      // On native, try local expense parsing first
+      if (!isWeb) {
+        const parsed = await parseExpenseText(msg);
+        if (parsed && parsed.amount > 0) {
+          setMessages(prev => [...prev, {
+            id: generateId(), role: 'assistant',
+            content: `I found an expense: **${parsed.merchant}** — ${parsed.amount} AED${parsed.vat ? ` (VAT: ${parsed.vat} AED)` : ''}. Verify to save it.`,
+            extractedTransaction: parsed,
+          }]);
+          setPendingTxn(parsed);
+          setLoading(false);
+          fetchSessions();
+          return;
+        }
+      }
+      // Fall back to API for conversational responses
       const d = await api.sendMessage(msg, sessionId);
       if (d.error) {
         setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `Error: ${d.error}` }]);
@@ -64,75 +113,139 @@ export default function ChatScreen({ darkMode }) {
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      base64: true,
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setLoading(true);
-      setMessages(prev => [...prev, { id: generateId(), role: 'user', content: 'Receipt uploaded', hasImage: true }]);
-      try {
-        const asset = result.assets[0];
-        const d = await api.scanReceipt(asset.base64, asset.mimeType || 'image/jpeg', sessionId);
-        if (d.error) {
-          setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `Scan error: ${d.error}` }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: generateId(), role: 'assistant', content: d.message,
-            extractedTransaction: d.extractedTransaction,
-          }]);
-          if (d.extractedTransaction) setPendingTxn(d.extractedTransaction);
+    if (isWeb) {
+      Alert.alert('Not available', 'Receipt scanning requires the mobile app. Please download Filely on iOS.');
+      return;
+    }
+    try {
+      // Use local pipeline on native
+      const result = await scanReceipt('gallery');
+      if (result.success && result.transaction) {
+        setLoading(true);
+        setMessages(prev => [...prev, { id: generateId(), role: 'user', content: 'Receipt uploaded', hasImage: true }]);
+        setMessages(prev => [...prev, {
+          id: generateId(), role: 'assistant',
+          content: `I found: **${result.transaction.merchant}** — ${result.transaction.amount} AED${result.transaction.vat ? ` (VAT: ${result.transaction.vat} AED)` : ''}. Verify to save it.`,
+          extractedTransaction: result.transaction,
+        }]);
+        setPendingTxn(result.transaction);
+        setLoading(false);
+      } else if (result.needsBackend && result.imageBase64) {
+        // Native OCR not available, fall back to API
+        setLoading(true);
+        setMessages(prev => [...prev, { id: generateId(), role: 'user', content: 'Receipt uploaded', hasImage: true }]);
+        try {
+          const d = await api.scanReceipt(result.imageBase64, result.imageMimeType || 'image/jpeg', sessionId);
+          if (d.error) {
+            setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `Scan error: ${d.error}` }]);
+          } else {
+            setMessages(prev => [...prev, {
+              id: generateId(), role: 'assistant', content: d.message,
+              extractedTransaction: d.extractedTransaction,
+            }]);
+            if (d.extractedTransaction) setPendingTxn(d.extractedTransaction);
+          }
+        } catch(e) {
+          setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: 'Connection error.' }]);
         }
-      } catch(e) {}
-      setLoading(false);
+        setLoading(false);
+      } else {
+        Alert.alert('Scan Failed', result.error || 'Could not scan receipt. Try a clearer photo.');
+      }
+    } catch(e) {
+      Alert.alert('Error', 'Something went wrong scanning the receipt.');
     }
   };
 
   const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access is required to scan receipts.'); return; }
-    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 });
-    if (!result.canceled && result.assets[0]) {
-      setLoading(true);
-      setMessages(prev => [...prev, { id: generateId(), role: 'user', content: 'Receipt photo taken', hasImage: true }]);
-      try {
-        const asset = result.assets[0];
-        const d = await api.scanReceipt(asset.base64, 'image/jpeg', sessionId);
-        if (d.error) {
-          setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `Scan error: ${d.error}` }]);
-        } else {
-          setMessages(prev => [...prev, {
-            id: generateId(), role: 'assistant', content: d.message,
-            extractedTransaction: d.extractedTransaction,
-          }]);
-          if (d.extractedTransaction) setPendingTxn(d.extractedTransaction);
+    if (isWeb) {
+      Alert.alert('Not available', 'Camera scanning requires the mobile app. Please download Filely on iOS.');
+      return;
+    }
+    try {
+      const result = await scanReceipt('camera');
+      if (result.success && result.transaction) {
+        setLoading(true);
+        setMessages(prev => [...prev, { id: generateId(), role: 'user', content: 'Receipt photo taken', hasImage: true }]);
+        setMessages(prev => [...prev, {
+          id: generateId(), role: 'assistant',
+          content: `I found: **${result.transaction.merchant}** — ${result.transaction.amount} AED${result.transaction.vat ? ` (VAT: ${result.transaction.vat} AED)` : ''}. Verify to save it.`,
+          extractedTransaction: result.transaction,
+        }]);
+        setPendingTxn(result.transaction);
+        setLoading(false);
+      } else if (result.needsBackend && result.imageBase64) {
+        setLoading(true);
+        setMessages(prev => [...prev, { id: generateId(), role: 'user', content: 'Receipt photo taken', hasImage: true }]);
+        try {
+          const d = await api.scanReceipt(result.imageBase64, 'image/jpeg', sessionId);
+          if (d.error) {
+            setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `Scan error: ${d.error}` }]);
+          } else {
+            setMessages(prev => [...prev, {
+              id: generateId(), role: 'assistant', content: d.message,
+              extractedTransaction: d.extractedTransaction,
+            }]);
+            if (d.extractedTransaction) setPendingTxn(d.extractedTransaction);
+          }
+        } catch(e) {
+          setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: 'Connection error.' }]);
         }
-      } catch(e) {}
-      setLoading(false);
+        setLoading(false);
+      } else {
+        Alert.alert('Scan Failed', result.error || 'Could not scan receipt. Try a clearer photo.');
+      }
+    } catch(e) {
+      Alert.alert('Error', 'Something went wrong scanning the receipt.');
     }
   };
 
   const verifyTransaction = async (txn) => {
     try {
-      await api.createTransaction(txn);
+      if (!isWeb && orgId && orgId !== 'default') {
+        const { db } = require('../lib/supabase');
+        await db.createTransaction({
+          org_id: orgId,
+          user_id: userId,
+          merchant: txn.merchant,
+          date: txn.date,
+          amount: txn.amount,
+          vat: txn.vat,
+          trn: txn.trn || '',
+          currency: txn.currency || 'AED',
+          category: txn.category || 'General',
+          status: 'verified',
+        });
+      } else {
+        await api.createTransaction(txn);
+      }
       setPendingTxn(null);
       setMessages(prev => [...prev, {
         id: generateId(), role: 'assistant',
         content: `Transaction verified! ${txn.merchant} - ${txn.amount} AED ✅`,
       }]);
-    } catch(e) {}
+    } catch(e) {
+      // Fall back to API if Supabase fails
+      try {
+        await api.createTransaction(txn);
+        setPendingTxn(null);
+        setMessages(prev => [...prev, {
+          id: generateId(), role: 'assistant',
+          content: `Transaction verified! ${txn.merchant} - ${txn.amount} AED ✅`,
+        }]);
+      } catch(e2) {}
+    }
   };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={90}>
       {/* Session History */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sessionsBar} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-        <TouchableOpacity onPress={startNewChat} style={[styles.sessionChip, { backgroundColor: c.limeLight, borderColor: c.lime }]}>
+        <TouchableOpacity onPress={startNewChat} style={[styles.sessionChip, { backgroundColor: c.limeLight, borderColor: c.lime, borderWidth: 1 }]}>
           <Ionicons name="add" size={18} color={c.lime} />
         </TouchableOpacity>
         {sessions.slice(0, 8).map((s, i) => (
-          <TouchableOpacity key={i} onPress={() => loadSession(s.sessionId)} style={[styles.sessionChip, { backgroundColor: c.surfaceLow, borderColor: c.border }]}>
+          <TouchableOpacity key={i} onPress={() => loadSession(s.sessionId)} style={[styles.sessionChip, { backgroundColor: c.surfaceLow, borderColor: c.border, borderWidth: 1 }]}>
             <Ionicons name="document-text-outline" size={16} color={c.textSecondary} />
           </TouchableOpacity>
         ))}
@@ -142,14 +255,14 @@ export default function ChatScreen({ darkMode }) {
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}>
         {messages.length === 0 && (
           <View style={styles.emptyChat}>
-            <Ionicons name="sparkles" size={48} color={c.lime} />
+            <Ionicons name="sparkles" size={48} color={c.accent} />
             <Text style={[styles.emptyChatTitle, { color: c.text }]}>Filely AI</Text>
             <Text style={[styles.emptyChatSub, { color: c.textSecondary }]}>
               Scan receipts, log expenses, or ask about your UAE finances.
             </Text>
             <View style={styles.suggestions}>
               {['Scan a receipt', 'Paid 120 AED at ENOC', 'Last food bill'].map(s => (
-                <TouchableOpacity key={s} onPress={() => setInput(s)} style={[styles.suggestionChip, { backgroundColor: c.surfaceLow }]}>
+                <TouchableOpacity key={s} onPress={() => setInput(s)} style={[styles.suggestionChip, { backgroundColor: c.surfaceLow, borderColor: c.border, borderWidth: 1 }]}>
                   <Text style={[styles.suggestionText, { color: c.textSecondary }]}>{s}</Text>
                 </TouchableOpacity>
               ))}
@@ -160,7 +273,7 @@ export default function ChatScreen({ darkMode }) {
         {messages.map(msg => (
           <View key={msg.id} style={{ marginBottom: 16 }}>
             {msg.role === 'user' ? (
-              <View style={[styles.userBubble, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={[styles.userBubble, darkMode ? CardPresets.cardDark : { ...CardPresets.cardLight }]}>
                 {msg.hasImage && (
                   <View style={styles.imageTag}>
                     <Ionicons name="image" size={12} color={c.lime} />
@@ -171,15 +284,15 @@ export default function ChatScreen({ darkMode }) {
               </View>
             ) : (
               <View style={styles.aiBubbleRow}>
-                <View style={styles.aiIcon}>
-                  <Ionicons name="sparkles" size={18} color="#006e2c" />
+                <View style={[styles.aiIcon, { backgroundColor: 'rgba(79,142,255,0.12)', borderRadius: 16 }]}>
+                  <Ionicons name="sparkles" size={18} color="#4F8EFF" />
                 </View>
                 <View style={{ flex: 1, gap: 8 }}>
-                  <View style={[styles.aiBubble, { backgroundColor: c.surfaceLow, borderColor: c.border }]}>
+                  <View style={[styles.aiBubble, { backgroundColor: c.surfaceLow, borderColor: c.border, borderWidth: 1 }]}>
                     <Text style={[styles.messageText, { color: c.textSecondary }]}>{msg.content}</Text>
                   </View>
                   {msg.extractedTransaction && (
-                    <View style={[styles.txnCard, { backgroundColor: c.card, borderColor: c.border }]}>
+                    <View style={[styles.txnCard, darkMode ? CardPresets.cardDark : { ...CardPresets.cardLight }]}>
                       <View style={styles.txnCardHeader}>
                         <View style={styles.txnCardLine} />
                         <Text style={[styles.txnCardTitle, { color: c.text }]}>AI Confirmation</Text>
@@ -223,7 +336,7 @@ export default function ChatScreen({ darkMode }) {
 
         {loading && (
           <View style={styles.aiBubbleRow}>
-            <View style={styles.aiIcon}><Ionicons name="sparkles" size={18} color="#006e2c" /></View>
+            <View style={[styles.aiIcon, { backgroundColor: 'rgba(79,142,255,0.12)', borderRadius: 16 }]}><Ionicons name="sparkles" size={18} color="#4F8EFF" /></View>
             <View style={[styles.aiBubble, { backgroundColor: c.surfaceLow }]}>
               <View style={styles.loadingDots}>
                 <View style={[styles.dot, { backgroundColor: c.lime }]} />
@@ -236,7 +349,7 @@ export default function ChatScreen({ darkMode }) {
       </ScrollView>
 
       {/* Input Bar */}
-      <View style={[styles.inputBar, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={[styles.inputBar, darkMode ? CardPresets.cardDark : { ...CardPresets.cardLight }]}>
         <TouchableOpacity onPress={takePhoto} style={styles.cameraBtn}>
           <Ionicons name="camera" size={22} color="#00531f" />
         </TouchableOpacity>
@@ -261,39 +374,39 @@ export default function ChatScreen({ darkMode }) {
 }
 
 const styles = StyleSheet.create({
-  sessionsBar: { paddingVertical: 8, maxHeight: 60 },
-  sessionChip: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyChat: { alignItems: 'center', paddingTop: 80, gap: 8 },
-  emptyChatTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  emptyChatSub: { fontSize: 14, textAlign: 'center', maxWidth: 260, lineHeight: 20 },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 16 },
-  suggestionChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
-  suggestionText: { fontSize: 13, fontWeight: '500' },
-  userBubble: { alignSelf: 'flex-end', maxWidth: '85%', padding: 14, borderRadius: 18, borderBottomRightRadius: 4, borderWidth: 1 },
-  aiBubbleRow: { flexDirection: 'row', gap: 8, maxWidth: '90%' },
+  sessionsBar: { paddingVertical: Spacing.sm, maxHeight: 60 },
+  sessionChip: { width: 44, height: 44, borderRadius: Radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyChat: { alignItems: 'center', paddingTop: 80, gap: Spacing.sm },
+  emptyChatTitle: Typography.cardTitle,
+  emptyChatSub: { ...Typography.bodySmall, textAlign: 'center', maxWidth: 260, lineHeight: 20 },
+  suggestions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm, marginTop: Spacing.lg },
+  suggestionChip: { paddingHorizontal: Spacing.lg, paddingVertical: 10, borderRadius: Radius.pill },
+  suggestionText: Typography.caption,
+  userBubble: { alignSelf: 'flex-end', maxWidth: '85%', padding: 14, borderRadius: Radius.lg, borderBottomRightRadius: 4, borderWidth: 1 },
+  aiBubbleRow: { flexDirection: 'row', gap: Spacing.sm, maxWidth: '90%' },
   aiIcon: { width: 32, height: 32, marginTop: 4 },
-  aiBubble: { padding: 14, borderRadius: 18, borderBottomLeftRadius: 4, borderWidth: 1, flex: 1 },
-  messageText: { fontSize: 14, lineHeight: 20 },
-  imageTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  imageTagText: { fontSize: 11, fontWeight: '700' },
-  txnCard: { borderRadius: 16, padding: 18, borderWidth: 1 },
-  txnCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  aiBubble: { padding: 14, borderRadius: Radius.lg, borderBottomLeftRadius: 4, borderWidth: 1, flex: 1 },
+  messageText: Typography.bodySmall,
+  imageTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.xs },
+  imageTagText: Typography.micro,
+  txnCard: { borderRadius: Radius.lg, padding: 18, borderWidth: 1 },
+  txnCardHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
   txnCardLine: { width: 3, height: 24, backgroundColor: '#44e571', borderRadius: 2 },
-  txnCardTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  txnCardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  txnCardCell: { width: '45%', marginBottom: 8 },
-  txnLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginBottom: 4 },
-  txnValue: { fontSize: 15, fontWeight: '700' },
-  txnValueLarge: { fontSize: 22, fontWeight: '900' },
-  txnActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  verifyBtn: { flex: 1, backgroundColor: '#44e571', borderRadius: 24, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  verifyBtnText: { color: '#00531f', fontWeight: '800', fontSize: 15 },
-  editBtn: { flex: 1, borderRadius: 12, paddingVertical: 14, borderWidth: 1, alignItems: 'center' },
-  editBtnText: { fontWeight: '800', fontSize: 15 },
+  txnCardTitle: Typography.cardTitle,
+  txnCardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg },
+  txnCardCell: { width: '45%', marginBottom: Spacing.sm },
+  txnLabel: { ...Typography.labelWide, marginBottom: Spacing.xs },
+  txnValue: Typography.bodyBold,
+  txnValueLarge: Typography.valueS,
+  txnActions: { flexDirection: 'row', gap: 10, marginTop: Spacing.lg },
+  verifyBtn: { flex: 1, backgroundColor: '#44e571', borderRadius: Radius.pill, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(0,83,31,0.3)', ...Shadow.limeSm },
+  verifyBtnText: { color: '#00531f', ...Typography.btnPrimary },
+  editBtn: { flex: 1, borderRadius: Radius.md, paddingVertical: 14, borderWidth: 1, alignItems: 'center' },
+  editBtnText: Typography.btnPrimary,
   loadingDots: { flexDirection: 'row', gap: 6, padding: 4 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginBottom: 90, borderRadius: 28, borderWidth: 1, gap: 8 },
-  cameraBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#44e571', alignItems: 'center', justifyContent: 'center' },
+  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, marginHorizontal: Spacing.lg, marginBottom: 90, borderRadius: Radius.pill, borderWidth: 1, gap: Spacing.sm },
+  cameraBtn: { width: 44, height: 44, borderRadius: Radius.pill, backgroundColor: '#44e571', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,83,31,0.3)', ...Shadow.limeSm },
   galleryBtn: { padding: 4 },
-  textInput: { flex: 1, fontSize: 14, fontWeight: '500', paddingVertical: 8 },
+  textInput: { flex: 1, ...Typography.bodySmall, paddingVertical: Spacing.sm },
 });

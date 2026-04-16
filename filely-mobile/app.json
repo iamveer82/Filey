@@ -11,14 +11,39 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.filely.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Filely needs camera access to scan receipts",
-        "NSPhotoLibraryUsageDescription": "Filely needs photo library access to upload receipts"
+        "NSCameraUsageDescription": "Filely uses the camera to scan receipts and capture documents for VAT compliance.",
+        "NSPhotoLibraryUsageDescription": "Filely accesses your photo library to import receipts and documents.",
+        "NSPhotoLibraryAddUsageDescription": "Filely saves scanned receipts to your photo library.",
+        "NSFaceIDUsageDescription": "Filely uses Face ID to securely protect your financial data.",
+        "NSPrivacyTrackingDomains": []
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": ["E174.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
       }
     },
     "android": {
@@ -28,10 +53,39 @@
       },
       "package": "com.filely.app"
     },
-    "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
-    }
+    "plugins": [
+      "expo-font",
+      "expo-asset",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1",
+            "useFrameworks": "static",
+            "privacyManifests": {
+              "NSPrivacyAccessedAPITypes": [
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+                  "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+                },
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+                  "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]
+                },
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+                  "NSPrivacyAccessedAPITypeReasons": ["E174.1"]
+                },
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                  "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    ]
   }
 }
