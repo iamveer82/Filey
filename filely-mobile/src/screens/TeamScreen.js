@@ -1,507 +1,78 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
-  Pressable,
+  View, Text, ScrollView, TextInput, Pressable, StyleSheet,
+  Modal, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withRepeat,
-  withSequence,
-  withDelay,
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  ZoomIn,
-  Easing,
-  interpolate,
-  runOnJS,
+  FadeInDown, FadeInUp, FadeIn, SlideInRight, Layout,
+  useSharedValue, useAnimatedStyle, withSpring, withRepeat,
+  withTiming, withSequence,
 } from 'react-native-reanimated';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
-import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '../theme/tokens';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// ─── Spring Pressable ────────────────────────────────────────
-// Reusable component: scales down on press with spring physics
-function SpringPressable({ onPress, style, children, disabled, accessibilityRole, accessibilityLabel, accessibilityState }) {
-  const pressed = useSharedValue(1);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pressed.value }],
-  }));
-
-  const handlePressIn = useCallback(() => {
-    pressed.value = withSpring(0.92, { damping: 15, stiffness: 300 });
-  }, []);
-
-  const handlePressOut = useCallback(() => {
-    pressed.value = withSpring(1, { damping: 12, stiffness: 200 });
-  }, []);
-
+function SpringPressable({ children, style, onPress, disabled, ...rest }) {
+  const scale = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <AnimatedPressable
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={disabled}
-      style={[animStyle, style]}
-      accessibilityRole={accessibilityRole}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={accessibilityState}
+      onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
+      style={[style, anim]}
+      {...rest}
     >
       {children}
     </AnimatedPressable>
   );
 }
 
-// ─── Admin Glow Ring ─────────────────────────────────────────
-// Animated pulsing lime glow ring around the admin avatar
-function AdminGlowRing({ size }) {
-  const glowOpacity = useSharedValue(0.25);
-
+function PulseDot() {
+  const s = useSharedValue(1);
   useEffect(() => {
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.7, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.25, { duration: 1400, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
+    s.value = withRepeat(withSequence(
+      withTiming(1.6, { duration: 900 }),
+      withTiming(1, { duration: 900 }),
+    ), -1, false);
   }, []);
-
-  const glowStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
-    width: size + 10,
-    height: size + 10,
-    borderRadius: 9999,
-    borderWidth: 2,
-    borderColor: 'rgba(59,107,255,1)',
-    opacity: glowOpacity.value,
+  const anim = useAnimatedStyle(() => ({
+    transform: [{ scale: s.value }],
+    opacity: 2 - s.value,
   }));
-
-  return <Animated.View style={glowStyle} />;
+  return (
+    <View style={styles.pulseWrap}>
+      <Animated.View style={[styles.pulseRing, anim]} />
+      <View style={styles.pulseCore} />
+    </View>
+  );
 }
 
-// ─── Member Avatar ───────────────────────────────────────────
-function MemberAvatar({ member, index, colors }) {
+function Avatar({ name, size = 36, isAdmin, stackOffset }) {
+  const letter = (name || '?')[0]?.toUpperCase();
   return (
-    <Animated.View
-      entering={FadeIn.delay(index * 100).duration(400).springify().damping(14).stiffness(120)}
-      style={styles.memberItem}
-    >
-      <View style={styles.avatarWrapper}>
-        {member.isAdmin && <AdminGlowRing size={56} />}
-        <View
-          style={[
-            styles.avatar,
-            member.isAdmin
-              ? { borderColor: '#3B6BFF', borderWidth: 2, backgroundColor: 'rgba(59,107,255,0.10)' }
-              : { borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surfaceLow },
-          ]}
-        >
-          <Text style={[styles.avatarText, { color: member.isAdmin ? '#3B6BFF' : colors.text }]}>
-            {member.name?.[0]?.toUpperCase() || '?'}
-          </Text>
-        </View>
-      </View>
-      <Text style={[styles.memberName, { color: member.isAdmin ? colors.text : colors.textSecondary }]}>
-        {member.isAdmin ? 'You' : member.name}
+    <View style={[
+      styles.avatar,
+      { width: size, height: size, borderRadius: size / 2 },
+      stackOffset ? { marginLeft: -12 } : null,
+      isAdmin ? styles.avatarAdmin : styles.avatarMember,
+    ]}>
+      <Text style={{ color: isAdmin ? '#3B6BFF' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
+        {letter}
       </Text>
-      {member.isAdmin && (
-        <View style={styles.adminBadge}>
-          <Text style={styles.adminBadgeText}>ADMIN</Text>
-        </View>
-      )}
-    </Animated.View>
+    </View>
   );
 }
 
-// ─── Invite Avatar Button ────────────────────────────────────
-function InviteAvatar({ onPress, colors }) {
-  const scale = useSharedValue(1);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = useCallback(() => {
-    scale.value = withSpring(0.88, { damping: 14, stiffness: 280 });
-  }, []);
-
-  const handlePressOut = useCallback(() => {
-    scale.value = withSpring(1, { damping: 10, stiffness: 180 });
-  }, []);
-
-  return (
-    <Animated.View entering={FadeIn.delay(500).duration(400)} style={styles.memberItem}>
-      <AnimatedPressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={animStyle}
-        accessibilityRole="button"
-        accessibilityLabel="Invite team member"
-      >
-        <View style={[styles.avatar, styles.inviteAvatar, { borderColor: colors.textMuted }]}>
-          <Ionicons name="add" size={22} color={colors.textMuted} />
-        </View>
-      </AnimatedPressable>
-      <Text style={[styles.memberName, { color: colors.textSecondary }]}>Invite</Text>
-    </Animated.View>
-  );
-}
-
-// ─── Activity Card ───────────────────────────────────────────
-function ActivityCard({ item, index, isLatest, colors, darkMode }) {
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 80).duration(400).springify().damping(16)}>
-      <SpringPressable
-        style={[
-          styles.activityCard,
-          isLatest
-            ? {
-                ...(darkMode ? CardPresets.cardDark : CardPresets.cardLight),
-                borderColor: '#3B6BFF',
-                borderWidth: 1.5,
-              }
-            : {
-                backgroundColor: colors.surfaceLow,
-                borderColor: colors.border,
-                borderWidth: 1,
-              },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Activity: ${item.description?.substring(0, 40)}`}
-      >
-        {isLatest && <View style={styles.latestIndicator} />}
-        <View
-          style={[
-            styles.activityIcon,
-            {
-              backgroundColor: isLatest ? 'rgba(59,107,255,0.12)' : colors.surfaceLow,
-              borderWidth: 1,
-              borderColor: isLatest ? 'rgba(59,107,255,0.25)' : colors.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name={
-              item.type === 'transaction'
-                ? 'receipt-outline'
-                : item.type === 'edit'
-                ? 'create-outline'
-                : 'person-add-outline'
-            }
-            size={18}
-            color={isLatest ? '#3B6BFF' : colors.textSecondary}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.activityText, { color: colors.text }]} numberOfLines={2}>
-            {item.description?.substring(0, 60)}
-          </Text>
-          <Text style={[styles.activityMeta, { color: colors.textMuted }]}>
-            {item.category || item.type}
-          </Text>
-        </View>
-        <Text style={[styles.activityTime, { color: isLatest ? '#3B6BFF' : colors.textMuted }]}>
-          {new Date(item.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
-      </SpringPressable>
-    </Animated.View>
-  );
-}
-
-// ─── Chat Bubble ─────────────────────────────────────────────
-function ChatBubble({ message, index, isMe, colors, darkMode }) {
-  return (
-    <Animated.View
-      entering={FadeInUp.delay(index * 60).duration(350).springify().damping(18)}
-      style={[styles.chatMsg, isMe && { alignSelf: 'flex-end', flexDirection: 'row-reverse' }]}
-    >
-      <View
-        style={[
-          styles.chatAvatar,
-          {
-            backgroundColor: isMe ? 'rgba(59,107,255,0.15)' : colors.surfaceLow,
-            borderWidth: 1,
-            borderColor: isMe ? 'rgba(59,107,255,0.3)' : colors.border,
-          },
-        ]}
-      >
-        <Text style={[styles.chatAvatarText, { color: isMe ? '#3B6BFF' : colors.text }]}>
-          {message.userName?.[0]?.toUpperCase() || '?'}
-        </Text>
-      </View>
-      <View style={{ maxWidth: '75%' }}>
-        <Text
-          style={[
-            styles.chatSender,
-            { color: colors.textMuted, textAlign: isMe ? 'right' : 'left' },
-          ]}
-        >
-          {message.userName}
-        </Text>
-        <View
-          style={[
-            styles.chatBubble,
-            isMe
-              ? {
-                  backgroundColor: 'rgba(59,107,255,0.10)',
-                  borderColor: 'rgba(59,107,255,0.22)',
-                  borderWidth: 1,
-                  borderTopRightRadius: 4,
-                }
-              : {
-                  ...(darkMode ? CardPresets.cardDark : CardPresets.cardLight),
-                  borderTopLeftRadius: 4,
-                },
-          ]}
-        >
-          <Text style={[styles.chatText, { color: colors.text }]}>{message.message}</Text>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ─── Section Divider ─────────────────────────────────────────
-function SectionDivider({ label, colors, style }) {
-  return (
-    <Animated.View
-      entering={FadeIn.duration(500)}
-      style={[styles.sectionDivider, style]}
-    >
-      <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-      <Text style={[styles.dividerText, { color: colors.textMuted }]}>{label}</Text>
-      <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-    </Animated.View>
-  );
-}
-
-// ─── Invite Modal ────────────────────────────────────────────
-function InviteModal({ visible, onClose, onInvite, colors, darkMode, invName, setInvName, invEmail, setInvEmail, invRole, setInvRole }) {
-  const overlayOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.85);
-  const modalOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (visible) {
-      overlayOpacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.ease) });
-      modalScale.value = withSpring(1, { damping: 16, stiffness: 200, mass: 0.8 });
-      modalOpacity.value = withTiming(1, { duration: 200 });
-    } else {
-      overlayOpacity.value = withTiming(0, { duration: 200 });
-      modalScale.value = withTiming(0.85, { duration: 200 });
-      modalOpacity.value = withTiming(0, { duration: 150 });
-    }
-  }, [visible]);
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
-  const modalStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: modalScale.value }],
-    opacity: modalOpacity.value,
-  }));
-
-  const roles = ['member', 'editor', 'admin'];
-
-  return (
-    <Modal visible={visible} transparent animationType="none">
-      <Animated.View style={[styles.modalOverlay, overlayStyle]}>
-        <Animated.View
-          style={[
-            styles.modalContent,
-            darkMode ? CardPresets.cardElevatedDark : CardPresets.cardLight,
-            modalStyle,
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderLeft}>
-              <View style={[styles.modalIconCircle, { backgroundColor: 'rgba(59,107,255,0.12)' }]}>
-                <Ionicons name="person-add" size={20} color="#3B6BFF" />
-              </View>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Invite Member</Text>
-            </View>
-            <SpringPressable
-              onPress={onClose}
-              style={[styles.modalCloseBtn, { backgroundColor: colors.surfaceLow }]}
-              accessibilityRole="button"
-              accessibilityLabel="Close modal"
-            >
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
-            </SpringPressable>
-          </View>
-
-          {/* Inputs */}
-          <View style={styles.modalInputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>FULL NAME</Text>
-            <TextInput
-              value={invName}
-              onChangeText={setInvName}
-              placeholder="John Doe"
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.modalInput,
-                {
-                  backgroundColor: colors.surfaceLow,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              autoCapitalize="words"
-              accessibilityLabel="Invite name"
-            />
-          </View>
-
-          <View style={styles.modalInputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>EMAIL ADDRESS</Text>
-            <TextInput
-              value={invEmail}
-              onChangeText={setInvEmail}
-              placeholder="john@company.ae"
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.modalInput,
-                {
-                  backgroundColor: colors.surfaceLow,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              accessibilityLabel="Invite email"
-            />
-          </View>
-
-          {/* Role Selector */}
-          <View style={styles.modalInputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>ROLE</Text>
-            <View style={styles.roleRow}>
-              {roles.map((r) => (
-                <SpringPressable
-                  key={r}
-                  onPress={() => setInvRole(r)}
-                  style={[
-                    styles.roleChip,
-                    {
-                      backgroundColor:
-                        invRole === r ? 'rgba(59,107,255,0.15)' : colors.surfaceLow,
-                      borderColor:
-                        invRole === r ? 'rgba(59,107,255,0.4)' : colors.border,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select role ${r}`}
-                  accessibilityState={{ selected: invRole === r }}
-                >
-                  <Text
-                    style={[
-                      styles.roleChipText,
-                      { color: invRole === r ? '#3B6BFF' : colors.textSecondary },
-                    ]}
-                  >
-                    {r.charAt(0).toUpperCase() + r.slice(1)}
-                  </Text>
-                </SpringPressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Actions */}
-          <SpringPressable
-            onPress={onInvite}
-            style={[styles.inviteBtn, Shadow.limeSm]}
-            accessibilityRole="button"
-            accessibilityLabel="Send invite"
-          >
-            <Ionicons name="paper-plane-outline" size={16} color="#003516" style={{ marginRight: 8 }} />
-            <Text style={styles.inviteBtnText}>Send Invite</Text>
-          </SpringPressable>
-
-          <SpringPressable
-            onPress={onClose}
-            style={styles.cancelBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel invite"
-          >
-            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
-          </SpringPressable>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  );
-}
-
-// ─── Send Button ─────────────────────────────────────────────
-function SendButton({ onPress, disabled, colors }) {
-  const scale = useSharedValue(1);
-  const rotation = useSharedValue(0);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],
-  }));
-
-  const handlePressIn = useCallback(() => {
-    scale.value = withSpring(0.85, { damping: 12, stiffness: 300 });
-    rotation.value = withSpring(-15, { damping: 12, stiffness: 300 });
-  }, []);
-
-  const handlePressOut = useCallback(() => {
-    scale.value = withSpring(1, { damping: 10, stiffness: 200 });
-    rotation.value = withSpring(0, { damping: 10, stiffness: 200 });
-  }, []);
-
-  return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={disabled ? undefined : handlePressIn}
-      onPressOut={disabled ? undefined : handlePressOut}
-      disabled={disabled}
-      style={[
-        animStyle,
-        styles.chatSendBtn,
-        {
-          backgroundColor: disabled ? colors.border : '#3B6BFF',
-        },
-        !disabled && Shadow.limeSm,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel="Send team message"
-      accessibilityState={{ disabled }}
-    >
-      <Ionicons name="send" size={18} color={disabled ? colors.textMuted : '#003516'} />
-    </AnimatedPressable>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ─── MAIN TEAM SCREEN ────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════
 export default function TeamScreen({ darkMode }) {
   const c = darkMode ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
   const { orgId, userId, profile } = useAuth();
   const isWeb = Platform.OS === 'web';
 
@@ -514,81 +85,67 @@ export default function TeamScreen({ darkMode }) {
   const [invName, setInvName] = useState('');
   const [invEmail, setInvEmail] = useState('');
   const [invRole, setInvRole] = useState('member');
+  const [tab, setTab] = useState('activity');
   const chatRef = useRef();
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { chatRef.current?.scrollToEnd({ animated: true }); }, [teamChat]);
 
-  useEffect(() => {
-    chatRef.current?.scrollToEnd({ animated: true });
-  }, [teamChat]);
-
-  // ─── Data Fetching (unchanged business logic) ──────────────
   const fetchAll = async () => {
     try {
       if (!isWeb && orgId && orgId !== 'default') {
         const { db } = require('../lib/supabase');
-        const [teamRes, activityRes, chatRes] = await Promise.all([
+        const [t, a, ch] = await Promise.all([
           db.getTeam(orgId).catch(() => null),
           db.getTeamActivity(orgId).catch(() => null),
           db.getTeamChat(orgId).catch(() => null),
         ]);
-        if (teamRes?.data) setTeam(teamRes.data);
-        if (activityRes?.data) setActivity(activityRes.data);
-        if (chatRes?.data) setTeamChat(chatRes.data);
+        if (t?.data) setTeam(t.data);
+        if (a?.data) setActivity(a.data);
+        if (ch?.data) setTeamChat(ch.data);
       } else {
-        const t = await api.getTeam();
-        setTeam(t.team);
-        const a = await api.getTeamActivity();
-        setActivity(a.activity || []);
-        const ch = await api.getTeamChat();
-        setTeamChat(ch.messages || []);
+        const t = await api.getTeam(); setTeam(t.team);
+        const a = await api.getTeamActivity(); setActivity(a.activity || []);
+        const ch = await api.getTeamChat(); setTeamChat(ch.messages || []);
       }
-    } catch (e) {
+    } catch {
       try {
-        const t = await api.getTeam();
-        setTeam(t.team);
-        const a = await api.getTeamActivity();
-        setActivity(a.activity || []);
-        const ch = await api.getTeamChat();
-        setTeamChat(ch.messages || []);
-      } catch (e2) {}
+        const t = await api.getTeam(); setTeam(t.team);
+        const a = await api.getTeamActivity(); setActivity(a.activity || []);
+        const ch = await api.getTeamChat(); setTeamChat(ch.messages || []);
+      } catch {}
     }
   };
 
-  const sendChat = async () => {
+  const sendChat = useCallback(async () => {
     if (!chatInput.trim() || sending) return;
     setSending(true);
+    const text = chatInput;
     try {
       if (!isWeb && orgId && orgId !== 'default') {
         const { db } = require('../lib/supabase');
         await db.sendTeamChat({
-          org_id: orgId,
-          user_id: userId,
-          user_name: profile?.name || 'Admin',
-          message: chatInput,
+          org_id: orgId, user_id: userId,
+          user_name: profile?.name || 'Admin', message: text,
         });
         setChatInput('');
         const { data } = await db.getTeamChat(orgId);
         setTeamChat(data || []);
       } else {
-        await api.sendTeamChat(chatInput, team?.admin?.name || 'Admin');
+        await api.sendTeamChat(text, team?.admin?.name || profile?.name || 'Admin');
         setChatInput('');
         const ch = await api.getTeamChat();
         setTeamChat(ch.messages || []);
       }
-    } catch (e) {
+    } catch {
       try {
-        await api.sendTeamChat(chatInput, team?.admin?.name || 'Admin');
+        await api.sendTeamChat(text, profile?.name || 'Admin');
         setChatInput('');
         const ch = await api.getTeamChat();
         setTeamChat(ch.messages || []);
-      } catch (e2) {}
-    } finally {
-      setSending(false);
-    }
-  };
+      } catch {}
+    } finally { setSending(false); }
+  }, [chatInput, sending, isWeb, orgId, userId, profile, team]);
 
   const invite = async () => {
     if (!invName || !invEmail) return;
@@ -600,538 +157,376 @@ export default function TeamScreen({ darkMode }) {
         await api.inviteMember({ name: invName, email: invEmail, role: invRole });
       }
       setShowInvite(false);
-      setInvName('');
-      setInvEmail('');
+      setInvName(''); setInvEmail('');
+      Alert.alert('Invite sent', `${invName} will receive an email shortly.`);
       fetchAll();
-    } catch (e) {}
+    } catch {
+      Alert.alert('Error', 'Failed to send invite');
+    }
   };
 
   const members = [
-    { name: team?.admin?.name || 'Admin', isAdmin: true },
+    { name: team?.admin?.name || profile?.name || 'Admin', isAdmin: true },
     ...(team?.members || []),
   ];
 
-  const isSendDisabled = sending || !chatInput.trim();
-
-  // ─── Render ────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: c.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ─── Team Header ─────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.headerRow}>
-          <View>
-            <Text style={[styles.headerTitle, { color: c.text }]}>Your Team</Text>
-            <Text style={[styles.headerSub, { color: c.textSecondary }]}>
-              {members.length} {members.length === 1 ? 'member' : 'members'}
-            </Text>
+      <StatusBar style="light" />
+      <View style={[styles.hero, { paddingTop: insets.top + 10 }]}>
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.heroInner}>
+          <View style={styles.heroTopRow}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.liveRow}>
+                <PulseDot />
+                <Text style={styles.liveLabel}>LIVE</Text>
+              </View>
+              <Text style={styles.heroTitle}>Team</Text>
+              <Text style={styles.heroSub}>
+                {members.length} {members.length === 1 ? 'member' : 'members'} · {activity.length} events
+              </Text>
+            </View>
+            <SpringPressable
+              onPress={() => setShowInvite(true)}
+              style={styles.inviteChip}
+              accessibilityLabel="Invite member"
+            >
+              <Ionicons name="person-add" size={14} color="#3B6BFF" />
+              <Text style={{ color: '#3B6BFF', fontWeight: '700', fontSize: 12.5 }}>Invite</Text>
+            </SpringPressable>
           </View>
-          <View style={[styles.onlineBadge, { backgroundColor: 'rgba(59,107,255,0.12)' }]}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Online</Text>
+
+          <View style={styles.avatarStack}>
+            {members.slice(0, 6).map((m, i) => (
+              <Animated.View
+                key={`${m.name}-${i}`}
+                entering={FadeInUp.delay(100 + i * 60).duration(400)}
+              >
+                <Avatar name={m.name} isAdmin={m.isAdmin} stackOffset={i > 0} size={40} />
+              </Animated.View>
+            ))}
+            {members.length > 6 && (
+              <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12 }]}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>+{members.length - 6}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.pillRow}>
+            {[['activity', 'Activity'], ['chat', 'Chat']].map(([v, l]) => (
+              <SpringPressable
+                key={v}
+                onPress={() => setTab(v)}
+                style={[styles.pill, tab === v ? styles.pillActive : styles.pillIdle]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === v }}
+              >
+                <Text style={[styles.pillText, { color: tab === v ? '#3B6BFF' : '#FFFFFF' }]}>{l}</Text>
+              </SpringPressable>
+            ))}
           </View>
         </Animated.View>
+      </View>
 
-        {/* ─── Member Avatars ──────────────────────────────── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ paddingVertical: Spacing.lg }}
-          contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.xl }}
-          accessibilityLabel="Team members"
-        >
-          {members.map((m, i) => (
-            <MemberAvatar key={i} member={m} index={i} colors={c} />
-          ))}
-          <InviteAvatar onPress={() => setShowInvite(true)} colors={c} />
-        </ScrollView>
+      <View style={[styles.sheet, { backgroundColor: c.bg }]}>
+        <View style={styles.handle} />
 
-        {/* ─── Activity Stream ─────────────────────────────── */}
-        <SectionDivider label="ACTIVITY STREAM" colors={c} />
-
-        <View style={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}>
-          {activity.length === 0 && (
-            <Animated.View entering={FadeIn.duration(400)} style={styles.emptyContainer}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: c.surfaceLow }]}>
-                <Ionicons name="pulse-outline" size={28} color={c.textMuted} />
-              </View>
-              <Text style={[styles.emptyText, { color: c.textSecondary }]}>
-                No activity yet
-              </Text>
-              <Text style={[styles.emptySubtext, { color: c.textMuted }]}>
-                Team actions will appear here
-              </Text>
-            </Animated.View>
-          )}
-          {activity.slice(0, 5).map((a, i) => (
-            <ActivityCard
-              key={i}
-              item={a}
-              index={i}
-              isLatest={i === 0}
-              colors={c}
-              darkMode={darkMode}
-            />
-          ))}
-        </View>
-
-        {/* ─── Team Chat ───────────────────────────────────── */}
-        <SectionDivider label="SECURE CHANNEL" colors={c} style={{ marginTop: Spacing.xxl }} />
-
-        <Animated.View
-          entering={FadeInDown.delay(200).duration(450)}
-          style={[
-            styles.chatContainer,
-            {
-              backgroundColor: c.surfaceLow,
-              borderColor: c.border,
-              borderWidth: 1,
-            },
-          ]}
-        >
-          {/* Chat Header Bar */}
-          <View style={[styles.chatHeaderBar, { borderBottomColor: c.border }]}>
-            <Ionicons name="lock-closed" size={12} color={c.textMuted} />
-            <Text style={[styles.chatHeaderText, { color: c.textMuted }]}>
-              End-to-end encrypted
-            </Text>
-          </View>
-
+        {tab === 'activity' ? (
           <ScrollView
-            ref={chatRef}
-            style={{ maxHeight: 280 }}
-            contentContainerStyle={{ padding: Spacing.md, gap: Spacing.md }}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 140 }}
             showsVerticalScrollIndicator={false}
           >
-            {teamChat.length === 0 && (
-              <Animated.View entering={FadeIn.duration(400)} style={styles.emptyChatContainer}>
-                <View style={[styles.emptyChatIcon, { backgroundColor: 'rgba(59,107,255,0.08)' }]}>
-                  <Ionicons name="chatbubbles-outline" size={32} color={c.textMuted} />
+            {activity.length === 0 && (
+              <Animated.View entering={FadeIn.duration(400)} style={styles.empty}>
+                <View style={[styles.emptyIcon, { backgroundColor: c.primaryLight }]}>
+                  <Ionicons name="pulse" size={32} color={c.primary} />
                 </View>
-                <Text style={[styles.emptyText, { color: c.textSecondary }]}>
-                  Start a team conversation!
+                <Text style={[styles.emptyTitle, { color: c.text }]}>No activity yet</Text>
+                <Text style={[styles.emptySub, { color: c.textMuted }]}>
+                  Invite members and actions will show up here in real-time.
                 </Text>
               </Animated.View>
             )}
-            {teamChat.map((m, i) => {
-              const isMe = m.userId === userId || m.user_id === userId;
-              return (
-                <ChatBubble
-                  key={i}
-                  message={m}
-                  index={i}
-                  isMe={isMe}
-                  colors={c}
-                  darkMode={darkMode}
-                />
-              );
-            })}
+
+            {activity.map((ev, i) => (
+              <Animated.View
+                key={ev.id || i}
+                entering={SlideInRight.delay(Math.min(i * 40, 240)).duration(350)}
+                layout={Layout.springify()}
+                style={styles.timelineRow}
+              >
+                <View style={styles.timelineCol}>
+                  <View style={[styles.timelineDot, { backgroundColor: c.primary }]} />
+                  {i < activity.length - 1 && <View style={[styles.timelineLine, { backgroundColor: c.borderSubtle }]} />}
+                </View>
+                <View style={[styles.eventCard, { backgroundColor: c.card, borderColor: c.borderSubtle }]}>
+                  <View style={styles.eventHead}>
+                    <Avatar name={ev.user || ev.actor || '?'} size={24} />
+                    <Text style={[styles.eventUser, { color: c.text }]}>{ev.user || ev.actor || 'User'}</Text>
+                    <Text style={[styles.eventTime, { color: c.textMuted }]}>
+                      {ev.time || ev.timestamp || 'now'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.eventText, { color: c.textSecondary }]}>
+                    {ev.action || ev.message || ev.description || '—'}
+                  </Text>
+                </View>
+              </Animated.View>
+            ))}
           </ScrollView>
-        </Animated.View>
-      </ScrollView>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              ref={chatRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 20, paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: true })}
+            >
+              {teamChat.length === 0 && (
+                <Animated.View entering={FadeIn.duration(400)} style={styles.empty}>
+                  <View style={[styles.emptyIcon, { backgroundColor: c.primaryLight }]}>
+                    <Ionicons name="chatbubbles" size={30} color={c.primary} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: c.text }]}>Start the conversation</Text>
+                  <Text style={[styles.emptySub, { color: c.textMuted }]}>
+                    Messages are synced across your team in real-time.
+                  </Text>
+                </Animated.View>
+              )}
+              {teamChat.map((m, i) => {
+                const mine = m.user_id === userId || m.user_name === profile?.name;
+                return (
+                  <Animated.View
+                    key={m.id || i}
+                    entering={FadeInUp.delay(Math.min(i * 30, 200)).duration(300)}
+                    layout={Layout.springify()}
+                    style={[styles.chatRow, { justifyContent: mine ? 'flex-end' : 'flex-start' }]}
+                  >
+                    {!mine && <Avatar name={m.user_name || m.user || '?'} size={28} />}
+                    <View
+                      style={[
+                        styles.chatBubble,
+                        {
+                          backgroundColor: mine ? c.primary : c.card,
+                          borderColor: mine ? 'transparent' : c.borderSubtle,
+                          borderBottomRightRadius: mine ? 6 : 18,
+                          borderBottomLeftRadius: mine ? 18 : 6,
+                        },
+                      ]}
+                    >
+                      {!mine && (
+                        <Text style={[styles.chatName, { color: c.primary }]}>{m.user_name || m.user || 'User'}</Text>
+                      )}
+                      <Text style={{ color: mine ? '#FFFFFF' : c.text, fontSize: 14, lineHeight: 20 }}>
+                        {m.message || m.content}
+                      </Text>
+                    </View>
+                  </Animated.View>
+                );
+              })}
+            </ScrollView>
 
-      {/* ─── Chat Input Bar ──────────────────────────────── */}
-      <Animated.View
-        entering={FadeInUp.duration(400).delay(300)}
-        style={[styles.chatInputBar, { borderTopColor: c.border, backgroundColor: c.bg }]}
-      >
-        <View
-          style={[
-            styles.chatInputWrapper,
-            {
-              backgroundColor: c.surfaceLow,
-              borderColor: c.border,
-            },
-          ]}
-        >
-          <TextInput
-            value={chatInput}
-            onChangeText={setChatInput}
-            placeholder="Type a message..."
-            placeholderTextColor={c.textMuted}
-            style={[styles.chatTextInput, { color: c.text }]}
-            onSubmitEditing={sendChat}
-            returnKeyType="send"
-            accessibilityLabel="Team chat message"
-            multiline
-          />
-          <SendButton onPress={sendChat} disabled={isSendDisabled} colors={c} />
-        </View>
-      </Animated.View>
+            <View style={[styles.inputBar, {
+              backgroundColor: c.card, borderColor: c.borderSubtle,
+              marginBottom: insets.bottom + 90, marginHorizontal: 16,
+            }]}>
+              <TextInput
+                value={chatInput}
+                onChangeText={setChatInput}
+                placeholder="Message the team…"
+                placeholderTextColor={c.textMuted}
+                style={[styles.input, { color: c.text }]}
+                multiline
+                maxLength={1500}
+              />
+              <SpringPressable
+                onPress={sendChat}
+                disabled={!chatInput.trim() || sending}
+                style={[styles.sendBtn, { backgroundColor: chatInput.trim() && !sending ? c.primary : c.borderSubtle }]}
+                accessibilityLabel="Send"
+              >
+                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+              </SpringPressable>
+            </View>
+          </View>
+        )}
+      </View>
 
-      {/* ─── Invite Modal ────────────────────────────────── */}
-      <InviteModal
-        visible={showInvite}
-        onClose={() => setShowInvite(false)}
-        onInvite={invite}
-        colors={c}
-        darkMode={darkMode}
-        invName={invName}
-        setInvName={setInvName}
-        invEmail={invEmail}
-        setInvEmail={setInvEmail}
-        invRole={invRole}
-        setInvRole={setInvRole}
-      />
+      <Modal visible={showInvite} animationType="slide" transparent onRequestClose={() => setShowInvite(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowInvite(false)}>
+          <Pressable style={[styles.modalSheet, { backgroundColor: c.bg }]} onPress={() => {}}>
+            <View style={styles.handle} />
+            <Text style={[styles.modalTitle, { color: c.text }]}>Invite member</Text>
+            <Text style={[styles.modalSub, { color: c.textMuted }]}>They'll receive an email link.</Text>
+
+            <TextInput
+              value={invName}
+              onChangeText={setInvName}
+              placeholder="Full name"
+              placeholderTextColor={c.textMuted}
+              style={[styles.field, { backgroundColor: c.card, borderColor: c.borderSubtle, color: c.text }]}
+            />
+            <TextInput
+              value={invEmail}
+              onChangeText={setInvEmail}
+              placeholder="Email"
+              placeholderTextColor={c.textMuted}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={[styles.field, { backgroundColor: c.card, borderColor: c.borderSubtle, color: c.text }]}
+            />
+
+            <View style={styles.roleRow}>
+              {['member', 'admin'].map(r => (
+                <SpringPressable
+                  key={r}
+                  onPress={() => setInvRole(r)}
+                  style={[
+                    styles.rolePill,
+                    { backgroundColor: invRole === r ? c.primary : c.card, borderColor: invRole === r ? c.primary : c.borderSubtle },
+                  ]}
+                >
+                  <Text style={{ color: invRole === r ? '#FFFFFF' : c.text, fontWeight: '700', fontSize: 13, textTransform: 'capitalize' }}>
+                    {r}
+                  </Text>
+                </SpringPressable>
+              ))}
+            </View>
+
+            <SpringPressable
+              onPress={invite}
+              style={[styles.sendInviteBtn, { backgroundColor: c.primary }]}
+            >
+              <Ionicons name="paper-plane" size={16} color="#FFFFFF" />
+              <Text style={styles.sendInviteText}>Send invite</Text>
+            </SpringPressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ─── STYLES ──────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
-  // Header
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-  },
-  headerTitle: {
-    ...Typography.sectionTitle,
-    fontSize: 22,
-  },
-  headerSub: {
-    ...Typography.caption,
-    marginTop: 2,
-  },
-  onlineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
-    borderRadius: Radius.pill,
-    gap: 6,
-  },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  hero: {
     backgroundColor: '#3B6BFF',
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  onlineText: {
-    ...Typography.micro,
-    color: '#3B6BFF',
+  heroInner: { gap: 18 },
+  heroTopRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2 },
+  heroTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
+  heroSub: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 },
+  inviteChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18,
   },
-
-  // Members
-  memberItem: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-    minWidth: 64,
-  },
-  avatarWrapper: {
-    width: 66,
-    height: 66,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  avatarStack: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#3B6BFF',
   },
-  avatarText: {
-    ...Typography.bodyBold,
-    fontSize: 20,
+  avatarAdmin: { backgroundColor: '#FFFFFF' },
+  avatarMember: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  avatarMore: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#3B6BFF',
   },
-  memberName: {
-    ...Typography.micro,
-    fontWeight: '600',
-  },
-  adminBadge: {
-    backgroundColor: 'rgba(59,107,255,0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(59,107,255,0.25)',
-  },
-  adminBadgeText: {
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    color: '#3B6BFF',
-  },
-  inviteAvatar: {
-    borderStyle: 'dashed',
-    borderWidth: 2,
-  },
-
-  // Section dividers
-  sectionDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    marginVertical: Spacing.lg,
-    gap: Spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-  },
-  dividerText: {
-    ...Typography.label,
-  },
-
-  // Empty states
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xxxl,
-    gap: Spacing.sm,
-  },
-  emptyIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  emptyText: {
-    textAlign: 'center',
-    ...Typography.body,
-  },
-  emptySubtext: {
-    textAlign: 'center',
-    ...Typography.caption,
-  },
-  emptyChatContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xxl,
-    gap: Spacing.md,
-  },
-  emptyChatIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Activity
-  activityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    gap: Spacing.md,
-    overflow: 'hidden',
-  },
-  latestIndicator: {
+  pulseWrap: { width: 10, height: 10, alignItems: 'center', justifyContent: 'center' },
+  pulseRing: {
     position: 'absolute',
-    left: 0,
-    top: 6,
-    bottom: 6,
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: '#3B6BFF',
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: '#22C55E',
   },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pulseCore: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+  pillRow: { flexDirection: 'row', gap: 8 },
+  pill: {
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
   },
-  activityText: {
-    ...Typography.bodyBold,
+  pillActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  pillIdle: { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.22)' },
+  pillText: { fontSize: 13, fontWeight: '700' },
+  sheet: {
+    flex: 1, marginTop: -24,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 8,
   },
-  activityMeta: {
-    ...Typography.micro,
-    marginTop: 2,
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(11,23,53,0.15)',
+    alignSelf: 'center', marginTop: 6, marginBottom: 10,
   },
-  activityTime: {
-    ...Typography.micro,
-    letterSpacing: 1,
+  empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 20 },
+  emptyIcon: {
+    width: 64, height: 64, borderRadius: 32,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
   },
-
-  // Chat
-  chatContainer: {
-    marginHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
-    minHeight: 140,
-    overflow: 'hidden',
+  emptyTitle: { fontSize: 16, fontWeight: '800' },
+  emptySub: { fontSize: 13.5, textAlign: 'center', marginTop: 6 },
+  timelineRow: { flexDirection: 'row', gap: 12 },
+  timelineCol: { alignItems: 'center', width: 14 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 14 },
+  timelineLine: { width: 2, flex: 1, marginTop: 4 },
+  eventCard: {
+    flex: 1, padding: 12, borderRadius: 16, borderWidth: 1,
+    marginBottom: 10,
   },
-  chatHeaderBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  chatHeaderText: {
-    ...Typography.micro,
-    fontSize: 10,
-    letterSpacing: 0.8,
-  },
-  chatMsg: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    maxWidth: '85%',
-  },
-  chatAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chatAvatarText: {
-    ...Typography.micro,
-    fontWeight: '700',
-  },
-  chatSender: {
-    ...Typography.micro,
-    marginBottom: Spacing.xs,
-    letterSpacing: 0.5,
-  },
+  eventHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  eventUser: { flex: 1, fontSize: 13, fontWeight: '700' },
+  eventTime: { fontSize: 11, fontWeight: '600' },
+  eventText: { fontSize: 13, lineHeight: 18 },
+  chatRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 10 },
   chatBubble: {
-    padding: Spacing.md,
-    borderRadius: Radius.md,
+    maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 18, borderWidth: 1,
   },
-  chatText: {
-    ...Typography.caption,
-    lineHeight: 20,
+  chatName: { fontSize: 11, fontWeight: '700', marginBottom: 3, letterSpacing: 0.3 },
+  inputBar: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 28, borderWidth: 1,
+    shadowColor: '#0B1735', shadowOpacity: 0.08, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 }, elevation: 6,
   },
-
-  // Chat input
-  chatInputBar: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: 90,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 0,
+  input: { flex: 1, maxHeight: 120, minHeight: 36, paddingHorizontal: 6, paddingVertical: 8, fontSize: 14.5 },
+  sendBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
   },
-  chatInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    gap: Spacing.sm,
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: {
+    padding: 24, paddingBottom: 40,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
   },
-  chatTextInput: {
-    flex: 1,
-    ...Typography.bodySmall,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Platform.OS === 'ios' ? Spacing.md : Spacing.sm,
-    maxHeight: 100,
+  modalTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginTop: 10 },
+  modalSub: { fontSize: 13.5, marginTop: 4, marginBottom: 20 },
+  field: {
+    borderRadius: 14, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14.5,
+    marginBottom: 12,
   },
-  chatSendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
+  roleRow: { flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 20 },
+  rolePill: {
+    flex: 1, alignItems: 'center',
+    paddingVertical: 12, borderRadius: 14, borderWidth: 1,
   },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xxl,
+  sendInviteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, height: 52, borderRadius: 26,
   },
-  modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: Radius.xl,
-    padding: Spacing.xxl,
-    gap: Spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  modalIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    ...Typography.sectionTitle,
-  },
-  modalInputGroup: {
-    gap: Spacing.xs + 2,
-  },
-  inputLabel: {
-    ...Typography.label,
-    fontSize: 10,
-    marginLeft: 4,
-  },
-  modalInput: {
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    ...Typography.body,
-  },
-  roleRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  roleChip: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  roleChipText: {
-    ...Typography.captionBold,
-    letterSpacing: 0.3,
-  },
-  inviteBtn: {
-    backgroundColor: '#3B6BFF',
-    borderRadius: Radius.pill,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: 'rgba(59,107,255,0.35)',
-    minHeight: 52,
-  },
-  inviteBtnText: {
-    color: '#003516',
-    ...Typography.btnPrimary,
-  },
-  cancelBtn: {
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  cancelText: {
-    textAlign: 'center',
-    ...Typography.body,
-    paddingVertical: Spacing.sm,
-  },
+  sendInviteText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
 });
