@@ -82,7 +82,7 @@ export default function CompanySetupScreen({ darkMode, onComplete }) {
                     { backgroundColor: form.emirate === e ? c.lime : c.surfaceLow, borderColor: form.emirate === e ? '#000' : c.border }
                   ]}
                 >
-                  <Text style={[styles.emirateText, { color: form.emirate === e ? '#00531f' : c.text }]}>{e}</Text>
+                  <Text style={[styles.emirateText, { color: form.emirate === e ? '#2E5BFF' : c.text }]}>{e}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -93,7 +93,7 @@ export default function CompanySetupScreen({ darkMode, onComplete }) {
             disabled={loading}
             style={[styles.submitBtn, { backgroundColor: c.lime }]}
           >
-            {loading ? <ActivityIndicator color="#00531f" /> : (
+            {loading ? <ActivityIndicator color="#2E5BFF" /> : (
               <Text style={styles.submitBtnText}>Complete Setup</Text>
             )}
           </TouchableOpacity>
@@ -127,5 +127,5 @@ const styles = StyleSheet.create({
     alignItems: 'center', borderWidth: BorderWidth.thin, borderColor: '#000',
     ...Shadow.hardMd
   },
-  submitBtnText: { ...Typography.btnPrimary, color: '#00531f' },
+  submitBtnText: { ...Typography.btnPrimary, color: '#2E5BFF' },
 });

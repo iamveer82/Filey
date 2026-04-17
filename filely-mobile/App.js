@@ -53,7 +53,7 @@ const FilelyLightTheme = {
     card: '#FFFFFF',
     text: '#0F172A',
     border: 'rgba(15,23,42,0.08)',
-    primary: '#44e571',
+    primary: '#3B6BFF',
   },
 };
 
@@ -65,7 +65,7 @@ const FilelyDarkTheme = {
     card: '#141B2D',
     text: '#FFFFFF',
     border: 'rgba(255,255,255,0.08)',
-    primary: '#44e571',
+    primary: '#3B6BFF',
   },
 };
 
@@ -150,7 +150,7 @@ function AnimatedTabIcon({ routeName, focused, darkMode }) {
         <Ionicons
           name={iconName}
           size={focused ? 22 : 24}
-          color={focused ? '#003516' : inactiveColor}
+          color={focused ? '#FFFFFF' : inactiveColor}
         />
       </Animated.View>
     </View>
@@ -176,8 +176,8 @@ const tabIconStyles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#44e571',
-    shadowColor: '#44e571',
+    backgroundColor: '#3B6BFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 14,
@@ -198,7 +198,7 @@ function CustomTabBar({ state, descriptors, navigation, darkMode }) {
   const barBorder = darkMode
     ? 'rgba(255,255,255,0.06)'
     : 'rgba(15,23,42,0.06)';
-  const barShadowColor = darkMode ? '#4F8EFF' : '#000000';
+  const barShadowColor = darkMode ? '#3B6BFF' : '#000000';
 
   return (
     <View style={[
@@ -362,8 +362,8 @@ function AppContent() {
     text:      darkMode ? '#FFFFFF'                 : '#0F172A',
     textMuted: darkMode ? 'rgba(255,255,255,0.35)'  : '#94A3B8',
     border:    darkMode ? 'rgba(255,255,255,0.08)'  : 'rgba(15,23,42,0.08)',
-    lime:      '#44e571',
-    accent:    '#4F8EFF',
+    lime:      '#3B6BFF',
+    accent:    '#3B6BFF',
   };
 
   // ── Auth flow gates ─────────────────────────────────────────────────────────
@@ -371,7 +371,7 @@ function AppContent() {
   if (loading || checkingAi) {
     return (
       <View style={[gateStyles.center, { backgroundColor: c.bg }]}>
-        <ActivityIndicator size="large" color="#44e571" />
+        <ActivityIndicator size="large" color="#3B6BFF" />
       </View>
     );
   }
@@ -453,7 +453,7 @@ function AppContent() {
               headerTitle: 'Filey',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="wallet" size={22} color="#44e571" />
+                  <Ionicons name="wallet" size={22} color="#3B6BFF" />
                 </View>
               ),
               headerRight: () => (
@@ -471,7 +471,7 @@ function AppContent() {
               headerTitle: 'AI Hub',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="sparkles" size={22} color="#4F8EFF" />
+                  <Ionicons name="sparkles" size={22} color="#3B6BFF" />
                 </View>
               ),
               headerRight: () => (
@@ -489,7 +489,7 @@ function AppContent() {
               headerTitle: '5-Year Vault',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="shield-checkmark" size={22} color="#44e571" />
+                  <Ionicons name="shield-checkmark" size={22} color="#3B6BFF" />
                 </View>
               ),
               headerRight: () => (
@@ -507,7 +507,7 @@ function AppContent() {
               headerTitle: 'Team Hub',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="people" size={22} color="#4F8EFF" />
+                  <Ionicons name="people" size={22} color="#3B6BFF" />
                 </View>
               ),
               headerRight: () => (

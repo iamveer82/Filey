@@ -123,7 +123,7 @@ function ToggleRow({ icon, label, color, c, value, onValueChange, isLast }) {
         <Switch
           value={value}
           onValueChange={onValueChange}
-          trackColor={{ true: '#44e571', false: c.surfaceLow }}
+          trackColor={{ true: '#3B6BFF', false: c.surfaceLow }}
           thumbColor="#fff"
         />
       </View>
@@ -284,13 +284,13 @@ export default function SettingsScreen({ darkMode }) {
 
   /* ── Menu items ────────────────────────── */
   const securityItems = [
-    { icon: 'shield-checkmark-outline', label: 'Privacy & Security', color: '#4F8EFF' },
+    { icon: 'shield-checkmark-outline', label: 'Privacy & Security', color: '#3B6BFF' },
     { icon: 'cloud-download-outline', label: 'AI Model Management', color: '#F59E0B' },
   ];
 
   const dataItems = [
-    { icon: 'download-outline', label: 'Export My Data', color: '#44e571' },
-    { icon: 'people-outline', label: 'Workspace Transfer', color: '#4F8EFF' },
+    { icon: 'download-outline', label: 'Export My Data', color: '#3B6BFF' },
+    { icon: 'people-outline', label: 'Workspace Transfer', color: '#3B6BFF' },
   ];
 
   const generalItems = [
@@ -320,13 +320,13 @@ export default function SettingsScreen({ darkMode }) {
             style={[
               styles.avatar,
               {
-                backgroundColor: 'rgba(79,142,255,0.12)',
-                borderColor: 'rgba(79,142,255,0.3)',
+                backgroundColor: 'rgba(59,107,255,0.12)',
+                borderColor: 'rgba(59,107,255,0.3)',
                 borderWidth: 2,
               },
             ]}
           >
-            <Text style={[styles.avatarText, { color: '#4F8EFF' }]}>
+            <Text style={[styles.avatarText, { color: '#3B6BFF' }]}>
               {profile?.name?.[0] || 'U'}
             </Text>
           </View>
@@ -452,8 +452,8 @@ export default function SettingsScreen({ darkMode }) {
               accessibilityRole="button"
               accessibilityLabel="Edit profile"
             >
-              <Text style={[styles.editProfileText, { color: '#4F8EFF' }]}>Edit Profile</Text>
-              <Ionicons name="arrow-forward" size={14} color="#4F8EFF" />
+              <Text style={[styles.editProfileText, { color: '#3B6BFF' }]}>Edit Profile</Text>
+              <Ionicons name="arrow-forward" size={14} color="#3B6BFF" />
             </SpringPressable>
           </Animated.View>
         )}
@@ -475,8 +475,8 @@ export default function SettingsScreen({ darkMode }) {
           <View style={styles.orgCardHeader}>
             <View>
               <View style={styles.orgBadge}>
-                <Ionicons name="business" size={12} color="#4F8EFF" />
-                <Text style={[styles.orgLabel, { color: '#4F8EFF' }]}>ORGANIZATION</Text>
+                <Ionicons name="business" size={12} color="#3B6BFF" />
+                <Text style={[styles.orgLabel, { color: '#3B6BFF' }]}>ORGANIZATION</Text>
               </View>
               <Text style={[styles.orgTitle, { color: c.text }]}>Company Details</Text>
             </View>
@@ -547,11 +547,11 @@ export default function SettingsScreen({ darkMode }) {
                   <View style={{ flexDirection: 'row', gap: 4 }}>
                     <SpringPressable
                       onPress={() => openCert(cert)}
-                      style={[styles.certActionBtn, { backgroundColor: 'rgba(79,142,255,0.15)' }]}
+                      style={[styles.certActionBtn, { backgroundColor: 'rgba(59,107,255,0.15)' }]}
                       accessibilityRole="button"
                       accessibilityLabel={`View ${cert.name}`}
                     >
-                      <Ionicons name="eye-outline" size={14} color="#4F8EFF" />
+                      <Ionicons name="eye-outline" size={14} color="#3B6BFF" />
                     </SpringPressable>
                     <SpringPressable
                       onPress={() => deleteCertificate(cert.id)}
@@ -628,7 +628,7 @@ export default function SettingsScreen({ darkMode }) {
                 accessibilityRole="button"
                 accessibilityLabel="Add new certificate"
               >
-                <View style={[styles.certAddIcon, { backgroundColor: '#44e571' }]}>
+                <View style={[styles.certAddIcon, { backgroundColor: '#3B6BFF' }]}>
                   <Ionicons name="add" size={18} color="#003516" />
                 </View>
                 <Text style={[styles.certAddText, { color: c.text }]}>ADD NEW</Text>
@@ -645,7 +645,7 @@ export default function SettingsScreen({ darkMode }) {
           <ToggleRow
             icon="notifications"
             label="Daily Reminders"
-            color="#4F8EFF"
+            color="#3B6BFF"
             c={c}
             value={notifications}
             onValueChange={setNotifications}
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: Radius.full,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderWidth: 2.5,
     borderColor: '#0B0F1E',
     alignItems: 'center',
@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     flex: 1,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,
     alignItems: 'center',
@@ -930,9 +930,9 @@ const styles = StyleSheet.create({
   orgEditBtn: {
     padding: Spacing.sm,
     borderRadius: Radius.sm,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderWidth: 1,
-    borderColor: 'rgba(0,83,31,0.3)',
+    borderColor: 'rgba(59,107,255,0.35)',
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',
@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
   },
   certUploadBtn: {
     flex: 1,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderRadius: Radius.sm,
     paddingVertical: Spacing.sm,
     alignItems: 'center',

@@ -89,7 +89,7 @@ function AdminGlowRing({ size }) {
     height: size + 10,
     borderRadius: 9999,
     borderWidth: 2,
-    borderColor: 'rgba(68,229,113,1)',
+    borderColor: 'rgba(59,107,255,1)',
     opacity: glowOpacity.value,
   }));
 
@@ -109,11 +109,11 @@ function MemberAvatar({ member, index, colors }) {
           style={[
             styles.avatar,
             member.isAdmin
-              ? { borderColor: '#44e571', borderWidth: 2, backgroundColor: 'rgba(68,229,113,0.10)' }
+              ? { borderColor: '#3B6BFF', borderWidth: 2, backgroundColor: 'rgba(59,107,255,0.10)' }
               : { borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surfaceLow },
           ]}
         >
-          <Text style={[styles.avatarText, { color: member.isAdmin ? '#44e571' : colors.text }]}>
+          <Text style={[styles.avatarText, { color: member.isAdmin ? '#3B6BFF' : colors.text }]}>
             {member.name?.[0]?.toUpperCase() || '?'}
           </Text>
         </View>
@@ -175,7 +175,7 @@ function ActivityCard({ item, index, isLatest, colors, darkMode }) {
           isLatest
             ? {
                 ...(darkMode ? CardPresets.cardDark : CardPresets.cardLight),
-                borderColor: '#44e571',
+                borderColor: '#3B6BFF',
                 borderWidth: 1.5,
               }
             : {
@@ -192,9 +192,9 @@ function ActivityCard({ item, index, isLatest, colors, darkMode }) {
           style={[
             styles.activityIcon,
             {
-              backgroundColor: isLatest ? 'rgba(68,229,113,0.12)' : colors.surfaceLow,
+              backgroundColor: isLatest ? 'rgba(59,107,255,0.12)' : colors.surfaceLow,
               borderWidth: 1,
-              borderColor: isLatest ? 'rgba(68,229,113,0.25)' : colors.border,
+              borderColor: isLatest ? 'rgba(59,107,255,0.25)' : colors.border,
             },
           ]}
         >
@@ -207,7 +207,7 @@ function ActivityCard({ item, index, isLatest, colors, darkMode }) {
                 : 'person-add-outline'
             }
             size={18}
-            color={isLatest ? '#44e571' : colors.textSecondary}
+            color={isLatest ? '#3B6BFF' : colors.textSecondary}
           />
         </View>
         <View style={{ flex: 1 }}>
@@ -218,7 +218,7 @@ function ActivityCard({ item, index, isLatest, colors, darkMode }) {
             {item.category || item.type}
           </Text>
         </View>
-        <Text style={[styles.activityTime, { color: isLatest ? '#44e571' : colors.textMuted }]}>
+        <Text style={[styles.activityTime, { color: isLatest ? '#3B6BFF' : colors.textMuted }]}>
           {new Date(item.timestamp).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
@@ -240,13 +240,13 @@ function ChatBubble({ message, index, isMe, colors, darkMode }) {
         style={[
           styles.chatAvatar,
           {
-            backgroundColor: isMe ? 'rgba(68,229,113,0.15)' : colors.surfaceLow,
+            backgroundColor: isMe ? 'rgba(59,107,255,0.15)' : colors.surfaceLow,
             borderWidth: 1,
-            borderColor: isMe ? 'rgba(68,229,113,0.3)' : colors.border,
+            borderColor: isMe ? 'rgba(59,107,255,0.3)' : colors.border,
           },
         ]}
       >
-        <Text style={[styles.chatAvatarText, { color: isMe ? '#44e571' : colors.text }]}>
+        <Text style={[styles.chatAvatarText, { color: isMe ? '#3B6BFF' : colors.text }]}>
           {message.userName?.[0]?.toUpperCase() || '?'}
         </Text>
       </View>
@@ -264,8 +264,8 @@ function ChatBubble({ message, index, isMe, colors, darkMode }) {
             styles.chatBubble,
             isMe
               ? {
-                  backgroundColor: 'rgba(68,229,113,0.10)',
-                  borderColor: 'rgba(68,229,113,0.22)',
+                  backgroundColor: 'rgba(59,107,255,0.10)',
+                  borderColor: 'rgba(59,107,255,0.22)',
                   borderWidth: 1,
                   borderTopRightRadius: 4,
                 }
@@ -338,8 +338,8 @@ function InviteModal({ visible, onClose, onInvite, colors, darkMode, invName, se
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderLeft}>
-              <View style={[styles.modalIconCircle, { backgroundColor: 'rgba(68,229,113,0.12)' }]}>
-                <Ionicons name="person-add" size={20} color="#44e571" />
+              <View style={[styles.modalIconCircle, { backgroundColor: 'rgba(59,107,255,0.12)' }]}>
+                <Ionicons name="person-add" size={20} color="#3B6BFF" />
               </View>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Invite Member</Text>
             </View>
@@ -408,9 +408,9 @@ function InviteModal({ visible, onClose, onInvite, colors, darkMode, invName, se
                     styles.roleChip,
                     {
                       backgroundColor:
-                        invRole === r ? 'rgba(68,229,113,0.15)' : colors.surfaceLow,
+                        invRole === r ? 'rgba(59,107,255,0.15)' : colors.surfaceLow,
                       borderColor:
-                        invRole === r ? 'rgba(68,229,113,0.4)' : colors.border,
+                        invRole === r ? 'rgba(59,107,255,0.4)' : colors.border,
                     },
                   ]}
                   accessibilityRole="button"
@@ -420,7 +420,7 @@ function InviteModal({ visible, onClose, onInvite, colors, darkMode, invName, se
                   <Text
                     style={[
                       styles.roleChipText,
-                      { color: invRole === r ? '#44e571' : colors.textSecondary },
+                      { color: invRole === r ? '#3B6BFF' : colors.textSecondary },
                     ]}
                   >
                     {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -484,7 +484,7 @@ function SendButton({ onPress, disabled, colors }) {
         animStyle,
         styles.chatSendBtn,
         {
-          backgroundColor: disabled ? colors.border : '#44e571',
+          backgroundColor: disabled ? colors.border : '#3B6BFF',
         },
         !disabled && Shadow.limeSm,
       ]}
@@ -632,7 +632,7 @@ export default function TeamScreen({ darkMode }) {
               {members.length} {members.length === 1 ? 'member' : 'members'}
             </Text>
           </View>
-          <View style={[styles.onlineBadge, { backgroundColor: 'rgba(68,229,113,0.12)' }]}>
+          <View style={[styles.onlineBadge, { backgroundColor: 'rgba(59,107,255,0.12)' }]}>
             <View style={styles.onlineDot} />
             <Text style={styles.onlineText}>Online</Text>
           </View>
@@ -711,7 +711,7 @@ export default function TeamScreen({ darkMode }) {
           >
             {teamChat.length === 0 && (
               <Animated.View entering={FadeIn.duration(400)} style={styles.emptyChatContainer}>
-                <View style={[styles.emptyChatIcon, { backgroundColor: 'rgba(68,229,113,0.08)' }]}>
+                <View style={[styles.emptyChatIcon, { backgroundColor: 'rgba(59,107,255,0.08)' }]}>
                   <Ionicons name="chatbubbles-outline" size={32} color={c.textMuted} />
                 </View>
                 <Text style={[styles.emptyText, { color: c.textSecondary }]}>
@@ -815,11 +815,11 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
   },
   onlineText: {
     ...Typography.micro,
-    color: '#44e571',
+    color: '#3B6BFF',
   },
 
   // Members
@@ -850,18 +850,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   adminBadge: {
-    backgroundColor: 'rgba(68,229,113,0.15)',
+    backgroundColor: 'rgba(59,107,255,0.15)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: 'rgba(68,229,113,0.25)',
+    borderColor: 'rgba(59,107,255,0.25)',
   },
   adminBadgeText: {
     fontSize: 8,
     fontWeight: '800',
     letterSpacing: 1.2,
-    color: '#44e571',
+    color: '#3B6BFF',
   },
   inviteAvatar: {
     borderStyle: 'dashed',
@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
     bottom: 6,
     width: 3,
     borderRadius: 2,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
   },
   activityIcon: {
     width: 40,
@@ -1111,14 +1111,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   inviteBtn: {
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderRadius: Radius.pill,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: 'rgba(0,83,31,0.3)',
+    borderColor: 'rgba(59,107,255,0.35)',
     minHeight: 52,
   },
   inviteBtnText: {

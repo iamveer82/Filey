@@ -182,8 +182,8 @@ function TransactionCard({ txn, pendingTxn, onVerify, onEdit, c, darkMode }) {
       style={[
         styles.txnCard,
         {
-          backgroundColor: darkMode ? 'rgba(79,142,255,0.06)' : '#F8FAFF',
-          borderColor: darkMode ? 'rgba(79,142,255,0.18)' : 'rgba(59,130,246,0.15)',
+          backgroundColor: darkMode ? 'rgba(59,107,255,0.06)' : '#F8FAFF',
+          borderColor: darkMode ? 'rgba(59,107,255,0.18)' : 'rgba(59,130,246,0.15)',
         },
       ]}
     >
@@ -233,7 +233,7 @@ function TransactionCard({ txn, pendingTxn, onVerify, onEdit, c, darkMode }) {
             style={styles.verifyBtn}
             scaleDown={0.95}
           >
-            <Ionicons name="checkmark-circle" size={18} color="#00531f" />
+            <Ionicons name="checkmark-circle" size={18} color="#2E5BFF" />
             <Text style={styles.verifyBtnText}>Verify & Save</Text>
           </SpringPressable>
           <SpringPressable
@@ -611,7 +611,7 @@ export default function ChatScreen({ darkMode }) {
             onPress={startNewChat}
             isNew
             icon="add"
-            iconColor={darkMode ? '#00531f' : '#00531f'}
+            iconColor={darkMode ? '#2E5BFF' : '#2E5BFF'}
             bgColor={c.lime}
             borderColor="rgba(0,83,31,0.25)"
           />
@@ -683,8 +683,8 @@ export default function ChatScreen({ darkMode }) {
                   style={[
                     styles.userBubble,
                     {
-                      backgroundColor: darkMode ? 'rgba(68,229,113,0.10)' : 'rgba(68,229,113,0.12)',
-                      borderColor: darkMode ? 'rgba(68,229,113,0.18)' : 'rgba(68,229,113,0.20)',
+                      backgroundColor: darkMode ? 'rgba(59,107,255,0.10)' : 'rgba(59,107,255,0.12)',
+                      borderColor: darkMode ? 'rgba(59,107,255,0.18)' : 'rgba(59,107,255,0.20)',
                     },
                   ]}
                 >
@@ -709,12 +709,12 @@ export default function ChatScreen({ darkMode }) {
                       styles.aiAvatar,
                       {
                         backgroundColor: darkMode
-                          ? 'rgba(79,142,255,0.12)'
+                          ? 'rgba(59,107,255,0.12)'
                           : 'rgba(59,130,246,0.10)',
                       },
                     ]}
                   >
-                    <Ionicons name="sparkles" size={16} color={darkMode ? '#4F8EFF' : '#3B82F6'} />
+                    <Ionicons name="sparkles" size={16} color={darkMode ? '#3B6BFF' : '#3B82F6'} />
                   </View>
 
                   <View style={styles.aiBubbleCol}>
@@ -724,10 +724,10 @@ export default function ChatScreen({ darkMode }) {
                         styles.aiBubble,
                         {
                           backgroundColor: darkMode
-                            ? 'rgba(79,142,255,0.06)'
+                            ? 'rgba(59,107,255,0.06)'
                             : 'rgba(59,130,246,0.06)',
                           borderColor: darkMode
-                            ? 'rgba(79,142,255,0.12)'
+                            ? 'rgba(59,107,255,0.12)'
                             : 'rgba(59,130,246,0.10)',
                         },
                       ]}
@@ -773,12 +773,12 @@ export default function ChatScreen({ darkMode }) {
                   styles.aiAvatar,
                   {
                     backgroundColor: darkMode
-                      ? 'rgba(79,142,255,0.12)'
+                      ? 'rgba(59,107,255,0.12)'
                       : 'rgba(59,130,246,0.10)',
                   },
                 ]}
               >
-                <Ionicons name="sparkles" size={16} color={darkMode ? '#4F8EFF' : '#3B82F6'} />
+                <Ionicons name="sparkles" size={16} color={darkMode ? '#3B6BFF' : '#3B82F6'} />
               </View>
               <View
                 style={[
@@ -786,10 +786,10 @@ export default function ChatScreen({ darkMode }) {
                   styles.typingBubble,
                   {
                     backgroundColor: darkMode
-                      ? 'rgba(79,142,255,0.06)'
+                      ? 'rgba(59,107,255,0.06)'
                       : 'rgba(59,130,246,0.06)',
                     borderColor: darkMode
-                      ? 'rgba(79,142,255,0.12)'
+                      ? 'rgba(59,107,255,0.12)'
                       : 'rgba(59,130,246,0.10)',
                   },
                 ]}
@@ -825,7 +825,7 @@ export default function ChatScreen({ darkMode }) {
         >
           {/* Camera button */}
           <SpringPressable onPress={takePhoto} style={styles.cameraBtn} scaleDown={0.85}>
-            <Ionicons name="camera" size={20} color="#00531f" />
+            <Ionicons name="camera" size={20} color="#2E5BFF" />
           </SpringPressable>
 
           {/* Gallery button */}
@@ -861,7 +861,7 @@ export default function ChatScreen({ darkMode }) {
             <Ionicons
               name="arrow-up"
               size={18}
-              color={canSend ? '#00531f' : c.textMuted}
+              color={canSend ? '#2E5BFF' : c.textMuted}
             />
           </SpringPressable>
         </View>
@@ -1035,7 +1035,7 @@ const styles = StyleSheet.create({
   txnCardAccentBar: {
     width: 3,
     height: 36,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderRadius: 2,
   },
   txnCardOverline: {
@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
   },
   verifyBtn: {
     flex: 1,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderRadius: Radius.pill,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -1109,12 +1109,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderWidth: BorderWidth.thin,
-    borderColor: 'rgba(0,83,31,0.3)',
+    borderColor: 'rgba(59,107,255,0.35)',
     ...Shadow.limeSm,
     minHeight: 48,
   },
   verifyBtnText: {
-    color: '#00531f',
+    color: '#2E5BFF',
     ...Typography.btnPrimary,
   },
   editBtn: {
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.pill,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: BorderWidth.thin,

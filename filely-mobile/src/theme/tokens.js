@@ -67,21 +67,21 @@ export const BorderWidth = {
 export const Shadow = {
   // Subtle card lift
   softSm: {
-    shadowColor: '#4F8EFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 4,
   },
   softMd: {
-    shadowColor: '#4F8EFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
     elevation: 8,
   },
   softLg: {
-    shadowColor: '#4F8EFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.20,
     shadowRadius: 40,
@@ -89,14 +89,14 @@ export const Shadow = {
   },
   // Lime glow for CTAs
   limeSm: {
-    shadowColor: '#44e571',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.30,
     shadowRadius: 12,
     elevation: 4,
   },
   limeMd: {
-    shadowColor: '#44e571',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
@@ -112,21 +112,21 @@ export const Shadow = {
   },
   // Legacy aliases (used in existing screens)
   hardSm: {
-    shadowColor: '#4F8EFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 4,
   },
   hardMd: {
-    shadowColor: '#4F8EFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.20,
     shadowRadius: 20,
     elevation: 8,
   },
   hardLg: {
-    shadowColor: '#4F8EFF',
+    shadowColor: '#3B6BFF',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.22,
     shadowRadius: 32,
@@ -192,7 +192,7 @@ export const CardPresets = {
   },
   // Button primary (lime green CTA)
   btnPrimary: {
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderColor: 'rgba(0,83,31,0.3)',
     borderWidth: 1,
     borderRadius: Radius.pill,

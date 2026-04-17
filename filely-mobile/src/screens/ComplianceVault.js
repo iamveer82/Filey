@@ -70,7 +70,7 @@ function SkeletonCard({ darkMode, index }) {
           style={[
             pulseStyle,
             styles.fileIcon,
-            { backgroundColor: darkMode ? 'rgba(79,142,255,0.08)' : 'rgba(79,142,255,0.06)' },
+            { backgroundColor: darkMode ? 'rgba(59,107,255,0.08)' : 'rgba(59,107,255,0.06)' },
           ]}
         />
         <View style={{ flex: 1, gap: 6 }}>
@@ -416,11 +416,11 @@ export default function ComplianceVault({ darkMode }) {
             label={label}
             active={filter === val}
             onPress={() => setFilter(val)}
-            activeColor="#44e571"
+            activeColor="#3B6BFF"
             inactiveColor={c.surfaceLow}
             textColor={c.text}
             activeTextColor="#003516"
-            borderActive="#006e2c"
+            borderActive="#2E5BFF"
             borderInactive={c.border}
           />
         ))}
@@ -446,7 +446,7 @@ export default function ComplianceVault({ darkMode }) {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={c.accent}
-            colors={['#4F8EFF']}
+            colors={['#3B6BFF']}
             progressBackgroundColor={c.card}
           />
         }
@@ -504,12 +504,12 @@ export default function ComplianceVault({ darkMode }) {
                       styles.fileIcon,
                       {
                         backgroundColor: darkMode
-                          ? 'rgba(79,142,255,0.12)'
-                          : 'rgba(79,142,255,0.08)',
+                          ? 'rgba(59,107,255,0.12)'
+                          : 'rgba(59,107,255,0.08)',
                       },
                     ]}
                   >
-                    <Ionicons name="document-text" size={20} color="#4F8EFF" />
+                    <Ionicons name="document-text" size={20} color="#3B6BFF" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.fileName, { color: c.text }]} numberOfLines={1}>
@@ -550,7 +550,7 @@ export default function ComplianceVault({ darkMode }) {
                       <Ionicons
                         name="checkmark-circle"
                         size={12}
-                        color="#4F8EFF"
+                        color="#3B6BFF"
                         style={{ marginLeft: 2 }}
                       />
                     </Animated.View>
@@ -623,12 +623,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     paddingHorizontal: Spacing.lg,
     paddingVertical: 10,
     borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(0,83,31,0.3)',
+    borderColor: 'rgba(59,107,255,0.35)',
     minHeight: 44,
     minWidth: 44,
   },
@@ -774,33 +774,33 @@ const styles = StyleSheet.create({
 
   /* VAT tag with glow */
   vatTag: {
-    backgroundColor: 'rgba(68,229,113,0.10)',
-    borderColor: 'rgba(68,229,113,0.25)',
+    backgroundColor: 'rgba(59,107,255,0.10)',
+    borderColor: 'rgba(59,107,255,0.25)',
   },
   vatTagText: {
     ...Typography.micro,
     fontWeight: '800',
-    color: '#44e571',
+    color: '#3B6BFF',
   },
   tagGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(68,229,113,0.05)',
+    backgroundColor: 'rgba(59,107,255,0.05)',
     borderRadius: 8,
   },
 
   /* TRN tag with glow */
   trnTag: {
-    backgroundColor: 'rgba(79,142,255,0.10)',
-    borderColor: 'rgba(79,142,255,0.25)',
+    backgroundColor: 'rgba(59,107,255,0.10)',
+    borderColor: 'rgba(59,107,255,0.25)',
   },
   trnTagText: {
     ...Typography.micro,
     fontWeight: '800',
-    color: '#4F8EFF',
+    color: '#3B6BFF',
   },
   trnTagGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(79,142,255,0.05)',
+    backgroundColor: 'rgba(59,107,255,0.05)',
     borderRadius: 8,
   },
 

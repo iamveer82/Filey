@@ -198,7 +198,7 @@ export default function AIMessagingHub({ darkMode, activeTab = 'cowork' }) {
             style={[
               styles.tab,
               currentTab === val
-                ? { backgroundColor: '#44e571', borderColor: 'rgba(0,83,31,0.3)', ...Shadow.limeSm }
+                ? { backgroundColor: '#3B6BFF', borderColor: 'rgba(59,107,255,0.35)', ...Shadow.limeSm }
                 : { backgroundColor: c.surfaceLow, borderColor: c.border },
             ]}
             accessibilityRole="tab"
@@ -268,11 +268,11 @@ export default function AIMessagingHub({ darkMode, activeTab = 'cowork' }) {
               styles.aiBubble,
               {
                 backgroundColor:
-                  msg.role === 'user'   ? '#44e571' :
+                  msg.role === 'user'   ? '#3B6BFF' :
                   msg.role === 'system' ? c.surfaceLow :
                   darkMode              ? c.card : '#FFFFFF',
                 borderColor:
-                  msg.role === 'user' ? 'rgba(0,83,31,0.3)' : c.border,
+                  msg.role === 'user' ? 'rgba(59,107,255,0.35)' : c.border,
               },
             ]}
           >
@@ -289,8 +289,8 @@ export default function AIMessagingHub({ darkMode, activeTab = 'cowork' }) {
             {msg.extractedTransaction ? (
               <View style={styles.billWidget}>
                 <View style={styles.billHeader}>
-                  <View style={[styles.billIconWrap, { backgroundColor: 'rgba(79,142,255,0.12)' }]}>
-                    <Ionicons name="receipt-outline" size={18} color="#4F8EFF" />
+                  <View style={[styles.billIconWrap, { backgroundColor: 'rgba(59,107,255,0.12)' }]}>
+                    <Ionicons name="receipt-outline" size={18} color="#3B6BFF" />
                   </View>
                   <Text style={[styles.billTitle, { color: c.text }]}>Smart Bill Detected</Text>
                 </View>
@@ -298,7 +298,7 @@ export default function AIMessagingHub({ darkMode, activeTab = 'cowork' }) {
                   <Text style={[styles.billMerchant, { color: c.text }]}>{msg.extractedTransaction.merchant}</Text>
                   <View style={styles.billAmountRow}>
                     <Text style={[styles.billAmount, { color: '#FF4B6E' }]}>{msg.extractedTransaction.amount} AED</Text>
-                    <Text style={[styles.billVat, { color: '#44e571' }]}>VAT: {msg.extractedTransaction.vat} AED</Text>
+                    <Text style={[styles.billVat, { color: '#3B6BFF' }]}>VAT: {msg.extractedTransaction.vat} AED</Text>
                   </View>
                 </View>
                 <SpringPressable
@@ -382,7 +382,7 @@ export default function AIMessagingHub({ darkMode, activeTab = 'cowork' }) {
             disabled={loading || sending || !input.trim()}
             style={[
               styles.sendBtn,
-              { backgroundColor: (loading || sending || !input.trim()) ? c.border : '#44e571' },
+              { backgroundColor: (loading || sending || !input.trim()) ? c.border : '#3B6BFF' },
               !(loading || sending || !input.trim()) && Shadow.limeSm,
             ]}
             accessibilityLabel="Send message"
@@ -495,9 +495,9 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 14,
     borderRadius: Radius.pill,
-    backgroundColor: '#44e571',
+    backgroundColor: '#3B6BFF',
     borderWidth: 1,
-    borderColor: 'rgba(0,83,31,0.3)',
+    borderColor: 'rgba(59,107,255,0.35)',
   },
   stapleBtnText: { ...Typography.btnSmall, color: '#003516', fontWeight: '800' },
 
