@@ -21,6 +21,9 @@ import { scanReceipt, scanReceiptBulk } from '../services/receiptPipeline';
 import TransactionEditor from '../components/TransactionEditor';
 import VatSummaryModal from '../components/VatSummaryModal';
 import { categoryById } from '../services/categories';
+import Markdown from 'react-native-markdown-display';
+import * as Clipboard from 'expo-clipboard';
+import { Share } from 'react-native';
 import { send as llmSend, getPreference as getLLMPref } from '../services/llmProvider';
 import { exportCSV, exportPDF } from '../services/exportLedger';
 
@@ -101,6 +104,8 @@ export default function AIMessagingHub() {
   const [scanning, setScanning] = useState(false);
   const [showVatSummary, setShowVatSummary] = useState(false);
   const scrollRef = useRef();
+  const abortRef = useRef(null);
+  const lastUserPromptRef = useRef(null);
 
   const name = profile?.name || user?.email?.split('@')[0] || 'there';
 
@@ -126,67 +131,116 @@ export default function AIMessagingHub() {
     setMessages(prev => [...prev, { id: genId(), ts: Date.now(), ...m }]);
   }, []);
 
+  const runTurn = useCallback(async (text, historyOverride) => {
+    const history = (historyOverride ?? messages).slice(-12)
+      .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    let txContext = '';
+    const needsData = /advice|summary|spend|spent|spending|budget|savings|report|breakdown|category|vat|tax|owe|reclaim|deduction/i.test(text);
+    if (needsData) {
+      try {
+        const res = await api.getTransactions({ orgId });
+        const list = (res?.transactions || res || []).slice(-50);
+        if (list.length) {
+          const { summarizeVat } = require('../services/categories');
+          const sum = summarizeVat(list);
+          const top = sum.byCategory.slice(0, 6)
+            .map(c => `- ${c.label}: ${c.amt.toFixed(2)} AED (VAT ${c.vat.toFixed(2)}, ×${c.count})`)
+            .join('\n');
+          txContext = `\n\nUSER TRANSACTION CONTEXT (last ${list.length}):\nTotal: ${sum.totalAmt.toFixed(2)} AED · VAT paid: ${sum.totalVat.toFixed(2)} · Reclaimable: ${sum.reclaimable.toFixed(2)}\nTop categories:\n${top}\nCompany: ${companyName} · Submitter: ${submitterName}`;
+        }
+      } catch {}
+    }
+
+    const sys = {
+      role: 'system',
+      content: `You are Filey, a UAE VAT-compliance assistant for ${companyName}. Be concise and direct. Use markdown (bold, lists, headers). Cite [n] when using web results. UAE VAT is 5% (FTA). Users can reclaim VAT on qualifying business expenses only (fuel, utilities, telecom, software, travel, office, legal, hotel).${txContext}`,
+    };
+    const convo = [sys, ...history, { role: 'user', content: text }];
+
+    // Create streaming placeholder message
+    const streamId = genId();
+    setMessages(prev => [...prev, { id: streamId, ts: Date.now(), role: 'assistant', content: '', streaming: true }]);
+
+    abortRef.current = new AbortController();
+
+    try {
+      const out = await llmSend(convo, {
+        signal: abortRef.current.signal,
+        onToken: (_delta, acc) => {
+          setMessages(prev => prev.map(m => m.id === streamId ? { ...m, content: acc } : m));
+        },
+      });
+      setMessages(prev => prev.map(m => m.id === streamId
+        ? { ...m, content: out.text || m.content || 'No response.', meta: out.meta, streaming: false }
+        : m
+      ));
+    } catch (e) {
+      const aborted = e.name === 'AbortError' || /abort/i.test(e.message || '');
+      setMessages(prev => prev.map(m => m.id === streamId
+        ? { ...m, content: m.content || (aborted ? '_Stopped._' : `Error: ${e.message}. Configure provider in Settings → AI & Integrations.`), streaming: false, aborted }
+        : m
+      ));
+    } finally {
+      abortRef.current = null;
+    }
+  }, [messages, orgId, companyName, submitterName]);
+
   const send = useCallback(async (overrideText) => {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
     setInput('');
     setLoading(true);
+    lastUserPromptRef.current = text;
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     pushMessage({ role: 'user', content: text });
+    await runTurn(text);
+    setLoading(false);
+  }, [input, loading, pushMessage, runTurn]);
 
-    try {
-      const history = messages.slice(-12)
-        .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
-        .map(m => ({ role: m.role, content: m.content }));
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+  }, []);
 
-      // RAG: inject tx context when prompt implies financial advice / summary.
-      let txContext = '';
-      const needsData = /advice|summary|spend|spent|spending|budget|savings|report|breakdown|category|vat|tax|owe|reclaim|deduction/i.test(text);
-      if (needsData) {
-        try {
-          const res = await api.getTransactions({ orgId });
-          const list = (res?.transactions || res || []).slice(-50);
-          if (list.length) {
-            const { summarizeVat } = require('../services/categories');
-            const sum = summarizeVat(list);
-            const top = sum.byCategory.slice(0, 6)
-              .map(c => `- ${c.label}: ${c.amt.toFixed(2)} AED (VAT ${c.vat.toFixed(2)}, ×${c.count})`)
-              .join('\n');
-            txContext = `\n\nUSER TRANSACTION CONTEXT (last ${list.length}):\nTotal: ${sum.totalAmt.toFixed(2)} AED · VAT paid: ${sum.totalVat.toFixed(2)} · Reclaimable: ${sum.reclaimable.toFixed(2)}\nTop categories:\n${top}\nCompany: ${companyName} · Submitter: ${submitterName}`;
-          }
-        } catch {}
+  const showMessageActions = useCallback((m) => {
+    if (!m.content) return;
+    try { Haptics.selectionAsync(); } catch {}
+    Alert.alert('Message', '', [
+      { text: 'Copy', onPress: async () => {
+        await Clipboard.setStringAsync(m.content);
+        try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      }},
+      { text: 'Share', onPress: async () => {
+        try { await Share.share({ message: m.content }); } catch {}
+      }},
+      { text: 'Report correction', onPress: () => {
+        pushMessage({ role: 'system', content: 'Noted. Correction queued for model retraining.' });
+      }},
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [pushMessage]);
+
+  const regenerate = useCallback(async () => {
+    if (loading) return;
+    // Remove last assistant message, re-run with last user prompt
+    let lastUserText = lastUserPromptRef.current;
+    let cutoff = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant' && !messages[i].extractedTransaction && !messages[i].kind) {
+        cutoff = i;
+        break;
       }
-
-      const sys = {
-        role: 'system',
-        content: `You are Filey, a UAE VAT-compliance assistant for ${companyName}. Be concise and direct. Cite [n] when using web results. UAE VAT is 5% (FTA). Users can reclaim VAT on qualifying business expenses only (fuel, utilities, telecom, software, travel, office, legal, hotel).${txContext}`,
-      };
-      const convo = [sys, ...history, { role: 'user', content: text }];
-      const out = await llmSend(convo);
-      pushMessage({
-        role: 'assistant',
-        content: out.text || 'No response.',
-        meta: out.meta,
-      });
-    } catch (e) {
-      // Fallback to legacy backend if provider fails.
-      try {
-        const res = await api.sendMessage(text, 'ai-session');
-        pushMessage({
-          role: 'assistant',
-          content: res.message || (e.message || 'No response.'),
-          extractedTransaction: res.extractedTransaction,
-        });
-      } catch {
-        pushMessage({
-          role: 'assistant',
-          content: `Error: ${e.message || 'Connection failed'}. Configure an LLM provider in Settings → AI & Integrations.`,
-        });
-      }
-    } finally {
-      setLoading(false);
     }
-  }, [input, loading, messages, pushMessage, orgId, companyName, submitterName]);
+    if (cutoff < 0 || !lastUserText) return;
+    const trimmed = messages.slice(0, cutoff);
+    setMessages(trimmed);
+    setLoading(true);
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    await runTurn(lastUserText, trimmed);
+    setLoading(false);
+  }, [loading, messages, runTurn]);
 
   const runScan = useCallback(async (source) => {
     setShowAttach(false);
@@ -451,7 +505,31 @@ export default function AIMessagingHub() {
               layout={Layout.springify()}
               style={styles.aiRow}
             >
-              <Text style={styles.aiText}>{m.content}</Text>
+              <Pressable
+                onLongPress={() => showMessageActions(m)}
+                delayLongPress={250}
+                style={{ width: '100%' }}
+              >
+                {m.content ? (
+                  <Markdown style={mdStyles}>{m.content}</Markdown>
+                ) : null}
+                {m.streaming && (
+                  <View style={styles.streamBar}>
+                    <View style={styles.streamDot} />
+                    <Text style={styles.streamText}>streaming…</Text>
+                    <Pressable onPress={stop} style={styles.stopBtn}>
+                      <Ionicons name="stop" size={11} color="#FCA5A5" />
+                      <Text style={styles.stopText}>Stop</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </Pressable>
+              {!m.streaming && !m.extractedTransaction && m.role === 'assistant' && i === messages.length - 1 && (
+                <Pressable onPress={regenerate} style={styles.regenBtn}>
+                  <Ionicons name="refresh" size={12} color="#9CA3AF" />
+                  <Text style={styles.regenText}>Regenerate</Text>
+                </Pressable>
+              )}
               {m.meta?.citations?.length > 0 && (
                 <View style={styles.citationRow}>
                   {m.meta.citations.map((cite, ci) => (
@@ -487,7 +565,12 @@ export default function AIMessagingHub() {
           );
         })}
 
-        {(loading || scanning) && (
+        {scanning && (
+          <Animated.View entering={FadeIn.duration(160)} style={styles.aiRow}>
+            <TypingDots />
+          </Animated.View>
+        )}
+        {loading && !messages[messages.length - 1]?.streaming && (
           <Animated.View entering={FadeIn.duration(160)} style={styles.aiRow}>
             <TypingDots />
           </Animated.View>
@@ -591,7 +674,49 @@ export default function AIMessagingHub() {
   );
 }
 
+const mdStyles = {
+  body: { color: '#F9FAFB', fontSize: 15.5, lineHeight: 23 },
+  strong: { color: '#FFFFFF', fontWeight: '700' },
+  em: { color: '#F9FAFB', fontStyle: 'italic' },
+  bullet_list: { marginVertical: 4 },
+  ordered_list: { marginVertical: 4 },
+  list_item: { color: '#F9FAFB', fontSize: 15.5, lineHeight: 23 },
+  code_inline: { backgroundColor: '#1F1F1F', color: '#BEF264', paddingHorizontal: 4, borderRadius: 4 },
+  code_block: { backgroundColor: '#1F1F1F', color: '#E5E7EB', padding: 10, borderRadius: 10 },
+  fence: { backgroundColor: '#1F1F1F', color: '#E5E7EB', padding: 10, borderRadius: 10 },
+  heading1: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+  heading2: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  heading3: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  link: { color: '#93C5FD' },
+  blockquote: { backgroundColor: '#1F1F1F', borderLeftWidth: 3, borderLeftColor: '#3B6BFF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+};
+
 const styles = StyleSheet.create({
+  streamBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginTop: 8, paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#262626',
+  },
+  streamDot: {
+    width: 7, height: 7, borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+  streamText: { color: '#9CA3AF', fontSize: 11, fontWeight: '600', flex: 1 },
+  stopBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 10, backgroundColor: '#1F1F1F',
+    borderWidth: 1, borderColor: '#2A2A2A',
+  },
+  stopText: { color: '#F9FAFB', fontSize: 11, fontWeight: '700' },
+  regenBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: 6, paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 10, backgroundColor: '#1F1F1F',
+    borderWidth: 1, borderColor: '#2A2A2A',
+  },
+  regenText: { color: '#E5E7EB', fontSize: 11, fontWeight: '600' },
   topBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingBottom: 14,

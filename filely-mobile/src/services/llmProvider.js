@@ -53,20 +53,69 @@ export async function testKey(provider) {
 
 // ---------- Adapters ----------
 
-async function callOpenAI({ messages, model, key, maxTokens }) {
+async function parseSSE(response, onToken, extractFn) {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    // React Native sometimes lacks ReadableStream; fallback to full text.
+    const txt = await response.text();
+    let acc = '';
+    for (const line of txt.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const delta = extractFn(JSON.parse(payload));
+        if (delta) { acc += delta; onToken?.(delta, acc); }
+      } catch {}
+    }
+    return acc;
+  }
+  const dec = new TextDecoder();
+  let buf = '';
+  let acc = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const delta = extractFn(JSON.parse(payload));
+        if (delta) { acc += delta; onToken?.(delta, acc); }
+      } catch {}
+    }
+  }
+  return acc;
+}
+
+async function callOpenAI({ messages, model, key, maxTokens, signal, onToken, tools }) {
+  const body = { model, messages, max_tokens: maxTokens || 1024, temperature: 0.7, stream: !!onToken };
+  if (tools?.length) { body.tools = tools; body.tool_choice = 'auto'; }
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens || 1024, temperature: 0.7 }),
+    body: JSON.stringify(body),
+    signal,
   });
   if (!r.ok) throw new Error(`OpenAI ${r.status}: ${await r.text()}`);
+  if (onToken) {
+    const text = await parseSSE(r, onToken, (j) => j.choices?.[0]?.delta?.content || '');
+    return { text };
+  }
   const j = await r.json();
-  return { text: j.choices?.[0]?.message?.content || '' };
+  const choice = j.choices?.[0]?.message;
+  return { text: choice?.content || '', toolCalls: choice?.tool_calls };
 }
 
-async function callAnthropic({ messages, model, key, maxTokens }) {
+async function callAnthropic({ messages, model, key, maxTokens, signal, onToken, tools }) {
   const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
   const msgs = messages.filter(m => m.role !== 'system');
+  const body = { model, messages: msgs, system: system || undefined, max_tokens: maxTokens || 1024, stream: !!onToken };
+  if (tools?.length) body.tools = tools;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -74,31 +123,47 @@ async function callAnthropic({ messages, model, key, maxTokens }) {
       'x-api-key': key,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({ model, messages: msgs, system: system || undefined, max_tokens: maxTokens || 1024 }),
+    body: JSON.stringify(body),
+    signal,
   });
   if (!r.ok) throw new Error(`Anthropic ${r.status}: ${await r.text()}`);
+  if (onToken) {
+    const text = await parseSSE(r, onToken, (j) => {
+      if (j.type === 'content_block_delta') return j.delta?.text || '';
+      return '';
+    });
+    return { text };
+  }
   const j = await r.json();
-  return { text: j.content?.[0]?.text || '' };
+  const blocks = j.content || [];
+  const textPart = blocks.find(b => b.type === 'text')?.text || '';
+  const toolUse = blocks.filter(b => b.type === 'tool_use');
+  return { text: textPart, toolCalls: toolUse.length ? toolUse : undefined };
 }
 
-async function callGemini({ messages, model, key, maxTokens }) {
+async function callGemini({ messages, model, key, maxTokens, signal, onToken }) {
   const contents = messages
     .filter(m => m.role !== 'system')
     .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
   const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const endpoint = onToken ? 'streamGenerateContent' : 'generateContent';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${encodeURIComponent(key)}${onToken ? '&alt=sse' : ''}`;
   const body = {
     contents,
     generationConfig: { maxOutputTokens: maxTokens || 1024, temperature: 0.7 },
   };
   if (sys) body.systemInstruction = { parts: [{ text: sys }] };
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${await r.text()}`);
+  if (onToken) {
+    const text = await parseSSE(r, onToken, (j) => j.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '');
+    return { text };
+  }
   const j = await r.json();
   return { text: j.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '' };
 }
 
-async function callOpenRouter({ messages, model, key, maxTokens }) {
+async function callOpenRouter({ messages, model, key, maxTokens, signal, onToken }) {
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -107,9 +172,14 @@ async function callOpenRouter({ messages, model, key, maxTokens }) {
       'HTTP-Referer': 'https://filey.app',
       'X-Title': 'Filey',
     },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens || 1024 }),
+    body: JSON.stringify({ model, messages, max_tokens: maxTokens || 1024, stream: !!onToken }),
+    signal,
   });
   if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${await r.text()}`);
+  if (onToken) {
+    const text = await parseSSE(r, onToken, (j) => j.choices?.[0]?.delta?.content || '');
+    return { text };
+  }
   const j = await r.json();
   return { text: j.choices?.[0]?.message?.content || '' };
 }
@@ -174,7 +244,13 @@ export async function send(messages, opts = {}) {
     if (!key) throw new Error(`No API key set for ${def.label}. Add one in Settings.`);
   }
 
-  const args = { messages: msgs, model, key, maxTokens: opts.maxTokens };
+  const args = {
+    messages: msgs, model, key,
+    maxTokens: opts.maxTokens,
+    signal: opts.signal,
+    onToken: opts.onToken,
+    tools: opts.tools,
+  };
   let out;
   switch (provider) {
     case 'gemma':      out = await callGemma(args); break;
@@ -185,5 +261,9 @@ export async function send(messages, opts = {}) {
     default: throw new Error(`Provider ${provider} not implemented`);
   }
 
-  return { text: out.text, meta: { provider, model, webUsed: !!webCtx, citations } };
+  return {
+    text: out.text,
+    toolCalls: out.toolCalls,
+    meta: { provider, model, webUsed: !!webCtx, citations },
+  };
 }
