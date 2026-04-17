@@ -1,260 +1,64 @@
-/**
- * ComplianceVault — Premium 5-Year FTA Vault
- * Staggered list animations, skeleton loading, pull-to-refresh,
- * spring press feedback on cards and buttons.
- */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Platform,
-  RefreshControl,
+  View, Text, ScrollView, TextInput, Pressable, StyleSheet,
+  Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import Animated, {
-  FadeInDown,
-  FadeIn,
-  SlideInRight,
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
+  FadeInDown, FadeInUp, FadeIn, Layout,
+  useSharedValue, useAnimatedStyle, withSpring, withRepeat,
+  withTiming, withSequence, interpolate,
 } from 'react-native-reanimated';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
-import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '../theme/tokens';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// ---------------------------------------------------------------------------
-//  Skeleton shimmer placeholder
-// ---------------------------------------------------------------------------
-function SkeletonCard({ darkMode, index }) {
-  const c = darkMode ? Colors.dark : Colors.light;
-  const shimmer = useSharedValue(0.35);
-
-  useEffect(() => {
-    shimmer.value = withRepeat(
-      withSequence(
-        withTiming(0.7, { duration: 900, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.35, { duration: 900, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
-
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: shimmer.value }));
-
-  return (
-    <Animated.View
-      entering={FadeIn.delay(index * 120).duration(400)}
-      style={[
-        styles.fileCard,
-        darkMode ? CardPresets.cardDark : CardPresets.cardLight,
-        { marginHorizontal: Spacing.xxl },
-      ]}
-    >
-      <View style={styles.fileRow}>
-        <Animated.View
-          style={[
-            pulseStyle,
-            styles.fileIcon,
-            { backgroundColor: darkMode ? 'rgba(79,142,255,0.08)' : 'rgba(79,142,255,0.06)' },
-          ]}
-        />
-        <View style={{ flex: 1, gap: 6 }}>
-          <Animated.View
-            style={[
-              pulseStyle,
-              { width: '65%', height: 14, borderRadius: 6, backgroundColor: c.surfaceLow },
-            ]}
-          />
-          <Animated.View
-            style={[
-              pulseStyle,
-              { width: '40%', height: 10, borderRadius: 4, backgroundColor: c.surfaceLow },
-            ]}
-          />
-        </View>
-        <Animated.View
-          style={[
-            pulseStyle,
-            { width: 60, height: 14, borderRadius: 6, backgroundColor: c.surfaceLow },
-          ]}
-        />
-      </View>
-      <View style={[styles.footer, { borderTopColor: c.border }]}>
-        <Animated.View
-          style={[
-            pulseStyle,
-            { width: 80, height: 20, borderRadius: 6, backgroundColor: c.surfaceLow },
-          ]}
-        />
-        <Animated.View
-          style={[
-            pulseStyle,
-            { width: 48, height: 20, borderRadius: 6, backgroundColor: c.surfaceLow },
-          ]}
-        />
-      </View>
-    </Animated.View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-//  Animated empty-state folder icon (breathing scale)
-// ---------------------------------------------------------------------------
-function BreathingFolder({ color }) {
+function SpringPressable({ children, style, onPress, disabled, ...rest }) {
   const scale = useSharedValue(1);
-
-  useEffect(() => {
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.08, { duration: 1600, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
-
-  const breathStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Animated.View style={breathStyle}>
-      <Ionicons name="folder-open-outline" size={56} color={color} />
-    </Animated.View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-//  Pressable card wrapper with spring scale
-// ---------------------------------------------------------------------------
-function PressableCard({ children, style, onPress, accessibilityLabel }) {
-  const pressed = useSharedValue(1);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pressed.value }],
-  }));
-
-  const handlePressIn = () => {
-    pressed.value = withSpring(0.97, { damping: 15, stiffness: 200 });
-  };
-  const handlePressOut = () => {
-    pressed.value = withSpring(1, { damping: 12, stiffness: 180 });
-  };
-
-  return (
-    <AnimatedTouchable
-      activeOpacity={0.92}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+    <AnimatedPressable
       onPress={onPress}
-      style={[animStyle, style]}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
+      disabled={disabled}
+      onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
+      style={[style, anim]}
+      {...rest}
     >
       {children}
-    </AnimatedTouchable>
+    </AnimatedPressable>
   );
 }
 
-// ---------------------------------------------------------------------------
-//  Filter tab with spring scale on press
-// ---------------------------------------------------------------------------
-function FilterTab({ label, active, onPress, activeColor, inactiveColor, textColor, activeTextColor, borderActive, borderInactive }) {
-  const scale = useSharedValue(1);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.92, { damping: 14, stiffness: 220 });
-  };
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 180 });
-  };
-
+function BreathingShield() {
+  const s = useSharedValue(1);
+  useEffect(() => {
+    s.value = withRepeat(withSequence(
+      withTiming(1.08, { duration: 1400 }),
+      withTiming(1, { duration: 1400 }),
+    ), -1, false);
+  }, []);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
-    <AnimatedTouchable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={[
-        animStyle,
-        styles.tab,
-        {
-          backgroundColor: active ? activeColor : inactiveColor,
-          borderColor: active ? borderActive : borderInactive,
-        },
-      ]}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-    >
-      <Text style={[styles.tabText, { color: active ? activeTextColor : textColor }]}>
-        {label}
-      </Text>
-    </AnimatedTouchable>
+    <Animated.View style={[styles.shield, anim]}>
+      <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
+    </Animated.View>
   );
 }
 
-// ---------------------------------------------------------------------------
-//  Export button with spring press + lime glow
-// ---------------------------------------------------------------------------
-function ExportButton({ onPress, exporting, darkMode }) {
-  const scale = useSharedValue(1);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.93, { damping: 14, stiffness: 220 });
-  };
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 180 });
-  };
-
+function StatPill({ label, value }) {
   return (
-    <AnimatedTouchable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={exporting}
-      style={[animStyle, styles.exportBtn, Shadow.limeMd]}
-      accessibilityRole="button"
-      accessibilityLabel="Generate FTA report"
-    >
-      {exporting ? (
-        <Animated.View entering={FadeIn.duration(200)}>
-          <Ionicons name="hourglass-outline" size={16} color="#003516" />
-        </Animated.View>
-      ) : (
-        <Animated.View entering={FadeIn.duration(200)} style={styles.exportInner}>
-          <Ionicons name="download-outline" size={16} color="#003516" />
-          <Text style={styles.exportText}>FTA Report</Text>
-        </Animated.View>
-      )}
-    </AnimatedTouchable>
+    <View style={styles.statPill}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
-// ===========================================================================
-//  MAIN COMPONENT
-// ===========================================================================
 export default function ComplianceVault({ darkMode }) {
   const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
@@ -266,17 +70,7 @@ export default function ComplianceVault({ darkMode }) {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
 
-  // Search-bar focus border animation
-  const searchBorderAnim = useSharedValue(0);
-  const searchBorderStyle = useAnimatedStyle(() => ({
-    borderColor: searchBorderAnim.value === 1
-      ? withSpring(c.accent, { damping: 20, stiffness: 150 })
-      : withSpring(c.border, { damping: 20, stiffness: 150 }),
-  }));
-
-  // ---- API calls (unchanged business logic) ----
   const fetchFiles = async () => {
     setLoading(true);
     try {
@@ -289,27 +83,21 @@ export default function ComplianceVault({ darkMode }) {
     }
   };
 
-  useEffect(() => {
-    fetchFiles();
-  }, []);
+  useEffect(() => { fetchFiles(); }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       const d = await api.getFiles();
       setFiles(d.files || []);
-    } catch {
-      Alert.alert('Error', 'Failed to refresh vault records');
-    } finally {
-      setRefreshing(false);
-    }
+    } catch {} finally { setRefreshing(false); }
   }, []);
 
   const generateReport = async () => {
     setExporting(true);
     try {
       await api.exportFiles();
-      Alert.alert('Export Successful', 'Your FTA-compliant report has been generated.');
+      Alert.alert('Export Successful', 'FTA-compliant report generated.');
     } catch {
       Alert.alert('Error', 'Failed to generate report');
     } finally {
@@ -317,509 +105,255 @@ export default function ComplianceVault({ darkMode }) {
     }
   };
 
-  // ---- Filtering (unchanged business logic) ----
-  const filteredFiles = files.filter((f) => {
-    const matchesSearch =
-      !search ||
-      (f.merchant || '').toLowerCase().includes(search.toLowerCase()) ||
-      (f.trn || '').includes(search) ||
-      (f.date || '').includes(search);
-    if (filter === 'vat only') return matchesSearch && parseFloat(f.vat) > 0;
+  const filtered = files.filter((f) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q
+      || (f.merchant || '').toLowerCase().includes(q)
+      || (f.trn || '').includes(search)
+      || (f.date || '').includes(search);
+    if (filter === 'vat') return matchesSearch && parseFloat(f.vat) > 0;
     if (filter === 'flagged') return matchesSearch && f.status === 'flagged';
     return matchesSearch;
   });
 
-  // Handle search focus
-  const handleSearchFocus = () => {
-    setSearchFocused(true);
-    searchBorderAnim.value = 1;
-  };
-  const handleSearchBlur = () => {
-    setSearchFocused(false);
-    searchBorderAnim.value = 0;
-  };
+  const vatTotal = files.reduce((sum, f) => sum + (parseFloat(f.vat) || 0), 0);
+  const flaggedCount = files.filter(f => f.status === 'flagged').length;
 
-  // ---- Render ----
   return (
-    <View style={[styles.container, { backgroundColor: c.bg, paddingTop: insets.top + 16 }]}>
-      {/* ── Header ── */}
-      <Animated.View
-        entering={FadeInDown.duration(600).springify().damping(18).stiffness(140)}
-        style={styles.header}
-      >
-        <View>
-          <Text style={[styles.title, { color: c.text }]}>5-Year Vault</Text>
-          <Text style={[styles.subtitle, { color: c.textMuted }]}>FTA Compliance Archive</Text>
-        </View>
-        <ExportButton
-          onPress={generateReport}
-          exporting={exporting}
-          darkMode={darkMode}
-        />
-      </Animated.View>
-
-      {/* ── Search Bar ── */}
-      <Animated.View
-        entering={FadeInDown.delay(80).duration(500).springify().damping(18)}
-        style={[
-          styles.searchBar,
-          { backgroundColor: c.surfaceLow },
-          searchBorderStyle,
-          searchFocused && styles.searchBarFocused,
-        ]}
-      >
-        <Ionicons
-          name="search-outline"
-          size={18}
-          color={searchFocused ? c.accent : c.textMuted}
-        />
-        <TextInput
-          style={[styles.input, { color: c.text }]}
-          placeholder="Search by merchant, TRN, or date..."
-          placeholderTextColor={c.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          onFocus={handleSearchFocus}
-          onBlur={handleSearchBlur}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          accessibilityLabel="Search vault records"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity
-            onPress={() => setSearch('')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Clear search"
-            style={styles.clearBtn}
-          >
-            <Ionicons name="close-circle" size={18} color={c.textMuted} />
-          </TouchableOpacity>
-        )}
-      </Animated.View>
-
-      {/* ── Filter Tabs ── */}
-      <Animated.View
-        entering={FadeInDown.delay(160).duration(500).springify().damping(18)}
-        style={styles.tabBar}
-      >
-        {[
-          ['all', 'All'],
-          ['vat only', 'VAT Only'],
-          ['flagged', 'Flagged'],
-        ].map(([val, label]) => (
-          <FilterTab
-            key={val}
-            label={label}
-            active={filter === val}
-            onPress={() => setFilter(val)}
-            activeColor="#44e571"
-            inactiveColor={c.surfaceLow}
-            textColor={c.text}
-            activeTextColor="#003516"
-            borderActive="#006e2c"
-            borderInactive={c.border}
-          />
-        ))}
-        {/* Record count badge */}
-        {!loading && (
-          <Animated.View
-            entering={FadeIn.delay(300).duration(300)}
-            style={[styles.countBadge, { backgroundColor: c.accentLight }]}
-          >
-            <Text style={[styles.countText, { color: c.accent }]}>
-              {filteredFiles.length}
-            </Text>
-          </Animated.View>
-        )}
-      </Animated.View>
-
-      {/* ── File List ── */}
-      <Animated.ScrollView
-        contentContainerStyle={{ paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={c.accent}
-            colors={['#4F8EFF']}
-            progressBackgroundColor={c.card}
-          />
-        }
-      >
-        {loading ? (
-          /* ── Skeleton Loading ── */
-          <View>
-            {[0, 1, 2].map((i) => (
-              <SkeletonCard key={i} darkMode={darkMode} index={i} />
-            ))}
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <StatusBar style="light" />
+      <View style={[styles.hero, { paddingTop: insets.top + 10 }]}>
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.heroInner}>
+          <View style={styles.heroTopRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heroKicker}>FTA ARCHIVE</Text>
+              <Text style={styles.heroTitle}>5-Year Vault</Text>
+              <Text style={styles.heroSub}>Tamper-proof compliance storage</Text>
+            </View>
+            <BreathingShield />
           </View>
-        ) : filteredFiles.length === 0 ? (
-          /* ── Empty State ── */
+
+          <View style={styles.statRow}>
+            <StatPill label="Records" value={files.length.toString()} />
+            <StatPill label="VAT AED" value={vatTotal.toFixed(0)} />
+            <StatPill label="Flagged" value={flaggedCount.toString()} />
+          </View>
+        </Animated.View>
+      </View>
+
+      <View style={[styles.sheet, { backgroundColor: c.bg }]}>
+        <View style={styles.handle} />
+
+        <View style={{ paddingHorizontal: 20, paddingTop: 6 }}>
           <Animated.View
-            entering={FadeIn.delay(100).duration(500)}
-            style={[
-              styles.emptyCard,
-              darkMode ? CardPresets.cardDark : CardPresets.cardLight,
-              { marginHorizontal: Spacing.xxl },
-            ]}
+            entering={FadeInUp.delay(80).duration(400)}
+            style={[styles.searchBar, { backgroundColor: c.card, borderColor: c.borderSubtle }]}
           >
-            <BreathingFolder color={c.textMuted} />
-            <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>
-              No records found
-            </Text>
-            <Text style={[styles.emptyHint, { color: c.textMuted }]}>
-              {search
-                ? 'Try adjusting your search or filter criteria'
-                : 'Upload receipts to start building your compliance vault'}
-            </Text>
+            <Ionicons name="search-outline" size={18} color={c.textMuted} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search merchant, TRN, date…"
+              placeholderTextColor={c.textMuted}
+              style={[styles.searchInput, { color: c.text }]}
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')} hitSlop={10}>
+                <Ionicons name="close-circle" size={18} color={c.textMuted} />
+              </Pressable>
+            )}
           </Animated.View>
-        ) : (
-          /* ── File Cards (staggered) ── */
-          filteredFiles.map((file, i) => (
-            <Animated.View
-              key={file.id || i}
-              entering={FadeInDown.delay(i * 60)
-                .duration(400)
-                .springify()
-                .damping(16)
-                .stiffness(140)}
+
+          <Animated.View entering={FadeInUp.delay(120).duration(400)} style={styles.filterRow}>
+            {[['all', 'All'], ['vat', 'VAT only'], ['flagged', 'Flagged']].map(([v, l]) => {
+              const active = filter === v;
+              return (
+                <SpringPressable
+                  key={v}
+                  onPress={() => setFilter(v)}
+                  style={[
+                    styles.filterPill,
+                    { backgroundColor: active ? c.primary : c.card, borderColor: active ? c.primary : c.borderSubtle },
+                  ]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={{ color: active ? '#FFFFFF' : c.text, fontSize: 13, fontWeight: '700' }}>{l}</Text>
+                </SpringPressable>
+              );
+            })}
+            <View style={{ flex: 1 }} />
+            <SpringPressable
+              onPress={generateReport}
+              disabled={exporting}
+              style={[styles.exportBtn, { backgroundColor: c.primaryLight }]}
             >
-              <PressableCard
-                style={[
-                  styles.fileCard,
-                  darkMode ? CardPresets.cardDark : CardPresets.cardLight,
-                  { marginHorizontal: Spacing.xxl },
-                ]}
-                accessibilityLabel={`View ${file.customName || file.merchant}`}
+              {exporting
+                ? <ActivityIndicator size="small" color={c.primary} />
+                : <Ionicons name="download-outline" size={16} color={c.primary} />}
+              <Text style={{ color: c.primary, fontSize: 12.5, fontWeight: '700' }}>Export</Text>
+            </SpringPressable>
+          </Animated.View>
+        </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 140 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} />
+          }
+        >
+          {loading && (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator color={c.primary} />
+            </View>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <Animated.View entering={FadeIn.duration(400)} style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: c.primaryLight }]}>
+                <Ionicons name="file-tray-outline" size={36} color={c.primary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>No records</Text>
+              <Text style={[styles.emptySub, { color: c.textMuted }]}>
+                {search || filter !== 'all' ? 'Nothing matches your filter.' : 'Scan your first receipt to start.'}
+              </Text>
+            </Animated.View>
+          )}
+
+          {!loading && filtered.map((f, i) => {
+            const flagged = f.status === 'flagged';
+            const vat = parseFloat(f.vat) || 0;
+            return (
+              <Animated.View
+                key={f.id || i}
+                entering={FadeInUp.delay(Math.min(i * 40, 240)).duration(400)}
+                layout={Layout.springify()}
               >
-                {/* Top row: icon + name + amount */}
-                <View style={styles.fileRow}>
-                  <View
-                    style={[
-                      styles.fileIcon,
-                      {
-                        backgroundColor: darkMode
-                          ? 'rgba(79,142,255,0.12)'
-                          : 'rgba(79,142,255,0.08)',
-                      },
-                    ]}
-                  >
-                    <Ionicons name="document-text" size={20} color="#4F8EFF" />
+                <SpringPressable
+                  onPress={() => {}}
+                  style={[styles.card, { backgroundColor: c.card, borderColor: flagged ? c.negative : c.borderSubtle }]}
+                  accessibilityLabel={`Record ${f.customName || f.merchant}`}
+                >
+                  <View style={[styles.cardIcon, { backgroundColor: flagged ? c.negativeLight : c.primaryLight }]}>
+                    <Ionicons
+                      name={flagged ? 'alert-circle' : 'receipt'}
+                      size={18}
+                      color={flagged ? c.negative : c.primary}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.fileName, { color: c.text }]} numberOfLines={1}>
-                      {file.customName || file.merchant}
+                    <Text style={[styles.cardTitle, { color: c.text }]} numberOfLines={1}>
+                      {f.customName || f.merchant || 'Untitled'}
                     </Text>
-                    <Text style={[styles.fileMeta, { color: c.textMuted }]}>
-                      {file.date} · {file.category}
+                    <Text style={[styles.cardMeta, { color: c.textMuted }]} numberOfLines={1}>
+                      {f.date || '—'}{f.category ? ` · ${f.category}` : ''}{f.trn ? ` · ${f.trn}` : ''}
                     </Text>
+                    {vat > 0 && (
+                      <View style={[styles.vatChip, { backgroundColor: c.primaryLight }]}>
+                        <Ionicons name="shield-checkmark" size={10} color={c.primary} />
+                        <Text style={{ color: c.primary, fontSize: 11, fontWeight: '700' }}>
+                          VAT {vat.toFixed(2)} AED
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={[styles.fileAmount, { color: c.negative }]}>
-                    -
-                    {parseFloat(file.amount || 0).toLocaleString('en-AE', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </Text>
-                </View>
-
-                {/* Footer: tags + view action */}
-                <View style={[styles.footer, { borderTopColor: c.borderSubtle }]}>
-                  {parseFloat(file.vat) > 0 && (
-                    <Animated.View
-                      entering={SlideInRight.delay(i * 60 + 200).duration(300).springify()}
-                      style={[styles.tag, styles.vatTag]}
-                    >
-                      <View style={styles.tagGlow} />
-                      <Text style={styles.vatTagText}>
-                        VAT: {parseFloat(file.vat).toFixed(2)} AED
-                      </Text>
-                    </Animated.View>
-                  )}
-                  {file.trn && (
-                    <Animated.View
-                      entering={SlideInRight.delay(i * 60 + 280).duration(300).springify()}
-                      style={[styles.tag, styles.trnTag]}
-                    >
-                      <View style={styles.trnTagGlow} />
-                      <Text style={styles.trnTagText}>TRN</Text>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={12}
-                        color="#4F8EFF"
-                        style={{ marginLeft: 2 }}
-                      />
-                    </Animated.View>
-                  )}
-                  {file.status === 'flagged' && (
-                    <Animated.View
-                      entering={SlideInRight.delay(i * 60 + 340).duration(300).springify()}
-                      style={[styles.tag, styles.flagTag]}
-                    >
-                      <Ionicons name="warning" size={11} color="#F59E0B" />
-                      <Text style={styles.flagTagText}>Flagged</Text>
-                    </Animated.View>
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.viewBtn,
-                      {
-                        backgroundColor: c.surfaceLow,
-                        borderColor: c.border,
-                      },
-                    ]}
-                    accessibilityLabel={`View details for ${file.customName || file.merchant}`}
-                    accessibilityRole="button"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="eye-outline" size={16} color={c.text} />
-                  </TouchableOpacity>
-                </View>
-              </PressableCard>
-            </Animated.View>
-          ))
-        )}
-      </Animated.ScrollView>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.cardAmount, { color: c.text }]}>
+                      {parseFloat(f.amount || 0).toLocaleString('en-AE', { maximumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={[styles.cardCurrency, { color: c.textMuted }]}>AED</Text>
+                  </View>
+                </SpringPressable>
+              </Animated.View>
+            );
+          })}
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
-// ===========================================================================
-//  STYLES
-// ===========================================================================
 const styles = StyleSheet.create({
-  /* Layout */
-  container: {
+  hero: {
+    backgroundColor: '#3B6BFF',
+    paddingBottom: 44,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroInner: { gap: 20 },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroKicker: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+  heroTitle: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', letterSpacing: -0.6, marginTop: 2 },
+  heroSub: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 },
+  shield: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  statRow: { flexDirection: 'row', gap: 8 },
+  statPill: {
     flex: 1,
-    paddingHorizontal: Spacing.xxl,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 14,
+    paddingVertical: 10, paddingHorizontal: 12,
   },
-
-  /* Header */
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
+  statValue: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
+  statLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10.5, fontWeight: '600', marginTop: 2, letterSpacing: 0.6 },
+  sheet: {
+    flex: 1, marginTop: -24,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 8,
   },
-  title: {
-    ...Typography.sectionTitle,
-    fontSize: 22,
-    letterSpacing: -0.6,
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(11,23,53,0.15)',
+    alignSelf: 'center', marginTop: 6, marginBottom: 10,
   },
-  subtitle: {
-    ...Typography.micro,
-    marginTop: 3,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-
-  /* Export button */
-  exportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#44e571',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 10,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(0,83,31,0.3)',
-    minHeight: 44,
-    minWidth: 44,
-  },
-  exportInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  exportText: {
-    color: '#003516',
-    ...Typography.btnSmall,
-  },
-
-  /* Search bar */
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? 13 : 10,
-    marginBottom: Spacing.md,
-    minHeight: 48,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 16, borderWidth: 1,
   },
-  searchBarFocused: {
-    borderWidth: 1.5,
+  searchInput: { flex: 1, fontSize: 14.5 },
+  filterRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 8, marginTop: 12,
   },
-  input: {
-    flex: 1,
-    ...Typography.bodySmall,
-    paddingVertical: 0,
+  filterPill: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 18, borderWidth: 1,
   },
-  clearBtn: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  exportBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14,
   },
-
-  /* Filter tabs */
-  tabBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+  empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 20 },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 36,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
-  tab: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 10,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  emptyTitle: { fontSize: 17, fontWeight: '800' },
+  emptySub: { fontSize: 13.5, textAlign: 'center', marginTop: 6 },
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 14, borderRadius: 18, borderWidth: 1,
+    marginBottom: 10,
   },
-  tabText: {
-    ...Typography.btnSmall,
+  cardIcon: {
+    width: 40, height: 40, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
   },
-  countBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Radius.pill,
-    marginLeft: 'auto',
+  cardTitle: { fontSize: 15, fontWeight: '700' },
+  cardMeta: { fontSize: 12, marginTop: 3 },
+  vatChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', marginTop: 8,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
   },
-  countText: {
-    ...Typography.micro,
-    fontWeight: '800',
-  },
-
-  /* Empty state */
-  emptyCard: {
-    padding: Spacing.xxxl,
-    paddingVertical: 48,
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  emptyTitle: {
-    ...Typography.bodyBold,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
-  },
-  emptyHint: {
-    ...Typography.caption,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 260,
-  },
-
-  /* File cards */
-  fileCard: {
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
-  },
-  fileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  fileIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fileName: {
-    ...Typography.bodyBold,
-  },
-  fileMeta: {
-    ...Typography.micro,
-    marginTop: 2,
-  },
-  fileAmount: {
-    ...Typography.bodyBold,
-    fontVariant: ['tabular-nums'],
-  },
-
-  /* Footer & tags */
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: BorderWidth.hairline,
-  },
-
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 3,
-    overflow: 'hidden',
-  },
-
-  /* VAT tag with glow */
-  vatTag: {
-    backgroundColor: 'rgba(68,229,113,0.10)',
-    borderColor: 'rgba(68,229,113,0.25)',
-  },
-  vatTagText: {
-    ...Typography.micro,
-    fontWeight: '800',
-    color: '#44e571',
-  },
-  tagGlow: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(68,229,113,0.05)',
-    borderRadius: 8,
-  },
-
-  /* TRN tag with glow */
-  trnTag: {
-    backgroundColor: 'rgba(79,142,255,0.10)',
-    borderColor: 'rgba(79,142,255,0.25)',
-  },
-  trnTagText: {
-    ...Typography.micro,
-    fontWeight: '800',
-    color: '#4F8EFF',
-  },
-  trnTagGlow: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(79,142,255,0.05)',
-    borderRadius: 8,
-  },
-
-  /* Flagged tag */
-  flagTag: {
-    backgroundColor: 'rgba(245,158,11,0.10)',
-    borderColor: 'rgba(245,158,11,0.25)',
-  },
-  flagTagText: {
-    ...Typography.micro,
-    fontWeight: '800',
-    color: '#F59E0B',
-  },
-
-  /* View button */
-  viewBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 'auto',
-  },
+  cardAmount: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  cardCurrency: { fontSize: 11, fontWeight: '600', marginTop: 2 },
 });

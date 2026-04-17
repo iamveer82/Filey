@@ -1,693 +1,560 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
+  Pressable,
+  TextInput,
+  Modal,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Dimensions,
   StatusBar,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSpring,
-  withDelay,
-  withSequence,
-  interpolate,
-  Easing,
-  FadeIn,
   FadeInDown,
   FadeInUp,
-  FadeOut,
   SlideInDown,
-  Layout,
-  runOnJS,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
-import { Typography, Radius, Shadow, Spacing, BorderWidth } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get('window');
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// ---------------------------------------------------------------------------
-// Floating Orb — a single semi-transparent gradient circle drifting around
-// ---------------------------------------------------------------------------
-function FloatingOrb({ color, size, initialX, initialY, durationX, durationY, delay = 0 }) {
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(0);
-
-  useEffect(() => {
-    // Entrance
-    scale.value = withDelay(delay, withSpring(1, { damping: 12, stiffness: 60 }));
-
-    // Infinite drift
-    translateX.value = withDelay(
-      delay,
-      withRepeat(
-        withTiming(initialX * 0.6, {
-          duration: durationX,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        -1,
-        true,
-      ),
-    );
-    translateY.value = withDelay(
-      delay,
-      withRepeat(
-        withTiming(initialY * 0.5, {
-          duration: durationY,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        -1,
-        true,
-      ),
-    );
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
+function CreditCard({ variant, label, number, holder, extra, style }) {
+  const isBlue = variant === 'blue';
+  const bg = isBlue ? '#3B6BFF' : '#111827';
+  const accentBg = isBlue ? '#2E5BFF' : '#1F2937';
 
   return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
-          left: initialX,
-          top: initialY,
-        },
-        animStyle,
-      ]}
-    />
+    <View style={[styles.card, { backgroundColor: bg }, style]}>
+      <View style={[styles.cardHighlight, { backgroundColor: accentBg }]} />
+
+      <View style={styles.cardTopRow}>
+        <Ionicons name="wifi" size={22} color="#FFFFFF" style={{ transform: [{ rotate: '90deg' }] }} />
+        <Text style={styles.cardLabel}>{label}</Text>
+      </View>
+
+      <Text style={styles.cardNumber}>{number}</Text>
+
+      <View style={styles.cardBottomRow}>
+        <View>
+          <Text style={styles.cardHolderLabel}>CARDHOLDER</Text>
+          <Text style={styles.cardHolder}>{holder}</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          {extra ? (
+            <>
+              <Text style={styles.cardHolderLabel}>EXPIRES</Text>
+              <Text style={styles.cardHolder}>{extra}</Text>
+            </>
+          ) : (
+            <Text style={styles.cardVisa}>VISA</Text>
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Animated Accent Line at bottom
-// ---------------------------------------------------------------------------
-function AccentLine({ color }) {
-  const lineWidth = useSharedValue(0);
-
-  useEffect(() => {
-    lineWidth.value = withDelay(
-      1600,
-      withSpring(56, { damping: 14, stiffness: 80 }),
-    );
-  }, []);
-
-  const lineStyle = useAnimatedStyle(() => ({
-    width: lineWidth.value,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: color,
-  }));
-
-  return <Animated.View style={lineStyle} />;
-}
-
-// ---------------------------------------------------------------------------
-// LoginScreen
-// ---------------------------------------------------------------------------
-export default function LoginScreen({ darkMode, onNavigateToCompanySetup }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+export default function LoginScreen({ darkMode = true, onNavigateToCompanySetup }) {
   const { signIn, signUp } = useAuth();
-
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [mode, setMode] = useState('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [secureText, setSecureText] = useState(true);
 
-  // ── Logo entrance animations ──────────────────────────────
-  const logoScale = useSharedValue(0);
-  const logoGlow = useSharedValue(0);
-  const titleOpacity = useSharedValue(0);
-  const subtitleTranslateY = useSharedValue(20);
-  const subtitleOpacity = useSharedValue(0);
+  const pressScale = useSharedValue(1);
 
-  // ── Submit button spring ──────────────────────────────────
-  const btnScale = useSharedValue(1);
+  const btnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
 
-  // ── Error shake ───────────────────────────────────────────
-  const errorShake = useSharedValue(0);
+  const onBtnPressIn = () => {
+    pressScale.value = withSpring(0.96, { damping: 14, stiffness: 220 });
+  };
+  const onBtnPressOut = () => {
+    pressScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+  };
 
-  useEffect(() => {
-    // 1) Logo circle springs in
-    logoScale.value = withDelay(200, withSpring(1, { damping: 10, stiffness: 90 }));
-
-    // 2) Glow pulse starts
-    logoGlow.value = withDelay(
-      600,
-      withRepeat(
-        withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
-        -1,
-        true,
-      ),
-    );
-
-    // 3) Title fades in
-    titleOpacity.value = withDelay(700, withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) }));
-
-    // 4) Subtitle slides up
-    subtitleOpacity.value = withDelay(1000, withTiming(1, { duration: 500 }));
-    subtitleTranslateY.value = withDelay(1000, withSpring(0, { damping: 14, stiffness: 100 }));
+  const openAuth = useCallback((nextMode) => {
+    setMode(nextMode);
+    setError('');
+    setModalVisible(true);
   }, []);
 
-  // ── Trigger error shake ───────────────────────────────────
-  useEffect(() => {
-    if (error) {
-      errorShake.value = withSequence(
-        withTiming(10, { duration: 50 }),
-        withTiming(-10, { duration: 50 }),
-        withTiming(8, { duration: 50 }),
-        withTiming(-8, { duration: 50 }),
-        withTiming(4, { duration: 50 }),
-        withTiming(0, { duration: 50 }),
-      );
-    }
-  }, [error]);
-
-  // ── Animated styles ───────────────────────────────────────
-  const logoCircleStyle = useAnimatedStyle(() => {
-    const glowOpacity = interpolate(logoGlow.value, [0, 1], [0.15, 0.45]);
-    return {
-      transform: [{ scale: logoScale.value }],
-      shadowOpacity: glowOpacity,
-    };
-  });
-
-  const titleStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-  }));
-
-  const subtitleStyle = useAnimatedStyle(() => ({
-    opacity: subtitleOpacity.value,
-    transform: [{ translateY: subtitleTranslateY.value }],
-  }));
-
-  const btnAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: btnScale.value }],
-  }));
-
-  const errorAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: errorShake.value }],
-  }));
-
-  // ── Handlers ──────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError('Please fill in all fields');
-      return;
-    }
-    if (isSignUp && !name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setLoading(true);
+  const submit = useCallback(async () => {
     setError('');
-
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required.');
+      return;
+    }
+    if (mode === 'signup' && password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    setLoading(true);
     try {
-      if (isSignUp) {
-        await signUp(email.trim(), password, name.trim());
-        onNavigateToCompanySetup?.();
+      if (mode === 'signup') {
+        const res = await signUp(email, password, name || 'Filey User');
+        if (res?.error) {
+          setError(String(res.error.message || res.error));
+        } else {
+          setModalVisible(false);
+          onNavigateToCompanySetup && onNavigateToCompanySetup();
+        }
       } else {
-        await signIn(email.trim(), password);
+        const res = await signIn(email, password);
+        if (res?.error) setError(String(res.error.message || res.error));
+        else setModalVisible(false);
       }
     } catch (e) {
-      setError(e.message || 'Authentication failed. Please try again.');
+      setError(String(e?.message || e));
     } finally {
       setLoading(false);
     }
-  };
+  }, [email, password, name, mode, signUp, signIn, onNavigateToCompanySetup]);
 
-  const onPressIn = () => {
-    btnScale.value = withSpring(0.94, { damping: 12, stiffness: 200 });
-  };
-  const onPressOut = () => {
-    btnScale.value = withSpring(1, { damping: 8, stiffness: 180 });
-  };
-
-  const toggleMode = () => {
-    setIsSignUp((prev) => !prev);
-    setError('');
-  };
-
-  // ── Orb configs (background decoration) ───────────────────
-  const orbs = [
-    {
-      color: 'rgba(68,229,113,0.08)',
-      size: 260,
-      initialX: -60,
-      initialY: SCREEN_HEIGHT * 0.08,
-      durationX: 7000,
-      durationY: 9000,
-      delay: 0,
-    },
-    {
-      color: 'rgba(79,142,255,0.07)',
-      size: 220,
-      initialX: SCREEN_WIDTH * 0.55,
-      initialY: SCREEN_HEIGHT * 0.18,
-      durationX: 8500,
-      durationY: 7500,
-      delay: 300,
-    },
-    {
-      color: 'rgba(68,229,113,0.05)',
-      size: 180,
-      initialX: SCREEN_WIDTH * 0.2,
-      initialY: SCREEN_HEIGHT * 0.6,
-      durationX: 9500,
-      durationY: 6500,
-      delay: 600,
-    },
-    {
-      color: 'rgba(79,142,255,0.05)',
-      size: 140,
-      initialX: SCREEN_WIDTH * 0.7,
-      initialY: SCREEN_HEIGHT * 0.55,
-      durationX: 6500,
-      durationY: 8000,
-      delay: 900,
-    },
-  ];
-
-  // ── Render ────────────────────────────────────────────────
   return (
-    <View style={[styles.root, { backgroundColor: c.bg }]}>
-      <StatusBar barStyle="light-content" backgroundColor={c.bg} />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B1435" />
 
-      {/* Floating background orbs */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {orbs.map((orb, i) => (
-          <FloatingOrb key={i} {...orb} />
-        ))}
+      <Animated.View
+        entering={FadeInDown.duration(500)}
+        style={styles.statusRow}
+      >
+        <View style={styles.dotOnline} />
+        <Text style={styles.statusText}>Secure session</Text>
+      </Animated.View>
+
+      <Animated.View
+        entering={FadeInDown.delay(100).duration(500)}
+        style={styles.titleRow}
+      >
+        <Text style={styles.titleSmall}>Welcome to Filey</Text>
+        <Ionicons name="hand-left-outline" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
+      </Animated.View>
+
+      <View style={styles.cardStack}>
+        <Animated.View
+          entering={FadeInUp.delay(250).duration(700).springify().damping(14)}
+          style={{
+            position: 'absolute',
+            transform: [{ translateX: -30 }, { translateY: 0 }, { rotate: '-8deg' }],
+          }}
+        >
+          <CreditCard
+            variant="blue"
+            label="Diamond"
+            number="1288 7068 2260 2640"
+            holder="Erickson"
+          />
+        </Animated.View>
+
+        <Animated.View
+          entering={FadeInUp.delay(450).duration(700).springify().damping(14)}
+          style={{
+            position: 'absolute',
+            transform: [{ translateX: 30 }, { translateY: 60 }, { rotate: '4deg' }],
+          }}
+        >
+          <CreditCard
+            variant="black"
+            label="Platinum"
+            number="1288 7068 2260 2640"
+            holder="Aden Erickson"
+            extra="05/24"
+          />
+        </Animated.View>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      <Animated.View
+        entering={FadeInUp.delay(650).duration(600)}
+        style={styles.heroWrap}
       >
-        {/* ── Logo Section ──────────────────────────────── */}
-        <View style={styles.logoSection}>
+        <Text style={styles.hero}>Better Homes,{'\n'}Smarter, For{'\n'}Your Finance.</Text>
+      </Animated.View>
+
+      <Animated.View
+        entering={FadeInUp.delay(800).duration(500)}
+        style={styles.ctaWrap}
+      >
+        <AnimatedPressable
+          onPressIn={onBtnPressIn}
+          onPressOut={onBtnPressOut}
+          onPress={() => openAuth('signup')}
+          style={[styles.ctaBtn, btnStyle]}
+        >
+          <Text style={styles.ctaText}>Let's Go!</Text>
+          <Ionicons name="arrow-forward" size={20} color="#0B1435" style={{ marginLeft: 8 }} />
+        </AnimatedPressable>
+
+        <Pressable
+          onPress={() => openAuth('signin')}
+          hitSlop={10}
+          style={styles.signInLink}
+        >
+          <Text style={styles.signInText}>
+            Already have account?{' '}
+            <Text style={styles.signInTextBold}>Sign in</Text>
+          </Text>
+        </Pressable>
+      </Animated.View>
+
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => !loading && setModalVisible(false)}
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalWrap}
+          pointerEvents="box-none"
+        >
           <Animated.View
-            style={[
-              styles.logoCircle,
-              {
-                backgroundColor: darkMode
-                  ? 'rgba(68,229,113,0.10)'
-                  : 'rgba(68,229,113,0.14)',
-                borderColor: darkMode
-                  ? 'rgba(68,229,113,0.25)'
-                  : 'rgba(68,229,113,0.35)',
-                shadowColor: '#44e571',
-                shadowOffset: { width: 0, height: 0 },
-                shadowRadius: 30,
-                elevation: 12,
-              },
-              logoCircleStyle,
-            ]}
+            entering={SlideInDown.duration(320)}
+            style={styles.sheet}
           >
-            <Text style={styles.logoLetter}>F</Text>
-          </Animated.View>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>
+              {mode === 'signup' ? 'Create account' : 'Sign in'}
+            </Text>
+            <Text style={styles.sheetSubtitle}>
+              {mode === 'signup'
+                ? 'Start tracking spending in seconds.'
+                : 'Welcome back to Filey.'}
+            </Text>
 
-          <Animated.Text
-            style={[
-              styles.logoTitle,
-              { color: c.text },
-              titleStyle,
-            ]}
-          >
-            Filely
-          </Animated.Text>
-
-          <Animated.Text
-            style={[
-              styles.logoSubtitle,
-              { color: c.textSecondary },
-              subtitleStyle,
-            ]}
-          >
-            UAE Tax Scanner — Smart, Simple, Compliant
-          </Animated.Text>
-        </View>
-
-        {/* ── Form Section ──────────────────────────────── */}
-        <Animated.View layout={Layout.springify()} style={styles.formSection}>
-
-          {/* Name field (sign up only) */}
-          {isSignUp && (
-            <Animated.View
-              entering={FadeInDown.duration(400).springify()}
-              exiting={FadeOut.duration(200)}
-              layout={Layout.springify()}
-              style={styles.inputGroup}
-            >
-              <Text style={[styles.inputLabel, { color: c.textMuted }]}>FULL NAME</Text>
-              <View style={[styles.inputWrapper, { backgroundColor: c.surfaceLow, borderColor: c.border }]}>
-                <Ionicons
-                  name="person-outline"
-                  size={18}
-                  color={c.textMuted}
-                  style={styles.inputIcon}
-                />
+            {mode === 'signup' ? (
+              <View style={styles.inputWrap}>
+                <Ionicons name="person-outline" size={18} color="rgba(11,20,53,0.48)" />
                 <TextInput
                   value={name}
                   onChangeText={setName}
-                  placeholder="Your full name"
-                  placeholderTextColor={c.textMuted}
-                  style={[styles.textInput, { color: c.text }]}
+                  placeholder="Name"
+                  placeholderTextColor="rgba(11,20,53,0.48)"
+                  style={styles.input}
                   autoCapitalize="words"
-                  returnKeyType="next"
+                  editable={!loading}
                 />
               </View>
-            </Animated.View>
-          )}
+            ) : null}
 
-          {/* Email */}
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(500).springify()}
-            layout={Layout.springify()}
-            style={styles.inputGroup}
-          >
-            <Text style={[styles.inputLabel, { color: c.textMuted }]}>EMAIL</Text>
-            <View style={[styles.inputWrapper, { backgroundColor: c.surfaceLow, borderColor: c.border }]}>
-              <Ionicons
-                name="mail-outline"
-                size={18}
-                color={c.textMuted}
-                style={styles.inputIcon}
-              />
+            <View style={styles.inputWrap}>
+              <Ionicons name="mail-outline" size={18} color="rgba(11,20,53,0.48)" />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="you@company.ae"
-                placeholderTextColor={c.textMuted}
-                style={[styles.textInput, { color: c.text }]}
+                placeholder="Email"
+                placeholderTextColor="rgba(11,20,53,0.48)"
+                style={styles.input}
                 autoCapitalize="none"
                 keyboardType="email-address"
-                autoComplete="email"
-                returnKeyType="next"
+                editable={!loading}
               />
             </View>
-          </Animated.View>
 
-          {/* Password */}
-          <Animated.View
-            entering={FadeInDown.delay(350).duration(500).springify()}
-            layout={Layout.springify()}
-            style={styles.inputGroup}
-          >
-            <Text style={[styles.inputLabel, { color: c.textMuted }]}>PASSWORD</Text>
-            <View style={[styles.inputWrapper, { backgroundColor: c.surfaceLow, borderColor: c.border }]}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={18}
-                color={c.textMuted}
-                style={styles.inputIcon}
-              />
+            <View style={styles.inputWrap}>
+              <Ionicons name="lock-closed-outline" size={18} color="rgba(11,20,53,0.48)" />
               <TextInput
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Min 6 characters"
-                placeholderTextColor={c.textMuted}
-                secureTextEntry={secureText}
-                style={[styles.textInput, { color: c.text, flex: 1 }]}
-                autoComplete="password"
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
+                placeholder="Password"
+                placeholderTextColor="rgba(11,20,53,0.48)"
+                style={styles.input}
+                secureTextEntry
+                editable={!loading}
               />
-              <TouchableOpacity
-                onPress={() => setSecureText(!secureText)}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                style={styles.eyeBtn}
-              >
-                <Ionicons
-                  name={secureText ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={c.textMuted}
-                />
-              </TouchableOpacity>
             </View>
-          </Animated.View>
 
-          {/* Error message */}
-          {error ? (
-            <Animated.View
-              entering={FadeIn.duration(300)}
-              exiting={FadeOut.duration(200)}
-              style={errorAnimStyle}
-            >
-              <View style={[styles.errorContainer, { backgroundColor: darkMode ? 'rgba(255,75,110,0.10)' : 'rgba(220,38,38,0.08)' }]}>
-                <Ionicons name="alert-circle" size={16} color={c.error} style={{ marginRight: 6 }} />
-                <Text style={[styles.errorText, { color: c.error }]}>{error}</Text>
-              </View>
-            </Animated.View>
-          ) : null}
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          {/* Submit Button */}
-          <Animated.View
-            entering={FadeInDown.delay(500).duration(500).springify()}
-            layout={Layout.springify()}
-          >
-            <AnimatedTouchable
-              onPress={handleSubmit}
-              onPressIn={onPressIn}
-              onPressOut={onPressOut}
+            <Pressable
+              onPress={submit}
               disabled={loading}
-              activeOpacity={0.85}
-              style={[
-                styles.submitBtn,
-                btnAnimStyle,
-                loading && styles.submitBtnLoading,
+              style={({ pressed }) => [
+                styles.sheetCta,
+                pressed && { opacity: 0.88 },
+                loading && { opacity: 0.72 },
               ]}
             >
               {loading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator color="#00531f" size="small" />
-                  <Text style={[styles.submitBtnText, { marginLeft: 10, opacity: 0.7 }]}>
-                    {isSignUp ? 'CREATING...' : 'SIGNING IN...'}
-                  </Text>
-                </View>
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.submitBtnText}>
-                  {isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}
-                </Text>
+                <>
+                  <Text style={styles.sheetCtaText}>
+                    {mode === 'signup' ? 'Create account' : 'Sign in'}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                </>
               )}
-            </AnimatedTouchable>
-          </Animated.View>
+            </Pressable>
 
-          {/* Toggle Sign In / Sign Up */}
-          <Animated.View
-            entering={FadeInDown.delay(650).duration(500).springify()}
-            layout={Layout.springify()}
-          >
-            <TouchableOpacity
-              onPress={toggleMode}
-              style={styles.toggleBtn}
-              activeOpacity={0.7}
+            <Pressable
+              onPress={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+              hitSlop={10}
+              style={{ alignSelf: 'center', paddingVertical: 8, marginTop: 4 }}
             >
-              <Text style={[styles.toggleText, { color: c.textSecondary }]}>
-                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-                <Text style={styles.toggleHighlight}>
-                  {isSignUp ? 'Sign In' : 'Sign Up'}
-                </Text>
+              <Text style={styles.switchModeText}>
+                {mode === 'signup'
+                  ? 'Already have an account? Sign in'
+                  : "Don't have an account? Create one"}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </Animated.View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-
-      {/* ── Bottom Accent ───────────────────────────────── */}
-      <Animated.View
-        entering={FadeInUp.delay(1400).duration(600)}
-        style={styles.bottomAccent}
-      >
-        <AccentLine color="#44e571" />
-        <Text style={[styles.bottomText, { color: c.textMuted }]}>
-          5-Year Vault — UAE Corporate Tax Compliance
-        </Text>
-      </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
+const CARD_W = 340;
+const CARD_H = 220;
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: '#0B1435',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingBottom: 24,
   },
-  keyboardView: {
-    flex: 1,
-    paddingHorizontal: Spacing.xxl,
-    justifyContent: 'center',
-  },
-
-  // ── Logo ───────────────────────────────────────────────
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 44,
-  },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: BorderWidth.medium,
-    marginBottom: 22,
-  },
-  logoLetter: {
-    fontSize: 46,
-    fontWeight: '900',
-    color: '#44e571',
-    letterSpacing: -2,
-    includeFontPadding: false,
-  },
-  logoTitle: {
-    fontSize: 38,
-    fontWeight: '900',
-    letterSpacing: -1.5,
-    marginBottom: 8,
-  },
-  logoSubtitle: {
-    ...Typography.bodySmall,
-    textAlign: 'center',
-    maxWidth: 260,
-  },
-
-  // ── Form ───────────────────────────────────────────────
-  formSection: {
-    gap: 18,
-  },
-  inputGroup: {
-    gap: 7,
-  },
-  inputLabel: {
-    ...Typography.labelWide,
-    marginLeft: 4,
-  },
-  inputWrapper: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.md,
-    borderWidth: BorderWidth.thin,
-    paddingHorizontal: Spacing.md,
-    minHeight: 52,
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
-  inputIcon: {
-    marginRight: 10,
+  dotOnline: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+    marginRight: 6,
   },
-  textInput: {
-    flex: 1,
-    ...Typography.body,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+  statusText: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  eyeBtn: {
-    padding: 6,
-    marginLeft: 4,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // ── Error ──────────────────────────────────────────────
-  errorContainer: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: Radius.sm,
+    alignSelf: 'center',
+    marginTop: 16,
   },
-  errorText: {
+  titleSmall: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '500',
+    opacity: 0.92,
+  },
+  cardStack: {
+    height: CARD_H + 80,
+    marginTop: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  card: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: 22,
+    padding: 22,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  cardHighlight: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    opacity: 0.6,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardLabel: {
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
-    flexShrink: 1,
+    letterSpacing: 0.6,
   },
-
-  // ── Submit Button ──────────────────────────────────────
-  submitBtn: {
-    backgroundColor: '#44e571',
-    borderRadius: Radius.pill,
-    paddingVertical: 16,
+  cardNumber: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '600',
+    letterSpacing: 2,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  cardHolderLabel: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  cardHolder: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cardVisa: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    letterSpacing: 1,
+  },
+  heroWrap: {
+    marginTop: 24,
+  },
+  hero: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -1.2,
+    lineHeight: 44,
+  },
+  ctaWrap: {
+    marginTop: 'auto',
+  },
+  ctaBtn: {
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 54,
-    borderWidth: BorderWidth.thin,
-    borderColor: 'rgba(0,83,31,0.25)',
-    ...Shadow.limeMd,
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  ctaText: {
+    color: '#0B1435',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  signInLink: {
+    alignSelf: 'center',
+    paddingVertical: 14,
     marginTop: 6,
   },
-  submitBtnLoading: {
-    opacity: 0.9,
+  signInText: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 14,
   },
-  submitBtnText: {
-    ...Typography.btnPrimary,
-    color: '#00531f',
+  signInTextBold: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
-  loadingRow: {
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  modalWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(11,20,53,0.14)',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    color: '#0B1435',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  sheetSubtitle: {
+    color: 'rgba(11,20,53,0.64)',
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F6FC',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(11,20,53,0.06)',
+  },
+  input: {
+    flex: 1,
+    height: 52,
+    marginLeft: 10,
+    color: '#0B1435',
+    fontSize: 15,
+  },
+  errorText: {
+    color: '#FF5470',
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  sheetCta: {
+    marginTop: 8,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#3B6BFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // ── Toggle ─────────────────────────────────────────────
-  toggleBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  toggleText: {
-    ...Typography.bodySmall,
-  },
-  toggleHighlight: {
-    color: '#44e571',
+  sheetCtaText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
   },
-
-  // ── Bottom Accent ──────────────────────────────────────
-  bottomAccent: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 48 : 36,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    gap: 8,
-  },
-  bottomText: {
-    ...Typography.micro,
-    letterSpacing: 0.5,
+  switchModeText: {
+    color: 'rgba(11,20,53,0.64)',
+    fontSize: 13,
   },
 });

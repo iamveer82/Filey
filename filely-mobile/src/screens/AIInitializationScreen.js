@@ -148,8 +148,8 @@ export default function AIInitializationScreen({ darkMode, onComplete }) {
   return (
     <View style={[styles.container, { backgroundColor: c.bg }]}>
       <Animated.View entering={FadeInUp.duration(800).springify()} style={styles.logoSection}>
-        <View style={[styles.logoIcon, { backgroundColor: 'rgba(79,142,255,0.12)', borderColor: 'rgba(79,142,255,0.2)', borderWidth: 1 }]}>
-          <Ionicons name="sparkles" size={48} color="#4F8EFF" />
+        <View style={[styles.logoIcon, { backgroundColor: 'rgba(59,107,255,0.12)', borderColor: 'rgba(59,107,255,0.2)', borderWidth: 1 }]}>
+          <Ionicons name="sparkles" size={48} color="#3B6BFF" />
         </View>
         <Text style={[styles.logoTitle, { color: c.text }]}>Filely AI</Text>
         <Text style={[styles.logoSubtitle, { color: c.textSecondary }]}>
@@ -171,17 +171,17 @@ export default function AIInitializationScreen({ darkMode, onComplete }) {
               <View style={[
                 styles.stepIcon,
                 {
-                  backgroundColor: isComplete ? '#44e571' : isActive ? c.surfaceLow : 'transparent',
-                  borderColor:     isComplete ? 'rgba(0,83,31,0.3)' : isActive ? '#4F8EFF' : c.border,
+                  backgroundColor: isComplete ? '#3B6BFF' : isActive ? c.surfaceLow : 'transparent',
+                  borderColor:     isComplete ? 'rgba(59,107,255,0.35)' : isActive ? '#3B6BFF' : c.border,
                 },
               ]}>
                 {isComplete  ? <Ionicons name="checkmark" size={18} color="#003516" /> :
-                 isActive    ? <ActivityIndicator size="small" color={isActive ? '#4F8EFF' : c.lime} /> :
+                 isActive    ? <ActivityIndicator size="small" color={isActive ? '#3B6BFF' : c.lime} /> :
                                <Ionicons name={step.icon} size={16} color={c.textMuted} />}
               </View>
               <Text style={[
                 styles.stepLabel,
-                { color: isComplete ? '#44e571' : isActive ? c.text : c.textMuted },
+                { color: isComplete ? '#3B6BFF' : isActive ? c.text : c.textMuted },
               ]}>
                 {step.label}
               </Text>
@@ -237,10 +237,10 @@ const styles = StyleSheet.create({
   progressText:   { fontSize: 12, fontWeight: '600' },
   progressSection:{ width: '100%', marginBottom: 30 },
   progressBarBg:  { height: 10, borderRadius: Radius.full, overflow: 'hidden' },
-  progressBarFill:{ height: '100%', backgroundColor: '#4F8EFF', borderRadius: Radius.full },
+  progressBarFill:{ height: '100%', backgroundColor: '#3B6BFF', borderRadius: Radius.full },
   progressLabel:  { fontSize: 12, marginTop: 10, textAlign: 'center' },
   errorSection:   { alignItems: 'center', gap: 16, padding: 24, borderRadius: Radius.lg, backgroundColor: 'rgba(255,75,110,0.05)', borderWidth: 1 },
   errorText:      { fontSize: 14, textAlign: 'center', fontWeight: '600' },
-  retryBtn:       { backgroundColor: '#44e571', borderRadius: Radius.pill, paddingHorizontal: 32, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(0,83,31,0.3)' },
+  retryBtn:       { backgroundColor: '#3B6BFF', borderRadius: Radius.pill, paddingHorizontal: 32, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(59,107,255,0.35)' },
   retryBtnText:   { color: '#003516', fontWeight: '900', fontSize: 14 },
 });

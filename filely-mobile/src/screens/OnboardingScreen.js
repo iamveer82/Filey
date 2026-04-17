@@ -1,262 +1,265 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions } from 'react-native';
-import Animated, {
-  FadeInDown, FadeInUp, FadeIn, FadeOut,
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  withRepeat, withSequence, withDelay, Easing, interpolate,
-  SlideInRight, SlideOutLeft,
-} from 'react-native-reanimated';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  StatusBar,
+  Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  FadeIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
-import { Typography, Radius, Shadow, Spacing, BorderWidth } from '../theme/tokens';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-const ONBOARDING_STEPS = [
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const STEPS = [
   {
-    title: 'Scan in\nSeconds',
-    desc: 'Snap a photo of any receipt and let our AI extract the details instantly.',
-    icon: 'camera-outline',
-    color: '#44e571',
-    accentBg: 'rgba(68,229,113,0.12)',
+    icon: 'wallet',
+    title: 'Track every\ndirham',
+    subtitle: 'Capture and categorize every expense with instant AI-powered insights.',
   },
   {
-    title: 'UAE VAT\nCompliant',
-    desc: 'Automatically track 5% VAT and ensure your business meets FTA standards.',
-    icon: 'shield-checkmark-outline',
-    color: '#4F8EFF',
-    accentBg: 'rgba(79,142,255,0.12)',
+    icon: 'shield-checkmark',
+    title: 'UAE VAT on\nautopilot',
+    subtitle: 'Automatic 5% VAT tracking and FTA-ready filings, quarter after quarter.',
   },
   {
-    title: 'Secure\n5-Year Vault',
-    desc: 'Your documents are safely stored for the legal retention period, always ready.',
-    icon: 'lock-closed-outline',
-    color: '#F59E0B',
-    accentBg: 'rgba(245,158,11,0.12)',
+    icon: 'camera',
+    title: 'All your receipts,\none tap',
+    subtitle: 'Scan, staple, and archive for 5 years — compliance made effortless.',
   },
 ];
 
-/* ─── Animated Icon with pulse ring ──────────────────────── */
-function PulsingIcon({ icon, color, accentBg }) {
-  const ringScale = useSharedValue(1);
-  const ringOpacity = useSharedValue(0.3);
-  const iconScale = useSharedValue(0);
+function SpringButton({ children, onPress, style, accessibilityLabel }) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 14, stiffness: 220 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 220 }); }}
+      style={[style, animStyle]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={10}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
 
-  useEffect(() => {
-    iconScale.value = withSpring(1, { damping: 10, stiffness: 80 });
-    ringScale.value = withRepeat(
-      withSequence(
-        withTiming(1.2, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-      ), -1, false
-    );
-    ringOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.5, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.15, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-      ), -1, false
-    );
-  }, []);
+function IllustrationCircle({ icon, c }) {
+  return (
+    <View style={styles.illusWrap}>
+      <View style={[styles.illusOuter, { backgroundColor: c.primaryBg }]} />
+      <View style={[styles.illusMid, { backgroundColor: c.primaryLight }]} />
+      <View style={[styles.illusInner, { backgroundColor: c.primary }]}>
+        <Ionicons name={icon} size={72} color="#FFFFFF" />
+      </View>
+    </View>
+  );
+}
 
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ringScale.value }],
-    opacity: ringOpacity.value,
-  }));
+export default function OnboardingScreen({ darkMode = true, onComplete }) {
+  const c = darkMode ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
+  const [step, setStep] = useState(0);
+  const isLast = step === STEPS.length - 1;
 
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.value }],
-  }));
+  const next = () => {
+    if (isLast) onComplete?.();
+    else setStep(step + 1);
+  };
+
+  const current = STEPS[step];
 
   return (
-    <View style={styles.iconContainer}>
-      <Animated.View style={[styles.iconRing, { borderColor: color }, ringStyle]} />
-      <Animated.View style={[styles.iconCircle, { backgroundColor: accentBg }, iconStyle]}>
-        <Ionicons name={icon} size={56} color={color} />
+    <View style={[styles.root, { backgroundColor: c.bg }]}>
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
+
+      {/* Progress indicator */}
+      <Animated.View
+        entering={FadeInDown.duration(400)}
+        style={[styles.progressRow, { paddingTop: insets.top + 16 }]}
+      >
+        {STEPS.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.progressSeg,
+              {
+                backgroundColor: i <= step ? c.primary : c.border,
+                flex: i === step ? 2 : 1,
+              },
+            ]}
+          />
+        ))}
+      </Animated.View>
+
+      {/* Skip */}
+      <Pressable
+        onPress={onComplete}
+        hitSlop={16}
+        style={[styles.skip, { top: insets.top + 32 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Skip onboarding"
+      >
+        <Text style={[styles.skipText, { color: c.textMuted }]}>Skip</Text>
+      </Pressable>
+
+      {/* Step content */}
+      <View style={styles.content}>
+        <Animated.View
+          key={`illus-${step}`}
+          entering={FadeInUp.duration(500).springify().damping(16)}
+        >
+          <IllustrationCircle icon={current.icon} c={c} />
+        </Animated.View>
+
+        <Animated.Text
+          key={`title-${step}`}
+          entering={FadeInUp.delay(60).duration(500)}
+          style={[styles.title, { color: c.text }]}
+        >
+          {current.title}
+        </Animated.Text>
+
+        <Animated.Text
+          key={`sub-${step}`}
+          entering={FadeInUp.delay(120).duration(500)}
+          style={[styles.subtitle, { color: c.textMuted }]}
+        >
+          {current.subtitle}
+        </Animated.Text>
+      </View>
+
+      {/* Bottom actions */}
+      <Animated.View
+        entering={FadeIn.delay(200).duration(400)}
+        style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}
+      >
+        <SpringButton
+          onPress={next}
+          style={[styles.cta, { backgroundColor: c.primary }]}
+          accessibilityLabel={isLast ? 'Get started' : 'Continue'}
+        >
+          <Text style={styles.ctaText}>{isLast ? 'Get Started' : 'Continue'}</Text>
+          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
+        </SpringButton>
       </Animated.View>
     </View>
   );
 }
 
-/* ─── Spring Pressable ──────────────────────────────────── */
-function SpringButton({ children, onPress, style }) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <AnimatedTouchable
-      onPress={onPress}
-      onPressIn={() => { scale.value = withSpring(0.93, { damping: 15, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
-      activeOpacity={0.9}
-      style={[style, animStyle]}
-      accessibilityRole="button"
-    >
-      {children}
-    </AnimatedTouchable>
-  );
-}
-
-export default function OnboardingScreen({ darkMode, onComplete }) {
-  const c = darkMode ? Colors.dark : Colors.light;
-  const [currentStep, setCurrentStep] = useState(0);
-
-  const nextStep = () => {
-    if (currentStep < ONBOARDING_STEPS.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onComplete?.();
-    }
-  };
-
-  const step = ONBOARDING_STEPS[currentStep];
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
-      {/* Skip button */}
-      <Animated.View entering={FadeIn.delay(800).duration(400)} style={styles.skipWrap}>
-        <TouchableOpacity
-          onPress={onComplete}
-          style={styles.skipBtn}
-          accessibilityLabel="Skip onboarding"
-          accessibilityRole="button"
-        >
-          <Text style={[styles.skipText, { color: c.textMuted }]}>Skip</Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      <View style={styles.content}>
-        {/* Animated Step Card */}
-        <Animated.View
-          key={`step-${currentStep}`}
-          entering={SlideInRight.duration(500).springify()}
-          exiting={SlideOutLeft.duration(300)}
-          style={styles.card}
-        >
-          <PulsingIcon icon={step.icon} color={step.color} accentBg={step.accentBg} />
-
-          <Animated.Text
-            entering={FadeInDown.delay(200).duration(500).springify()}
-            style={[styles.title, { color: c.text }]}
-          >
-            {step.title}
-          </Animated.Text>
-
-          <Animated.Text
-            entering={FadeInDown.delay(350).duration(500).springify()}
-            style={[styles.desc, { color: c.textSecondary }]}
-          >
-            {step.desc}
-          </Animated.Text>
-        </Animated.View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          {/* Animated pagination dots */}
-          <View style={styles.pagination}>
-            {ONBOARDING_STEPS.map((_, i) => {
-              const isActive = i === currentStep;
-              return (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.dot,
-                    {
-                      backgroundColor: isActive ? step.color : c.border,
-                      width: isActive ? 28 : 8,
-                    },
-                    isActive && {
-                      shadowColor: step.color,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.4,
-                      shadowRadius: 6,
-                    },
-                  ]}
-                />
-              );
-            })}
-          </View>
-
-          {/* Next / Get Started button */}
-          <SpringButton
-            onPress={nextStep}
-            style={[
-              styles.nextBtn,
-              {
-                backgroundColor: step.color,
-                borderColor: darkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.15)',
-              },
-              Shadow.limeMd,
-            ]}
-          >
-            <Text style={styles.nextBtnText}>
-              {currentStep === ONBOARDING_STEPS.length - 1 ? 'Get Started' : 'Continue'}
-            </Text>
-            <View style={[styles.nextBtnArrow, { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
-              <Ionicons name="arrow-forward" size={20} color="#003516" />
-            </View>
-          </SpringButton>
-
-          {/* Step counter */}
-          <Text style={[styles.stepCounter, { color: c.textMuted }]}>
-            {currentStep + 1} of {ONBOARDING_STEPS.length}
-          </Text>
-        </View>
-      </View>
-    </SafeAreaView>
-  );
-}
+const ILLUS = 240;
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  skipWrap: { position: 'absolute', top: 60, right: 24, zIndex: 10 },
-  skipBtn: { paddingHorizontal: 16, paddingVertical: 10, minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  skipText: { ...Typography.bodyBold },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xxl },
-  card: { alignItems: 'center', width: '100%', marginBottom: 80 },
-
-  // Icon
-  iconContainer: { width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginBottom: 40 },
-  iconRing: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 2,
+  root: { flex: 1 },
+  progressRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    gap: 8,
   },
-  iconCircle: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    alignItems: 'center',
+  progressSeg: {
+    height: 6,
+    borderRadius: 3,
+  },
+  skip: {
+    position: 'absolute',
+    right: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 44,
     justifyContent: 'center',
   },
-
-  title: { ...Typography.hero, textAlign: 'center', marginBottom: 16 },
-  desc: { ...Typography.body, textAlign: 'center', lineHeight: 24, paddingHorizontal: 20, maxWidth: 320 },
-
-  // Footer
-  footer: { position: 'absolute', bottom: 60, width: '100%', alignItems: 'center', paddingHorizontal: Spacing.xxl },
-  pagination: { flexDirection: 'row', gap: 8, marginBottom: 28 },
-  dot: { height: 8, borderRadius: 4 },
-  nextBtn: {
+  skipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  illusWrap: {
+    width: ILLUS,
+    height: ILLUS,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 56,
+  },
+  illusOuter: {
+    position: 'absolute',
+    width: ILLUS,
+    height: ILLUS,
+    borderRadius: ILLUS / 2,
+  },
+  illusMid: {
+    position: 'absolute',
+    width: ILLUS - 48,
+    height: ILLUS - 48,
+    borderRadius: (ILLUS - 48) / 2,
+  },
+  illusInner: {
+    width: ILLUS - 100,
+    height: ILLUS - 100,
+    borderRadius: (ILLUS - 100) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#3B6BFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 34,
+  },
+  subtitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 320,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  cta: {
+    height: 56,
+    borderRadius: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingLeft: 32,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
-    borderWidth: BorderWidth.thin,
-    width: '100%',
     justifyContent: 'center',
+    shadowColor: '#3B6BFF',
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
-  nextBtnText: { ...Typography.btnPrimary, color: '#003516', flex: 1, textAlign: 'center' },
-  nextBtnArrow: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  ctaText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
-  stepCounter: { ...Typography.micro, marginTop: 16, letterSpacing: 1 },
 });

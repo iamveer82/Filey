@@ -1,526 +1,368 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Dimensions,
+  View, Text, ScrollView, TextInput, Pressable, StyleSheet,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import Animated, {
-  FadeInDown, FadeInUp, FadeIn, FadeOut, ZoomIn, SlideInRight,
+  FadeInDown, FadeInUp, FadeIn, Layout,
   useSharedValue, useAnimatedStyle, withSpring, withRepeat,
-  withSequence, withTiming, withDelay, interpolate, Easing,
-  Layout,
+  withSequence, withTiming, withDelay,
 } from 'react-native-reanimated';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
-import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '../theme/tokens';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function generateId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-/* ─── Spring Pressable ──────────────────────────────────── */
-function SpringPressable({ children, onPress, style, disabled, accessibilityLabel, accessibilityRole, accessibilityState }) {
+function SpringPressable({ children, style, onPress, disabled, ...rest }) {
   const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <AnimatedTouchable
+    <AnimatedPressable
       onPress={onPress}
-      onPressIn={() => { scale.value = withSpring(0.93, { damping: 15, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
-      activeOpacity={0.9}
       disabled={disabled}
-      style={[style, animStyle]}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole={accessibilityRole || 'button'}
-      accessibilityState={accessibilityState}
+      onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
+      style={[style, anim]}
+      {...rest}
     >
       {children}
-    </AnimatedTouchable>
+    </AnimatedPressable>
   );
 }
 
-/* ─── Typing Indicator (3 pulsing dots) ─────────────────── */
-function TypingIndicator({ color }) {
-  const dot1 = useSharedValue(0.3);
-  const dot2 = useSharedValue(0.3);
-  const dot3 = useSharedValue(0.3);
+function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
 
+function TypingDots({ color }) {
+  const d1 = useSharedValue(0.3), d2 = useSharedValue(0.3), d3 = useSharedValue(0.3);
   useEffect(() => {
-    dot1.value = withRepeat(withSequence(
-      withTiming(1, { duration: 400 }), withTiming(0.3, { duration: 400 })
-    ), -1, false);
-    dot2.value = withDelay(150, withRepeat(withSequence(
-      withTiming(1, { duration: 400 }), withTiming(0.3, { duration: 400 })
-    ), -1, false));
-    dot3.value = withDelay(300, withRepeat(withSequence(
-      withTiming(1, { duration: 400 }), withTiming(0.3, { duration: 400 })
-    ), -1, false));
+    const loop = (v, delay) => {
+      v.value = withDelay(delay, withRepeat(withSequence(
+        withTiming(1, { duration: 380 }), withTiming(0.3, { duration: 380 })
+      ), -1, false));
+    };
+    loop(d1, 0); loop(d2, 130); loop(d3, 260);
   }, []);
-
-  const s1 = useAnimatedStyle(() => ({ opacity: dot1.value, transform: [{ scale: dot1.value }] }));
-  const s2 = useAnimatedStyle(() => ({ opacity: dot2.value, transform: [{ scale: dot2.value }] }));
-  const s3 = useAnimatedStyle(() => ({ opacity: dot3.value, transform: [{ scale: dot3.value }] }));
-
+  const s1 = useAnimatedStyle(() => ({ opacity: d1.value, transform: [{ scale: d1.value }] }));
+  const s2 = useAnimatedStyle(() => ({ opacity: d2.value, transform: [{ scale: d2.value }] }));
+  const s3 = useAnimatedStyle(() => ({ opacity: d3.value, transform: [{ scale: d3.value }] }));
   return (
-    <View style={styles.typingRow}>
-      <Animated.View style={[styles.typingDot, { backgroundColor: color }, s1]} />
-      <Animated.View style={[styles.typingDot, { backgroundColor: color }, s2]} />
-      <Animated.View style={[styles.typingDot, { backgroundColor: color }, s3]} />
+    <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 4 }}>
+      <Animated.View style={[styles.dot, { backgroundColor: color }, s1]} />
+      <Animated.View style={[styles.dot, { backgroundColor: color }, s2]} />
+      <Animated.View style={[styles.dot, { backgroundColor: color }, s3]} />
     </View>
   );
 }
 
-/* ─── Rotating Sparkle for Empty State ──────────────────── */
-function RotatingSparkle({ color, size = 64 }) {
-  const rotation = useSharedValue(0);
-  const pulse = useSharedValue(1);
-
-  useEffect(() => {
-    rotation.value = withRepeat(withTiming(360, { duration: 8000, easing: Easing.linear }), -1, false);
-    pulse.value = withRepeat(withSequence(
-      withTiming(1.12, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
-      withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
-    ), -1, false);
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { rotate: `${rotation.value}deg` },
-      { scale: pulse.value },
-    ],
-  }));
-
-  return (
-    <Animated.View style={animStyle}>
-      <Ionicons name="sparkles" size={size} color={color} />
-    </Animated.View>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   AIMessagingHub
-   ═══════════════════════════════════════════════════════════ */
-export default function AIMessagingHub({ darkMode, activeTab = 'cowork' }) {
+export default function AIMessagingHub({ darkMode, activeTab = 'assistant' }) {
   const c = darkMode ? Colors.dark : Colors.light;
-  const { profile, orgId, userId } = useAuth();
-  const [messages, setMessages]     = useState([]);
-  const [input, setInput]           = useState('');
-  const [loading, setLoading]       = useState(false);
-  const [currentTab, setCurrentTab] = useState(activeTab);
-  const [sending, setSending]       = useState(false);
+  const insets = useSafeAreaInsets();
+  const { profile, user } = useAuth();
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState(activeTab);
   const scrollRef = useRef();
 
-  useEffect(() => { loadMessages(); }, [currentTab]);
+  const name = profile?.name || user?.email?.split('@')[0] || 'there';
+
+  useEffect(() => { loadMessages(); }, [tab]);
 
   const loadMessages = async () => {
     try {
-      const sessionId = currentTab === 'cowork' ? 'team-session' : 'ai-session';
-      const data = await api.getChatMessages(sessionId);
-      setMessages((data.messages || []).map(m => ({ ...m, id: m.id || generateId(), ts: m.ts || Date.now() })));
-    } catch (e) {
-      // Silent — empty state shown
-    }
+      const sessionId = tab === 'cowork' ? 'team-session' : 'ai-session';
+      const d = await api.getChatMessages(sessionId);
+      setMessages((d.messages || []).map(m => ({ ...m, id: m.id || genId(), ts: m.ts || Date.now() })));
+    } catch {}
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading || sending) return;
-    const text = input.trim();
+  const send = useCallback(async (overrideText) => {
+    const text = (overrideText ?? input).trim();
+    if (!text || loading) return;
     setInput('');
-    setSending(true);
     setLoading(true);
-
-    const userMsgId = generateId();
-    setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: text, ts: Date.now() }]);
-
+    setMessages(p => [...p, { id: genId(), role: 'user', content: text, ts: Date.now() }]);
     try {
-      const sessionId = currentTab === 'cowork' ? 'team-session' : 'ai-session';
-      const response = await api.sendMessage(text, sessionId);
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'assistant',
-        content: response.message,
-        extractedTransaction: response.extractedTransaction,
-        ts: Date.now(),
+      const sessionId = tab === 'cowork' ? 'team-session' : 'ai-session';
+      const res = await api.sendMessage(text, sessionId);
+      setMessages(p => [...p, {
+        id: genId(), role: 'assistant',
+        content: res.message, extractedTransaction: res.extractedTransaction, ts: Date.now(),
       }]);
-    } catch (e) {
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'assistant',
-        content: 'Connection error. Please try again.',
-        ts: Date.now(),
-      }]);
+    } catch {
+      setMessages(p => [...p, { id: genId(), role: 'assistant', content: 'Connection error. Try again.', ts: Date.now() }]);
     } finally {
       setLoading(false);
-      setSending(false);
     }
-  };
+  }, [input, loading, tab]);
 
-  const handleStapleTransaction = async (transaction) => {
+  const staple = useCallback(async (tx) => {
     try {
-      await api.createTransaction(transaction);
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'system',
-        content: `Transaction stapled to vault: ${transaction.merchant} — ${transaction.amount} AED`,
-        ts: Date.now(),
+      await api.createTransaction(tx);
+      setMessages(p => [...p, {
+        id: genId(), role: 'system',
+        content: `Stapled: ${tx.merchant} · ${tx.amount} AED`, ts: Date.now(),
       }]);
-    } catch (e) {
-      Alert.alert('Error', 'Failed to save transaction');
-    }
-  };
+    } catch { Alert.alert('Error', 'Failed to save'); }
+  }, []);
 
   const quickPrompts = [
-    'Draft VAT summary',
-    'Explain corporate tax',
-    'Categorize this expense',
-    'Export monthly report',
+    { icon: 'document-text', text: 'Draft VAT summary' },
+    { icon: 'calculator', text: 'Explain corporate tax' },
+    { icon: 'pricetag', text: 'Categorize expense' },
+    { icon: 'download', text: 'Export monthly report' },
   ];
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: c.bg }]}
+      style={{ flex: 1, backgroundColor: c.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
-      {/* ── Tab Switcher ──────────────────────────────── */}
-      <Animated.View
-        entering={FadeInDown.duration(400).springify()}
-        style={[styles.tabContainer, { borderBottomColor: c.border }]}
-      >
-        {[['cowork', 'Co-work', 'people'], ['assistant', 'AI Assistant', 'sparkles']].map(([val, label, icon]) => (
-          <SpringPressable
-            key={val}
-            onPress={() => setCurrentTab(val)}
-            style={[
-              styles.tab,
-              currentTab === val
-                ? { backgroundColor: '#44e571', borderColor: 'rgba(0,83,31,0.3)', ...Shadow.limeSm }
-                : { backgroundColor: c.surfaceLow, borderColor: c.border },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: currentTab === val }}
-            accessibilityLabel={label}
-          >
-            <Ionicons name={icon} size={16} color={currentTab === val ? '#003516' : c.textMuted} />
-            <Text style={[styles.tabText, { color: currentTab === val ? '#003516' : c.text }]}>{label}</Text>
-          </SpringPressable>
-        ))}
-      </Animated.View>
-
-      {/* ── Messages List ─────────────────────────────── */}
-      <ScrollView
-        ref={scrollRef}
-        style={styles.messagesContainer}
-        contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: Spacing.lg }}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-      >
-        {messages.length === 0 && (
-          <Animated.View entering={FadeIn.delay(200).duration(600)} style={styles.emptyState}>
-            <View style={[styles.emptyIconWrap, { backgroundColor: currentTab === 'cowork' ? c.limeBg : c.accentBg }]}>
-              {currentTab === 'cowork'
-                ? <Ionicons name="people" size={48} color={c.lime} />
-                : <RotatingSparkle color={c.accent} size={48} />
-              }
+      <StatusBar style="light" />
+      <View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.heroInner}>
+          <View style={styles.heroTopRow}>
+            <View>
+              <Text style={styles.heroGreet}>Hi {name}</Text>
+              <Text style={styles.heroSub}>Your AI finance copilot</Text>
             </View>
-            <Text style={[styles.emptyTitle, { color: c.text }]}>
-              {currentTab === 'cowork' ? 'Team Chat' : 'Filely AI'}
-            </Text>
-            <Text style={[styles.emptyText, { color: c.textSecondary }]}>
-              {currentTab === 'cowork'
-                ? 'Start collaborating with your team'
-                : 'Ask me anything about UAE finances, VAT, or expenses'}
-            </Text>
-
-            {/* Suggestion chips */}
-            {currentTab === 'assistant' && (
-              <View style={styles.suggestions}>
-                {quickPrompts.map((prompt, idx) => (
-                  <Animated.View key={prompt} entering={FadeInUp.delay(400 + idx * 100).duration(400).springify()}>
-                    <SpringPressable
-                      onPress={() => setInput(prompt)}
-                      style={[styles.suggestionChip, { backgroundColor: c.surfaceLow, borderColor: c.border }]}
-                      accessibilityLabel={prompt}
-                    >
-                      <Ionicons name="flash-outline" size={14} color={c.accent} />
-                      <Text style={[styles.suggestionText, { color: c.textSecondary }]}>{prompt}</Text>
-                    </SpringPressable>
-                  </Animated.View>
-                ))}
-              </View>
-            )}
-          </Animated.View>
-        )}
-
-        {messages.map((msg, i) => (
-          <Animated.View
-            key={msg.id}
-            entering={FadeInUp.delay(Math.min(i * 50, 300)).duration(400).springify()}
-            layout={Layout.springify()}
-            style={[
-              styles.messageBubble,
-              msg.role === 'user'   ? styles.userBubble :
-              msg.role === 'system' ? styles.systemBubble :
-              styles.aiBubble,
-              {
-                backgroundColor:
-                  msg.role === 'user'   ? '#44e571' :
-                  msg.role === 'system' ? c.surfaceLow :
-                  darkMode              ? c.card : '#FFFFFF',
-                borderColor:
-                  msg.role === 'user' ? 'rgba(0,83,31,0.3)' : c.border,
-              },
-            ]}
-          >
-            {/* AI avatar for assistant messages */}
-            {msg.role === 'assistant' && (
-              <View style={styles.aiAvatarRow}>
-                <View style={[styles.aiAvatar, { backgroundColor: c.accentBg }]}>
-                  <Ionicons name="sparkles" size={14} color={c.accent} />
-                </View>
-                <Text style={[styles.aiLabel, { color: c.accent }]}>Filely AI</Text>
-              </View>
-            )}
-
-            {msg.extractedTransaction ? (
-              <View style={styles.billWidget}>
-                <View style={styles.billHeader}>
-                  <View style={[styles.billIconWrap, { backgroundColor: 'rgba(79,142,255,0.12)' }]}>
-                    <Ionicons name="receipt-outline" size={18} color="#4F8EFF" />
-                  </View>
-                  <Text style={[styles.billTitle, { color: c.text }]}>Smart Bill Detected</Text>
-                </View>
-                <View style={[styles.billData, { borderColor: c.border }]}>
-                  <Text style={[styles.billMerchant, { color: c.text }]}>{msg.extractedTransaction.merchant}</Text>
-                  <View style={styles.billAmountRow}>
-                    <Text style={[styles.billAmount, { color: '#FF4B6E' }]}>{msg.extractedTransaction.amount} AED</Text>
-                    <Text style={[styles.billVat, { color: '#44e571' }]}>VAT: {msg.extractedTransaction.vat} AED</Text>
-                  </View>
-                </View>
-                <SpringPressable
-                  onPress={() => handleStapleTransaction(msg.extractedTransaction)}
-                  style={[styles.stapleBtn, Shadow.limeSm]}
-                  accessibilityLabel={`Staple ${msg.extractedTransaction.merchant} to vault`}
-                >
-                  <Ionicons name="checkmark-circle" size={18} color="#003516" />
-                  <Text style={styles.stapleBtnText}>Staple to Vault</Text>
-                </SpringPressable>
-              </View>
-            ) : (
-              <Text style={[
-                styles.messageText,
-                { color: msg.role === 'user' ? '#003516' : msg.role === 'system' ? c.textSecondary : c.text },
-              ]}>
-                {msg.content}
-              </Text>
-            )}
-
-            <Text style={[styles.messageTime, { color: msg.role === 'user' ? 'rgba(0,53,22,0.5)' : c.textMuted }]}>
-              {new Date(msg.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </Animated.View>
-        ))}
-
-        {/* Typing indicator */}
-        {loading && (
-          <Animated.View entering={FadeIn.duration(300)} style={[styles.typingBubble, { backgroundColor: darkMode ? c.card : '#FFFFFF', borderColor: c.border }]}>
-            <View style={[styles.aiAvatar, { backgroundColor: c.accentBg }]}>
-              <Ionicons name="sparkles" size={14} color={c.accent} />
+            <View style={styles.avatarBadge}>
+              <Ionicons name={tab === 'cowork' ? 'people' : 'sparkles'} size={20} color="#FFFFFF" />
             </View>
-            <TypingIndicator color={c.accent} />
-          </Animated.View>
-        )}
-      </ScrollView>
+          </View>
 
-      {/* ── Quick Prompts (assistant mode only) ───────── */}
-      {currentTab === 'assistant' && messages.length > 0 && (
-        <Animated.View entering={SlideInRight.duration(300)}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.promptsContainer}
-            contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
-          >
-            {quickPrompts.map((prompt) => (
+          <View style={styles.pillRow}>
+            {[['assistant', 'AI Assistant', 'sparkles'], ['cowork', 'Co-work', 'people']].map(([v, l, ic]) => (
               <SpringPressable
-                key={prompt}
-                onPress={() => setInput(prompt)}
-                style={[styles.promptChip, { backgroundColor: c.surfaceLow, borderColor: c.border }]}
-                accessibilityLabel={prompt}
+                key={v}
+                onPress={() => setTab(v)}
+                style={[styles.pill, tab === v ? styles.pillActive : styles.pillIdle]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === v }}
               >
-                <Text style={[styles.promptText, { color: c.textSecondary }]}>{prompt}</Text>
+                <Ionicons name={ic} size={14} color={tab === v ? '#3B6BFF' : '#FFFFFF'} />
+                <Text style={[styles.pillText, { color: tab === v ? '#3B6BFF' : '#FFFFFF' }]}>{l}</Text>
               </SpringPressable>
             ))}
-          </ScrollView>
+          </View>
         </Animated.View>
-      )}
+      </View>
 
-      {/* ── Input Area ────────────────────────────────── */}
-      <Animated.View
-        entering={FadeInUp.duration(400).springify()}
-        style={[styles.inputContainer, { backgroundColor: darkMode ? 'rgba(11,15,30,0.95)' : 'rgba(255,255,255,0.95)', borderTopColor: c.border }]}
-      >
-        <View style={[styles.inputInner, { backgroundColor: c.surfaceLow, borderColor: c.border }]}>
+      <View style={[styles.sheet, { backgroundColor: c.bg }]}>
+        <View style={styles.handle} />
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.length === 0 && (
+            <Animated.View entering={FadeIn.delay(150).duration(500)} style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: c.primaryLight }]}>
+                <Ionicons name={tab === 'cowork' ? 'people' : 'sparkles'} size={36} color={c.primary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>
+                {tab === 'cowork' ? 'Start a team chat' : 'Ask Filey AI anything'}
+              </Text>
+              <Text style={[styles.emptySub, { color: c.textMuted }]}>
+                {tab === 'cowork' ? 'Share receipts, assign tasks, resolve VAT queries.' : 'UAE VAT, expense sorting, reports — in seconds.'}
+              </Text>
+              {tab === 'assistant' && (
+                <View style={styles.suggestWrap}>
+                  {quickPrompts.map((p, i) => (
+                    <Animated.View key={p.text} entering={FadeInUp.delay(200 + i * 80).duration(400)}>
+                      <SpringPressable
+                        onPress={() => send(p.text)}
+                        style={[styles.suggest, { backgroundColor: c.card, borderColor: c.borderSubtle }]}
+                      >
+                        <View style={[styles.suggestIcon, { backgroundColor: c.primaryLight }]}>
+                          <Ionicons name={p.icon} size={14} color={c.primary} />
+                        </View>
+                        <Text style={[styles.suggestText, { color: c.text }]}>{p.text}</Text>
+                        <Ionicons name="arrow-forward" size={14} color={c.textMuted} />
+                      </SpringPressable>
+                    </Animated.View>
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          )}
+
+          {messages.map((m, i) => {
+            const isUser = m.role === 'user';
+            const isSys = m.role === 'system';
+            return (
+              <Animated.View
+                key={m.id}
+                entering={FadeInUp.delay(Math.min(i * 40, 240)).duration(350)}
+                layout={Layout.springify()}
+                style={[
+                  styles.bubble,
+                  isUser ? styles.bubbleUser : (isSys ? styles.bubbleSys : styles.bubbleAi),
+                  {
+                    backgroundColor: isUser ? c.primary : (isSys ? c.primaryLight : c.card),
+                    borderColor: isUser ? 'transparent' : c.borderSubtle,
+                  },
+                ]}
+              >
+                {m.role === 'assistant' && (
+                  <View style={styles.aiLabelRow}>
+                    <View style={[styles.aiDot, { backgroundColor: c.primaryLight }]}>
+                      <Ionicons name="sparkles" size={10} color={c.primary} />
+                    </View>
+                    <Text style={[styles.aiLabel, { color: c.primary }]}>Filey AI</Text>
+                  </View>
+                )}
+                <Text style={{ color: isUser ? '#FFFFFF' : (isSys ? c.primary : c.text), fontSize: 14.5, lineHeight: 21 }}>
+                  {m.content}
+                </Text>
+                {m.extractedTransaction && (
+                  <View style={[styles.txCard, { borderColor: c.borderSubtle, backgroundColor: darkMode ? c.cardElevated : '#F8FAFF' }]}>
+                    <View style={styles.txRow}>
+                      <View style={[styles.txIcon, { backgroundColor: c.primaryLight }]}>
+                        <Ionicons name="receipt" size={14} color={c.primary} />
+                      </View>
+                      <Text style={[styles.txMerchant, { color: c.text }]} numberOfLines={1}>{m.extractedTransaction.merchant}</Text>
+                      <Text style={[styles.txAmount, { color: c.primary }]}>
+                        {m.extractedTransaction.amount} AED
+                      </Text>
+                    </View>
+                    <SpringPressable
+                      onPress={() => staple(m.extractedTransaction)}
+                      style={[styles.stapleBtn, { backgroundColor: c.primary }]}
+                    >
+                      <Ionicons name="attach" size={14} color="#FFFFFF" />
+                      <Text style={styles.stapleText}>Staple to vault</Text>
+                    </SpringPressable>
+                  </View>
+                )}
+              </Animated.View>
+            );
+          })}
+
+          {loading && (
+            <Animated.View entering={FadeIn.duration(200)} style={[styles.bubble, styles.bubbleAi, { backgroundColor: c.card, borderColor: c.borderSubtle }]}>
+              <TypingDots color={c.primary} />
+            </Animated.View>
+          )}
+        </ScrollView>
+
+        <View style={[styles.inputBar, { backgroundColor: c.card, borderColor: c.borderSubtle, marginBottom: insets.bottom + 90 }]}>
           <TextInput
-            style={[styles.input, { color: c.text }]}
-            placeholder={currentTab === 'cowork' ? 'Message team...' : 'Ask about UAE finances...'}
-            placeholderTextColor={c.textMuted}
             value={input}
             onChangeText={setInput}
+            placeholder={tab === 'cowork' ? 'Message the team…' : 'Ask Filey AI…'}
+            placeholderTextColor={c.textMuted}
+            style={[styles.input, { color: c.text }]}
             multiline
             maxLength={2000}
-            returnKeyType="send"
-            onSubmitEditing={sendMessage}
-            accessibilityLabel="Message input"
           />
           <SpringPressable
-            onPress={sendMessage}
-            disabled={loading || sending || !input.trim()}
-            style={[
-              styles.sendBtn,
-              { backgroundColor: (loading || sending || !input.trim()) ? c.border : '#44e571' },
-              !(loading || sending || !input.trim()) && Shadow.limeSm,
-            ]}
-            accessibilityLabel="Send message"
-            accessibilityState={{ disabled: loading || sending || !input.trim() }}
+            onPress={() => send()}
+            disabled={!input.trim() || loading}
+            style={[styles.sendBtn, { backgroundColor: input.trim() && !loading ? c.primary : c.borderSubtle }]}
+            accessibilityLabel="Send"
           >
-            <Ionicons name="send" size={18} color={(loading || sending || !input.trim()) ? c.textMuted : '#003516'} />
+            <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
           </SpringPressable>
         </View>
-      </Animated.View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
-  // Tab switcher
-  tabContainer: {
-    flexDirection: 'row',
-    padding: Spacing.md,
-    gap: Spacing.md,
-    borderBottomWidth: BorderWidth.hairline,
+  hero: {
+    backgroundColor: '#3B6BFF',
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: Radius.lg,
+  heroInner: { gap: 18 },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroGreet: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  avatarBadge: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pillRow: { flexDirection: 'row', gap: 8 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
     borderWidth: 1,
   },
-  tabText: { ...Typography.btnSmall, fontWeight: '800' },
-
-  // Messages
-  messagesContainer: { flex: 1 },
-  emptyState: { alignItems: 'center', paddingVertical: 60, gap: Spacing.md },
-  emptyIconWrap: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
+  pillActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  pillIdle: { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.22)' },
+  pillText: { fontSize: 13, fontWeight: '700' },
+  sheet: {
+    flex: 1, marginTop: -24,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 8,
   },
-  emptyTitle: { ...Typography.cardTitle, fontSize: 20 },
-  emptyText: { ...Typography.body, textAlign: 'center', maxWidth: 280, lineHeight: 24 },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm, marginTop: Spacing.lg, paddingHorizontal: Spacing.lg },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(11,23,53,0.15)',
+    alignSelf: 'center', marginTop: 6, marginBottom: 4,
   },
-  suggestionText: { ...Typography.caption },
-
-  // Message bubbles
-  messageBubble: {
-    maxWidth: '85%',
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
+  empty: { alignItems: 'center', paddingTop: 28, paddingHorizontal: 12 },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 36,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
-  userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4, ...Shadow.limeSm },
-  aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  systemBubble: { alignSelf: 'center', maxWidth: '90%' },
-
-  // AI avatar inline
-  aiAvatarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  aiAvatar: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  aiLabel: { ...Typography.micro, fontWeight: '700' },
-
-  messageText: { ...Typography.bodySmall, lineHeight: 22 },
-  messageTime: { ...Typography.micro, marginTop: 6, textAlign: 'right' },
-
-  // Typing
-  typingBubble: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 14,
-    borderRadius: Radius.lg,
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
+  emptyTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  emptySub: { fontSize: 13.5, textAlign: 'center', marginTop: 6, lineHeight: 19, maxWidth: 280 },
+  suggestWrap: { marginTop: 22, gap: 10, width: '100%' },
+  suggest: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 16, borderWidth: 1,
   },
-  typingRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 4 },
-  typingDot: { width: 8, height: 8, borderRadius: 4 },
-
-  // Bill widget
-  billWidget: { gap: 12 },
-  billIconWrap: { width: 32, height: 32, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
-  billHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  billTitle: { ...Typography.bodyBold },
-  billData: { paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, gap: 4 },
-  billMerchant: { ...Typography.bodyBold },
-  billAmountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  billAmount: { ...Typography.valueS },
-  billVat: { ...Typography.caption, fontWeight: '700' },
+  suggestIcon: {
+    width: 30, height: 30, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  suggestText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  bubble: {
+    maxWidth: '88%', paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 18, marginBottom: 10, borderWidth: 1,
+  },
+  bubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 6 },
+  bubbleAi: { alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
+  bubbleSys: { alignSelf: 'center', maxWidth: '90%' },
+  aiLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  aiDot: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  aiLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  txCard: { marginTop: 10, padding: 12, borderRadius: 14, borderWidth: 1, gap: 10 },
+  txRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  txIcon: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  txMerchant: { flex: 1, fontSize: 13.5, fontWeight: '700' },
+  txAmount: { fontSize: 13.5, fontWeight: '800' },
   stapleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: Radius.pill,
-    backgroundColor: '#44e571',
-    borderWidth: 1,
-    borderColor: 'rgba(0,83,31,0.3)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 9, borderRadius: 12,
   },
-  stapleBtnText: { ...Typography.btnSmall, color: '#003516', fontWeight: '800' },
-
-  // Quick prompts
-  promptsContainer: { maxHeight: 50, paddingVertical: Spacing.sm },
-  promptChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1 },
-  promptText: { ...Typography.caption },
-
-  // Input
-  inputContainer: {
-    padding: Spacing.md,
-    borderTopWidth: 1,
-    marginBottom: 90,
+  stapleText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' },
+  inputBar: {
+    position: 'absolute', left: 16, right: 16, bottom: 0,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 28, borderWidth: 1,
+    shadowColor: '#0B1735', shadowOpacity: 0.08, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 }, elevation: 6,
   },
-  inputInner: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: Spacing.sm,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
+  input: { flex: 1, maxHeight: 120, minHeight: 36, paddingHorizontal: 6, paddingVertical: 8, fontSize: 14.5 },
+  sendBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
   },
-  input: { flex: 1, ...Typography.bodySmall, paddingVertical: Spacing.sm, maxHeight: 100 },
-  sendBtn: { width: 44, height: 44, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
 });
