@@ -64,6 +64,8 @@ export async function autoCategorize({ merchant, amount, notes, ocrText }) {
  * VAT 5% split — inputs (reclaimable) vs outputs (expenses to customer).
  */
 export function summarizeVat(transactions) {
+  // Lazy import to avoid circular
+  const { reclaimableVat } = require('./vatRules');
   let totalAmt = 0, totalVat = 0, reclaimable = 0;
   const byCategory = {};
   for (const t of transactions) {
@@ -71,16 +73,18 @@ export function summarizeVat(transactions) {
     const vat = parseFloat(t.vat) || 0;
     totalAmt += amt;
     totalVat += vat;
+    const r = reclaimableVat(t);
+    reclaimable += r;
     const cat = categoryById(t.category);
-    if (cat.vatReclaim) reclaimable += vat;
-    byCategory[cat.id] = byCategory[cat.id] || { id: cat.id, label: cat.label, color: cat.color, amt: 0, vat: 0, count: 0 };
+    byCategory[cat.id] = byCategory[cat.id] || { id: cat.id, label: cat.label, color: cat.color, amt: 0, vat: 0, reclaim: 0, count: 0 };
     byCategory[cat.id].amt += amt;
     byCategory[cat.id].vat += vat;
+    byCategory[cat.id].reclaim += r;
     byCategory[cat.id].count += 1;
   }
   return {
     totalAmt, totalVat, reclaimable,
-    nonReclaimable: totalVat - reclaimable,
+    nonReclaimable: +(totalVat - reclaimable).toFixed(2),
     byCategory: Object.values(byCategory).sort((a, b) => b.amt - a.amt),
     count: transactions.length,
   };

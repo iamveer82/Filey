@@ -32,6 +32,8 @@ import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { send as llmSend, getPreference as getLLMPref } from '../services/llmProvider';
 import { exportCSV, exportPDF } from '../services/exportLedger';
+import { exportPeppolBatch } from '../services/eInvoiceExport';
+import { seedVersion } from '../services/txVersioning';
 import ThreadPicker from '../components/ThreadPicker';
 import {
   ensureActiveThread, msgKey, memKey, setActiveThreadId as setActiveThreadIdPersist,
@@ -489,6 +491,7 @@ export default function AIMessagingHub() {
         { text: 'Cancel', style: 'cancel' },
         { text: 'CSV (Excel)', onPress: () => doExport('csv') },
         { text: 'PDF report', onPress: () => doExport('pdf') },
+        { text: 'e-Invoice XML (PEPPOL)', onPress: () => doExport('peppol') },
       ]);
     }
   }, [runScan, runPdfPicker, send, pushMessage, runBulkScan, runMergeScan]);
@@ -503,6 +506,7 @@ export default function AIMessagingHub() {
         return;
       }
       if (fmt === 'csv') await exportCSV(txs);
+      else if (fmt === 'peppol') await exportPeppolBatch(txs, { supplierName: 'My Company' });
       else await exportPDF(txs, { company: 'My Company' });
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
       pushMessage({ role: 'system', content: `${fmt.toUpperCase()} ready — shared via iOS sheet.` });
@@ -573,6 +577,15 @@ export default function AIMessagingHub() {
       const enriched = withOrgContext(tx);
       await api.createTransaction(enriched);
       await recordSeen(tx, { submittedByName: submitterName });
+      try {
+        await seedVersion(enriched.id || tx.id, {
+          ocrText: tx.ocrText || tx.rawText,
+          imageUri: tx.imageUri,
+          parsed: enriched,
+          actorId: userId,
+          actorName: submitterName,
+        });
+      } catch {}
       runAnomalyCheck(tx);
       pushMessage({
         role: 'system',
@@ -591,8 +604,18 @@ export default function AIMessagingHub() {
     const ok = await dedupGuard(tx);
     if (!ok) return;
     try {
-      await api.createTransaction(withOrgContext(tx));
+      const enriched = withOrgContext(tx);
+      await api.createTransaction(enriched);
       await recordSeen(tx, { submittedByName: submitterName });
+      try {
+        await seedVersion(enriched.id || tx.id, {
+          ocrText: tx.ocrText || tx.rawText,
+          imageUri: tx.imageUri,
+          parsed: enriched,
+          actorId: userId,
+          actorName: submitterName,
+        });
+      } catch {}
       runAnomalyCheck(tx);
       pushMessage({ role: 'system', content: `Saved: ${tx.merchant || 'tx'} · ${tx.amount} AED · by ${submitterName}` });
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, extractedSaved: true } : m));

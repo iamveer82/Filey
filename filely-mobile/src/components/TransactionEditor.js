@@ -9,6 +9,8 @@ import Animated, {
   FadeIn, useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import { CATEGORIES, categoryById } from '../services/categories';
+import { validateTrn } from '../services/trnValidator';
+import { RECLAIM_PERCENT, RECLAIM_REASON, reclaimableVat } from '../services/vatRules';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -38,10 +40,14 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
     trn: transaction?.trn || '',
     category: transaction?.category || 'other',
     notes: transaction?.notes || '',
+    reclaimPct: transaction?.reclaimPct,
   });
   const [saving, setSaving] = useState(false);
 
   const activeCat = useMemo(() => categoryById(tx.category), [tx.category]);
+  const trnCheck = useMemo(() => tx.trn ? validateTrn(tx.trn) : null, [tx.trn]);
+  const effectivePct = (typeof tx.reclaimPct === 'number') ? tx.reclaimPct : (RECLAIM_PERCENT[tx.category] ?? 0);
+  const reclaimAmt = useMemo(() => reclaimableVat({ ...tx, vat: parseFloat(tx.vat) || 0 }), [tx]);
 
   const set = (k, v) => setTx(s => ({ ...s, [k]: v }));
 
@@ -55,6 +61,9 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
   };
 
   const handleSave = async () => {
+    if (tx.trn && !validateTrn(tx.trn).valid) {
+      // Still allow save but warn — user may have handwritten TRN
+    }
     setSaving(true);
     try {
       await onSave?.({
@@ -62,6 +71,7 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
         ...tx,
         amount: parseFloat(tx.amount) || 0,
         vat: parseFloat(tx.vat) || 0,
+        reclaimPct: typeof tx.reclaimPct === 'number' ? tx.reclaimPct : undefined,
       });
     } finally { setSaving(false); }
   };
@@ -120,15 +130,27 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
           />
         </View>
         <View style={[s.field, { flex: 1 }]}>
-          <Text style={s.label}>TRN</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={s.label}>TRN</Text>
+            {trnCheck?.valid && (
+              <Ionicons name="checkmark-circle" size={11} color="#22C55E" />
+            )}
+            {trnCheck && !trnCheck.valid && tx.trn.length >= 15 && (
+              <Ionicons name="alert-circle" size={11} color="#FCA5A5" />
+            )}
+          </View>
           <TextInput
             value={tx.trn}
-            onChangeText={(t) => set('trn', t)}
+            onChangeText={(t) => set('trn', t.replace(/\D/g, '').slice(0, 15))}
             placeholder="100..."
             placeholderTextColor="#6B7280"
-            autoCapitalize="characters"
-            style={s.input}
+            keyboardType="number-pad"
+            maxLength={15}
+            style={[s.input, trnCheck && !trnCheck.valid && tx.trn.length >= 15 && { borderColor: '#FCA5A5' }]}
           />
+          {trnCheck && !trnCheck.valid && tx.trn.length >= 3 && (
+            <Text style={{ color: '#FCA5A5', fontSize: 10, marginTop: 2 }}>{trnCheck.reason}</Text>
+          )}
         </View>
       </View>
 
@@ -156,6 +178,25 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
           />
         </View>
       </View>
+
+      {parseFloat(tx.vat) > 0 && (
+        <View style={s.reclaimBox}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="shield-checkmark" size={12} color={reclaimAmt > 0 ? '#22C55E' : '#6B7280'} />
+            <Text style={s.reclaimTitle}>
+              Reclaimable: {reclaimAmt.toFixed(2)} AED ({effectivePct}%)
+            </Text>
+          </View>
+          <Text style={s.reclaimHint}>{RECLAIM_REASON[tx.category] || ''}</Text>
+          <View style={s.pctRow}>
+            {[0, 25, 50, 80, 100].map(p => (
+              <Tap key={p} onPress={() => set('reclaimPct', p)} style={[s.pctChip, effectivePct === p && s.pctChipActive]}>
+                <Text style={[s.pctText, effectivePct === p && { color: '#0A0A0A' }]}>{p}%</Text>
+              </Tap>
+            ))}
+          </View>
+        </View>
+      )}
 
       <Text style={[s.label, { marginTop: 4 }]}>CATEGORY</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catRow}>
@@ -268,4 +309,11 @@ const s = StyleSheet.create({
   },
   imageFull: { width: '100%', height: '80%' },
   imageClose: { position: 'absolute', top: 60, right: 20 },
+  reclaimBox: { marginTop: 4, padding: 10, borderRadius: 12, backgroundColor: '#0A0A0A', borderWidth: 1, borderColor: '#262626', gap: 6 },
+  reclaimTitle: { color: '#F9FAFB', fontSize: 12, fontWeight: '700' },
+  reclaimHint: { color: '#9CA3AF', fontSize: 10.5, lineHeight: 14 },
+  pctRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  pctChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: '#1F1F1F', borderWidth: 1, borderColor: '#2A2A2A' },
+  pctChipActive: { backgroundColor: '#F9FAFB', borderColor: '#F9FAFB' },
+  pctText: { color: '#E5E7EB', fontSize: 11, fontWeight: '700' },
 });
