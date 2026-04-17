@@ -17,7 +17,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { scanReceipt, scanReceiptBulk } from '../services/receiptPipeline';
+import { scanReceipt, scanReceiptBulk, scanReceiptMerged } from '../services/receiptPipeline';
+import { checkDuplicate, recordSeen } from '../services/dedup';
+import { computeNudges } from '../services/nudges';
 import TransactionEditor from '../components/TransactionEditor';
 import VatSummaryModal from '../components/VatSummaryModal';
 import { categoryById } from '../services/categories';
@@ -83,6 +85,7 @@ const QUICK_ACTIONS = [
   { id: 'qa_scan',    label: 'Scan receipt',   icon: 'scan',              action: 'camera' },
   { id: 'qa_upload',  label: 'Upload receipt', icon: 'image-outline',     action: 'gallery' },
   { id: 'qa_bulk',    label: 'Bulk scan',      icon: 'albums-outline',    action: 'bulk' },
+  { id: 'qa_merge',   label: 'Multi-page',     icon: 'layers-outline',    action: 'merge' },
   { id: 'qa_pdf',     label: 'PDF invoice',    icon: 'document-outline',  action: 'pdf' },
   { id: 'qa_vat',     label: 'VAT help',       icon: 'shield-checkmark-outline', action: 'prompt', prompt: 'Explain UAE VAT in plain English.' },
   { id: 'qa_vat_sum', label: 'VAT summary',    icon: 'calculator-outline', action: 'vatSummary' },
@@ -152,6 +155,21 @@ export default function AIMessagingHub() {
     const all = await listThreads();
     setActiveThread(all.find(t => t.id === id) || null);
   }, []);
+
+  // Proactive nudges on mount (one-shot, cooldown guarded internally)
+  useEffect(() => {
+    let mounted = true;
+    const t = setTimeout(async () => {
+      try {
+        const nudges = await computeNudges({ orgId });
+        if (!mounted || !nudges?.length) return;
+        for (const n of nudges) {
+          pushMessage({ role: 'system', kind: 'nudge', severity: n.severity, content: n.text });
+        }
+      } catch {}
+    }, 1400);
+    return () => { mounted = false; clearTimeout(t); };
+  }, [orgId, pushMessage]);
 
   const newThread = useCallback(async () => {
     const t = await createThread('New chat');
@@ -421,6 +439,7 @@ export default function AIMessagingHub() {
     if (qa.action === 'camera') runScan('camera');
     else if (qa.action === 'gallery') runScan('gallery');
     else if (qa.action === 'bulk') runBulkScan();
+    else if (qa.action === 'merge') runMergeScan();
     else if (qa.action === 'vatSummary') setShowVatSummary(true);
     else if (qa.action === 'pdf') runPdfPicker();
     else if (qa.action === 'prompt') send(qa.prompt);
@@ -431,7 +450,7 @@ export default function AIMessagingHub() {
         { text: 'PDF report', onPress: () => doExport('pdf') },
       ]);
     }
-  }, [runScan, runPdfPicker, send, pushMessage, runBulkScan]);
+  }, [runScan, runPdfPicker, send, pushMessage, runBulkScan, runMergeScan]);
 
   const doExport = useCallback(async (fmt) => {
     try {
@@ -451,15 +470,37 @@ export default function AIMessagingHub() {
     }
   }, [pushMessage]);
 
+  const dedupGuard = useCallback(async (tx) => {
+    try {
+      const dup = await checkDuplicate(tx, { orgId });
+      if (dup.duplicate) {
+        const m = dup.match || {};
+        return new Promise((resolve) => {
+          Alert.alert(
+            'Possible duplicate',
+            `${m.merchant || tx.merchant} · ${m.amount || tx.amount} AED on ${m.date || tx.date} was already submitted${m.submittedByName ? ` by ${m.submittedByName}` : ''}. Save anyway?`,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Save anyway', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+      }
+    } catch {}
+    return true;
+  }, [orgId]);
+
   const staple = useCallback(async (tx) => {
+    const ok = await dedupGuard(tx);
+    if (!ok) return;
     try {
       const enriched = withOrgContext(tx);
       await api.createTransaction(enriched);
+      await recordSeen(tx, { submittedByName: submitterName });
       pushMessage({
         role: 'system',
         content: `Saved: ${tx.merchant || 'transaction'} · ${tx.amount} AED · ${categoryById(tx.category).label} · by ${submitterName}`,
       });
-      // Mark source message as saved to hide editor
       setMessages(prev => prev.map(m =>
         m.extractedTransaction?.id === tx.id ? { ...m, extractedSaved: true } : m
       ));
@@ -467,15 +508,44 @@ export default function AIMessagingHub() {
     } catch {
       Alert.alert('Error', 'Failed to save transaction');
     }
-  }, [pushMessage]);
+  }, [pushMessage, dedupGuard, submitterName]);
 
   const stapleFromQueue = useCallback(async (tx, msgId) => {
+    const ok = await dedupGuard(tx);
+    if (!ok) return;
     try {
       await api.createTransaction(withOrgContext(tx));
+      await recordSeen(tx, { submittedByName: submitterName });
       pushMessage({ role: 'system', content: `Saved: ${tx.merchant || 'tx'} · ${tx.amount} AED · by ${submitterName}` });
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, extractedSaved: true } : m));
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch { Alert.alert('Error', 'Failed to save'); }
+  }, [pushMessage, dedupGuard, submitterName]);
+
+  const runMergeScan = useCallback(async () => {
+    setShowAttach(false);
+    setScanning(true);
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+    pushMessage({ role: 'system', content: 'Multi-page merge — pick 2-6 pages of one invoice.' });
+    try {
+      const r = await scanReceiptMerged();
+      if (!r.success) {
+        pushMessage({ role: 'assistant', content: r.error || 'Merge failed.' });
+        return;
+      }
+      if (r.imageUri) pushMessage({ role: 'user', kind: 'image', uri: r.imageUri });
+      pushMessage({
+        role: 'assistant',
+        content: `Merged ${r.transaction.pageCount} pages into one transaction:`,
+        extractedTransaction: r.transaction,
+        imageUri: r.imageUri,
+      });
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+    } catch (e) {
+      pushMessage({ role: 'assistant', content: `Merge failed: ${e.message}` });
+    } finally {
+      setScanning(false);
+    }
   }, [pushMessage]);
 
   const runBulkScan = useCallback(async () => {

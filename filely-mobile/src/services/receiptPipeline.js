@@ -126,6 +126,70 @@ export async function scanReceipt(source = 'gallery') {
 }
 
 /**
+ * Multi-image single-tx scan: pick N images (e.g. 2-page invoice), OCR each,
+ * concat text, single parseReceipt → one merged transaction.
+ */
+export async function scanReceiptMerged() {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') return { success: false, error: 'Photo permission required.' };
+
+  const pick = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true,
+    selectionLimit: 6,
+    base64: false,
+    quality: 0.8,
+  });
+  if (pick.canceled || !pick.assets?.length) return { success: false, error: 'Cancelled.' };
+  if (pick.assets.length < 2) return { success: false, error: 'Pick at least 2 images to merge.' };
+
+  if (!isOcrAvailable()) {
+    return { success: false, error: 'On-device OCR not available.' };
+  }
+
+  const parts = [];
+  const uris = [];
+  for (let i = 0; i < pick.assets.length; i++) {
+    const asset = pick.assets[i];
+    uris.push(asset.uri);
+    try {
+      const ocr = await recognizeText(asset.uri);
+      if (ocr.text?.trim()) parts.push(`--- PAGE ${i + 1} ---\n${ocr.text}`);
+    } catch (e) {
+      parts.push(`--- PAGE ${i + 1} (failed: ${e.message}) ---`);
+    }
+  }
+  const ocrText = parts.join('\n\n');
+  if (!ocrText.trim()) return { success: false, error: 'No text detected across images.' };
+
+  const parsed = await parseReceipt(ocrText);
+  let category = parsed.category;
+  if (!category || category === 'other' || category === 'unknown') {
+    const cat = await autoCategorize({ merchant: parsed.merchant, amount: parsed.amount, ocrText });
+    category = cat.id;
+  }
+
+  return {
+    success: true,
+    transaction: {
+      id: generateId(),
+      merchant: parsed.merchant,
+      date: parsed.date,
+      amount: parsed.amount,
+      vat: parsed.vat,
+      trn: parsed.trn,
+      currency: parsed.currency || 'AED',
+      category,
+      status: 'pending',
+      pageCount: pick.assets.length,
+    },
+    imageUri: uris[0],
+    imageUris: uris,
+    ocrText,
+  };
+}
+
+/**
  * Parse a text message for expense info (e.g., "Paid 120 AED at ENOC")
  * Uses the same Gemma/local parser.
  */
