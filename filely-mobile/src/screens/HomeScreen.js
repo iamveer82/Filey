@@ -18,10 +18,18 @@ import Animated, {
   SlideInRight,
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedScrollHandler,
   withSpring,
   withTiming,
   withDelay,
+  interpolate,
+  Extrapolation,
+  runOnJS,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Modal, Switch } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 
@@ -62,6 +70,47 @@ const CARDS = [
   { id: 'c1', variant: 'blue',  label: 'Diamond',  holder: 'Erickson',     number: '1288 7068 2260 2640' },
   { id: 'c2', variant: 'black', label: 'Platinum', holder: 'Aden Erickson', number: '1288 7068 2260 2640' },
 ];
+
+const METRIC_LIBRARY = {
+  m_balance: {
+    id: 'm_balance', label: 'Total Balance', sub: 'All accounts',
+    amount: 365500, prefix: '$', delta: '+2.4%', deltaUp: true,
+    icon: 'wallet', gradient: ['#3B6BFF', '#2E5BFF', '#1E3A8A'], chipLabel: 'PRIMARY',
+  },
+  m_income: {
+    id: 'm_income', label: 'Income', sub: 'This month',
+    amount: 12480, prefix: '$', delta: '+18.2%', deltaUp: true,
+    icon: 'arrow-down-circle', gradient: ['#16A34A', '#0F7A37', '#064E21'], chipLabel: 'INCOMING',
+  },
+  m_spend: {
+    id: 'm_spend', label: 'Spending', sub: 'This month',
+    amount: 4832, prefix: '$', delta: '-6.8%', deltaUp: false,
+    icon: 'arrow-up-circle', gradient: ['#0B1435', '#1A2654', '#0B1435'], chipLabel: 'OUTGOING',
+  },
+  m_savings: {
+    id: 'm_savings', label: 'Savings', sub: 'Year-to-date',
+    amount: 48200, prefix: '$', delta: '+31.5%', deltaUp: true,
+    icon: 'trending-up', gradient: ['#8B5CF6', '#6D28D9', '#4C1D95'], chipLabel: 'GROWTH',
+  },
+  m_vat: {
+    id: 'm_vat', label: 'VAT Payable', sub: 'Current quarter',
+    amount: 3420, prefix: 'AED ', delta: '-4.1%', deltaUp: false,
+    icon: 'receipt', gradient: ['#F59E0B', '#B45309', '#78350F'], chipLabel: 'FTA',
+  },
+  m_invest: {
+    id: 'm_invest', label: 'Investments', sub: 'Portfolio value',
+    amount: 89450, prefix: '$', delta: '+12.7%', deltaUp: true,
+    icon: 'trending-up-outline', gradient: ['#EC4899', '#BE185D', '#831843'], chipLabel: 'EQUITY',
+  },
+  m_debt: {
+    id: 'm_debt', label: 'Debt', sub: 'Outstanding',
+    amount: 12300, prefix: '$', delta: '-8.4%', deltaUp: true,
+    icon: 'card-outline', gradient: ['#475569', '#1E293B', '#0F172A'], chipLabel: 'LIABILITY',
+  },
+};
+
+const DEFAULT_METRIC_IDS = ['m_balance', 'm_income', 'm_spend'];
+const STORAGE_KEY = '@filey/home_metrics_v1';
 
 const RECURRING = [
   { id: 'r1', name: 'Netflix',  freq: 'Monthly', amt: '$15.99', icon: 'play-circle-outline' },
@@ -135,6 +184,255 @@ function PillTabs({ active, onChange }) {
   );
 }
 
+const CARD_W = SCREEN_W * 0.78;
+const CARD_GAP = 14;
+const SNAP = CARD_W + CARD_GAP;
+
+function formatMoney(n, prefix) {
+  return `${prefix}${Math.round(n).toLocaleString('en-US')}`;
+}
+
+function CountUpText({ to, prefix = '$', style }) {
+  const v = useSharedValue(0);
+  const [display, setDisplay] = useState(`${prefix}0`);
+
+  useEffect(() => {
+    v.value = 0;
+    v.value = withTiming(to, { duration: 900 });
+    const id = setInterval(() => {
+      setDisplay(formatMoney(v.value, prefix));
+    }, 16);
+    const stop = setTimeout(() => {
+      clearInterval(id);
+      setDisplay(formatMoney(to, prefix));
+    }, 950);
+    return () => { clearInterval(id); clearTimeout(stop); };
+  }, [to, prefix]);
+
+  return <Text style={style}>{display}</Text>;
+}
+
+function MetricCard({ item, index, scrollX }) {
+  const inputRange = [(index - 1) * SNAP, index * SNAP, (index + 1) * SNAP];
+
+  const cardStyle = useAnimatedStyle(() => {
+    const scale = interpolate(scrollX.value, inputRange, [0.92, 1, 0.92], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollX.value, inputRange, [0.55, 1, 0.55], Extrapolation.CLAMP);
+    const translateY = interpolate(scrollX.value, inputRange, [10, 0, 10], Extrapolation.CLAMP);
+    return { transform: [{ scale }, { translateY }], opacity };
+  });
+
+  return (
+    <Animated.View style={[{ width: CARD_W, marginRight: CARD_GAP }, cardStyle]}>
+      <LinearGradient
+        colors={item.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.metricCard}
+      >
+        <View style={styles.metricBlob1} />
+        <View style={styles.metricBlob2} />
+
+        <View style={styles.metricTop}>
+          <View style={styles.metricIconWrap}>
+            <Ionicons name={item.icon} size={18} color="#FFFFFF" />
+          </View>
+          <View style={styles.metricChip}>
+            <Text style={styles.metricChipText}>{item.chipLabel}</Text>
+          </View>
+        </View>
+
+        <View style={{ marginTop: 'auto' }}>
+          <Text style={styles.metricLabel}>{item.label}</Text>
+          <CountUpText to={item.amount} prefix={item.prefix} style={styles.metricAmount} />
+          <View style={styles.metricBottomRow}>
+            <Text style={styles.metricSub}>{item.sub}</Text>
+            <View style={[styles.deltaPill, { backgroundColor: item.deltaUp ? 'rgba(34,197,94,0.22)' : 'rgba(255,84,112,0.22)' }]}>
+              <Ionicons
+                name={item.deltaUp ? 'trending-up' : 'trending-down'}
+                size={12}
+                color={item.deltaUp ? '#A7F3D0' : '#FCA5A5'}
+              />
+              <Text style={[styles.deltaText, { color: item.deltaUp ? '#A7F3D0' : '#FCA5A5' }]}>{item.delta}</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
+function Dot({ i, scrollX }) {
+  const dotStyle = useAnimatedStyle(() => {
+    const inputRange = [(i - 1) * SNAP, i * SNAP, (i + 1) * SNAP];
+    const w = interpolate(scrollX.value, inputRange, [6, 22, 6], Extrapolation.CLAMP);
+    const o = interpolate(scrollX.value, inputRange, [0.4, 1, 0.4], Extrapolation.CLAMP);
+    return { width: w, opacity: o };
+  });
+  return <Animated.View style={[styles.dot, dotStyle]} />;
+}
+
+function MetricCarousel({ metrics, onOpenCustomize }) {
+  const scrollX = useSharedValue(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollX.value = e.contentOffset.x;
+      const idx = Math.round(e.contentOffset.x / SNAP);
+      if (idx !== activeIdx) runOnJS(setActiveIdx)(idx);
+    },
+  });
+
+  useEffect(() => {
+    try { Haptics.selectionAsync(); } catch {}
+  }, [activeIdx]);
+
+  if (!metrics?.length) {
+    return (
+      <Animated.View entering={FadeInUp.duration(500).delay(80)} style={styles.emptyCarousel}>
+        <Ionicons name="albums-outline" size={28} color="rgba(255,255,255,0.7)" />
+        <Text style={styles.emptyCarouselText}>No cards visible</Text>
+        <Pressable onPress={onOpenCustomize} style={styles.emptyCarouselBtn}>
+          <Ionicons name="add" size={14} color="#3B6BFF" />
+          <Text style={styles.emptyCarouselBtnText}>Add a card</Text>
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View entering={FadeInUp.duration(500).delay(80)}>
+      <Animated.ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={SNAP}
+        snapToAlignment="start"
+        contentContainerStyle={{
+          paddingHorizontal: (SCREEN_W - CARD_W) / 2,
+          paddingVertical: 12,
+        }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        {metrics.map((m, i) => (
+          <MetricCard key={m.id} item={m} index={i} scrollX={scrollX} />
+        ))}
+      </Animated.ScrollView>
+
+      <View style={styles.dotsRow}>
+        {metrics.map((_, i) => <Dot key={i} i={i} scrollX={scrollX} />)}
+      </View>
+    </Animated.View>
+  );
+}
+
+function CustomizeSheet({ visible, onClose, ids, setIds }) {
+  const [local, setLocal] = useState(ids);
+  useEffect(() => { if (visible) setLocal(ids); }, [visible, ids]);
+
+  const toggle = (id) => {
+    try { Haptics.selectionAsync(); } catch {}
+    setLocal(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const move = (id, dir) => {
+    setLocal(prev => {
+      const i = prev.indexOf(id);
+      if (i < 0) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
+  };
+
+  const save = () => {
+    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+    setIds(local);
+    onClose();
+  };
+
+  const reset = () => {
+    setLocal(DEFAULT_METRIC_IDS);
+  };
+
+  const allIds = Object.keys(METRIC_LIBRARY);
+  const ordered = [
+    ...local,
+    ...allIds.filter(id => !local.includes(id)),
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.customSheet} onPress={() => {}}>
+          <View style={styles.customHandle} />
+          <View style={styles.customHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.customTitle}>Customize Dashboard</Text>
+              <Text style={styles.customSub}>Toggle visibility, reorder, or add new cards.</Text>
+            </View>
+            <Pressable onPress={reset} hitSlop={8} style={styles.resetBtn}>
+              <Text style={styles.resetText}>Reset</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            {ordered.map((id) => {
+              const m = METRIC_LIBRARY[id];
+              if (!m) return null;
+              const enabled = local.includes(id);
+              const idx = local.indexOf(id);
+              return (
+                <View key={id} style={styles.customRow}>
+                  <LinearGradient
+                    colors={m.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.customDot}
+                  >
+                    <Ionicons name={m.icon} size={14} color="#FFFFFF" />
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.customRowLabel}>{m.label}</Text>
+                    <Text style={styles.customRowSub}>{m.sub}</Text>
+                  </View>
+                  {enabled && (
+                    <View style={styles.orderControls}>
+                      <Pressable onPress={() => move(id, -1)} hitSlop={8} disabled={idx === 0} style={[styles.orderBtn, idx === 0 && { opacity: 0.35 }]}>
+                        <Ionicons name="chevron-up" size={14} color="#0B1435" />
+                      </Pressable>
+                      <Pressable onPress={() => move(id, 1)} hitSlop={8} disabled={idx === local.length - 1} style={[styles.orderBtn, idx === local.length - 1 && { opacity: 0.35 }]}>
+                        <Ionicons name="chevron-down" size={14} color="#0B1435" />
+                      </Pressable>
+                    </View>
+                  )}
+                  <Switch
+                    value={enabled}
+                    onValueChange={() => toggle(id)}
+                    trackColor={{ false: '#E5E7EB', true: '#3B6BFF' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.customFooter}>
+            <Pressable onPress={save} style={styles.saveBtn}>
+              <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+              <Text style={styles.saveText}>Save changes</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function Bar({ a, b, label, delay }) {
   const hA = useSharedValue(0);
   const hB = useSharedValue(0);
@@ -185,6 +483,30 @@ export default function HomeScreen({ navigation, darkMode = true }) {
   const { profile } = useAuth();
   const name = profile?.name || 'Friend';
   const [active, setActive] = useState('Dashboard');
+  const [metricIds, setMetricIds] = useState(DEFAULT_METRIC_IDS);
+  const [showCustomize, setShowCustomize] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length) setMetricIds(parsed);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const persistMetrics = (next) => {
+    setMetricIds(next);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+  };
+
+  const visibleMetrics = useMemo(
+    () => metricIds.map(id => METRIC_LIBRARY[id]).filter(Boolean),
+    [metricIds]
+  );
 
   const fabScale = useSharedValue(1);
   const fabStyle = useAnimatedStyle(() => ({
@@ -218,10 +540,22 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                 <Text style={styles.heroSubGreet}>Let's manage today's finance</Text>
               </View>
             </View>
-            <Pressable style={styles.bellBtn} hitSlop={8}>
-              <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
-              <View style={styles.bellDot} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {active === 'Dashboard' && (
+                <Pressable
+                  style={styles.bellBtn}
+                  hitSlop={8}
+                  onPress={() => setShowCustomize(true)}
+                  accessibilityLabel="Customize dashboard"
+                >
+                  <Ionicons name="options-outline" size={20} color="#FFFFFF" />
+                </Pressable>
+              )}
+              <Pressable style={styles.bellBtn} hitSlop={8}>
+                <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
+                <View style={styles.bellDot} />
+              </Pressable>
+            </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(100).duration(500)} style={{ marginTop: 14 }}>
@@ -230,16 +564,10 @@ export default function HomeScreen({ navigation, darkMode = true }) {
 
           <View style={styles.heroContent}>
             {active === 'Dashboard' && (
-              <Animated.View entering={FadeInUp.duration(500)} style={{ alignItems: 'center' }}>
-                <Text style={styles.balanceLabel}>Balance</Text>
-                <Text style={styles.balanceAmount}>{balance}</Text>
-                <View style={styles.savedBanner}>
-                  <Text style={styles.savedBannerText}>
-                    🎉 You have saved $10 in last 30 days
-                  </Text>
-                  <Ionicons name="chevron-forward" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
-                </View>
-              </Animated.View>
+              <MetricCarousel
+                metrics={visibleMetrics}
+                onOpenCustomize={() => setShowCustomize(true)}
+              />
             )}
 
             {active === 'Analytics' && (
@@ -461,6 +789,13 @@ export default function HomeScreen({ navigation, darkMode = true }) {
           <Text style={styles.fabText}>New Payment</Text>
         </AnimatedPressable>
       </View>
+
+      <CustomizeSheet
+        visible={showCustomize}
+        onClose={() => setShowCustomize(false)}
+        ids={metricIds}
+        setIds={persistMetrics}
+      />
     </View>
   );
 }
@@ -531,9 +866,61 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroContent: {
-    paddingTop: 18,
-    paddingBottom: 20,
-    minHeight: 180,
+    paddingTop: 4,
+    paddingBottom: 12,
+    minHeight: 220,
+  },
+  metricCard: {
+    height: 190,
+    borderRadius: 26,
+    padding: 20,
+    overflow: 'hidden',
+    shadowColor: '#0B1435',
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  metricBlob1: {
+    position: 'absolute',
+    width: 180, height: 180, borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -60, right: -40,
+  },
+  metricBlob2: {
+    position: 'absolute',
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -30, left: -30,
+  },
+  metricTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  metricIconWrap: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+  },
+  metricChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  metricChipText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  metricLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 12.5, fontWeight: '600', letterSpacing: 0.4 },
+  metricAmount: { color: '#FFFFFF', fontSize: 34, fontWeight: '800', letterSpacing: -1.2, marginTop: 2 },
+  metricBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  metricSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  deltaPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10,
+  },
+  deltaText: { fontSize: 11, fontWeight: '800' },
+  dotsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 2,
+  },
+  dot: {
+    height: 6, borderRadius: 3,
+    backgroundColor: '#FFFFFF',
   },
   balanceLabel: {
     color: 'rgba(255,255,255,0.78)',
@@ -955,4 +1342,69 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 6,
   },
+  emptyCarousel: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 30, gap: 8,
+  },
+  emptyCarouselText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
+  emptyCarouselBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
+    marginTop: 4,
+  },
+  emptyCarouselBtnText: { color: '#3B6BFF', fontSize: 13, fontWeight: '700' },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  customSheet: {
+    backgroundColor: '#F3F6FC',
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    maxHeight: '85%',
+  },
+  customHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(11,23,53,0.18)',
+    alignSelf: 'center', marginTop: 8, marginBottom: 6,
+  },
+  customHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(11,23,53,0.06)',
+  },
+  customTitle: { fontSize: 20, fontWeight: '800', color: '#0B1435', letterSpacing: -0.4 },
+  customSub: { fontSize: 12.5, color: 'rgba(11,23,53,0.6)', marginTop: 2 },
+  resetBtn: {
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: 'rgba(59,107,255,0.1)',
+  },
+  resetText: { color: '#3B6BFF', fontWeight: '700', fontSize: 12.5 },
+  customRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 14, borderRadius: 16, marginBottom: 10,
+    borderWidth: 1, borderColor: 'rgba(11,23,53,0.06)',
+  },
+  customDot: {
+    width: 38, height: 38, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  customRowLabel: { fontSize: 14.5, fontWeight: '700', color: '#0B1435' },
+  customRowSub: { fontSize: 12, color: 'rgba(11,23,53,0.55)', marginTop: 2 },
+  orderControls: { flexDirection: 'column', gap: 2 },
+  orderBtn: {
+    width: 28, height: 22, borderRadius: 7,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(11,23,53,0.06)',
+  },
+  customFooter: {
+    padding: 16, paddingBottom: 28,
+    borderTopWidth: 1, borderTopColor: 'rgba(11,23,53,0.06)',
+    backgroundColor: '#FFFFFF',
+  },
+  saveBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: '#3B6BFF', height: 52, borderRadius: 26,
+    shadowColor: '#3B6BFF', shadowOpacity: 0.3, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 }, elevation: 6,
+  },
+  saveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });
