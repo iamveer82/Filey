@@ -18,6 +18,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { scanReceipt } from '../services/receiptPipeline';
+import { send as llmSend, getPreference as getLLMPref } from '../services/llmProvider';
+import { exportCSV, exportPDF } from '../services/exportLedger';
 
 const MEMORY_KEY = '@filey/ai_chat_memory_v1';
 const MAX_MEMORY = 40;
@@ -118,21 +120,40 @@ export default function AIMessagingHub() {
     pushMessage({ role: 'user', content: text });
 
     try {
-      const res = await api.sendMessage(text, 'ai-session');
+      // Build convo from recent memory for context continuity.
+      const history = messages.slice(-12)
+        .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
+        .map(m => ({ role: m.role, content: m.content }));
+      const sys = {
+        role: 'system',
+        content: 'You are Filey, a UAE VAT-compliance assistant. Be concise. Cite [n] when using web results. User transactions follow FTA 5% VAT rules.',
+      };
+      const convo = [sys, ...history, { role: 'user', content: text }];
+      const out = await llmSend(convo);
       pushMessage({
         role: 'assistant',
-        content: res.message || 'No response.',
-        extractedTransaction: res.extractedTransaction,
+        content: out.text || 'No response.',
+        meta: out.meta,
       });
-    } catch {
-      pushMessage({
-        role: 'assistant',
-        content: 'Connection error. Using offline mode — limited responses until reconnect.',
-      });
+    } catch (e) {
+      // Fallback to legacy backend if provider fails.
+      try {
+        const res = await api.sendMessage(text, 'ai-session');
+        pushMessage({
+          role: 'assistant',
+          content: res.message || (e.message || 'No response.'),
+          extractedTransaction: res.extractedTransaction,
+        });
+      } catch {
+        pushMessage({
+          role: 'assistant',
+          content: `Error: ${e.message || 'Connection failed'}. Configure an LLM provider in Settings → AI & Integrations.`,
+        });
+      }
     } finally {
       setLoading(false);
     }
-  }, [input, loading, pushMessage]);
+  }, [input, loading, messages, pushMessage]);
 
   const runScan = useCallback(async (source) => {
     setShowAttach(false);
@@ -198,12 +219,31 @@ export default function AIMessagingHub() {
     else if (qa.action === 'pdf') runPdfPicker();
     else if (qa.action === 'prompt') send(qa.prompt);
     else if (qa.action === 'export') {
-      pushMessage({
-        role: 'assistant',
-        content: 'Export pipeline — generating CSV of your extracted transactions. PDF report included on next build.',
-      });
+      Alert.alert('Export ledger', 'Choose a format', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'CSV (Excel)', onPress: () => doExport('csv') },
+        { text: 'PDF report', onPress: () => doExport('pdf') },
+      ]);
     }
   }, [runScan, runPdfPicker, send, pushMessage]);
+
+  const doExport = useCallback(async (fmt) => {
+    try {
+      pushMessage({ role: 'system', content: `Preparing ${fmt.toUpperCase()} export…` });
+      const res = await api.getTransactions();
+      const txs = res?.transactions || res || [];
+      if (!txs.length) {
+        pushMessage({ role: 'assistant', content: 'No transactions in vault yet. Scan a receipt first.' });
+        return;
+      }
+      if (fmt === 'csv') await exportCSV(txs);
+      else await exportPDF(txs, { company: 'My Company' });
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      pushMessage({ role: 'system', content: `${fmt.toUpperCase()} ready — shared via iOS sheet.` });
+    } catch (e) {
+      pushMessage({ role: 'assistant', content: `Export failed: ${e.message || e}` });
+    }
+  }, [pushMessage]);
 
   const staple = useCallback(async (tx) => {
     try {
@@ -325,6 +365,23 @@ export default function AIMessagingHub() {
               style={styles.aiRow}
             >
               <Text style={styles.aiText}>{m.content}</Text>
+              {m.meta?.citations?.length > 0 && (
+                <View style={styles.citationRow}>
+                  {m.meta.citations.map((cite, ci) => (
+                    <View key={ci} style={styles.citationChip}>
+                      <Ionicons name="link" size={10} color="#9CA3AF" />
+                      <Text style={styles.citationText} numberOfLines={1}>
+                        [{ci + 1}] {cite.title}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {m.meta?.provider && m.meta.provider !== 'gemma' && (
+                <Text style={styles.providerHint}>
+                  {m.meta.webUsed ? '🌐 web · ' : ''}{m.meta.provider} · {m.meta.model}
+                </Text>
+              )}
               {m.extractedTransaction && (
                 <View style={styles.txCard}>
                   <View style={styles.txHeader}>
@@ -569,6 +626,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   saveBtnText: { color: '#0A0A0A', fontSize: 13.5, fontWeight: '700' },
+  citationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  citationChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 10, backgroundColor: '#1F1F1F',
+    maxWidth: 220,
+  },
+  citationText: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
+  providerHint: { color: '#6B7280', fontSize: 10.5, marginTop: 6, fontStyle: 'italic' },
 
   composer: {
     borderTopWidth: StyleSheet.hairlineWidth,

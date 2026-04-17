@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import AISettingsScreen from './AISettingsScreen';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -65,6 +66,7 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
   const { user, profile: authProfile, signOut } = useAuth();
   const [profile, setProfile] = useState(authProfile);
   const [notifications, setNotifications] = useState(true);
+  const [subScreen, setSubScreen] = useState(null); // 'ai' | null
 
   useEffect(() => {
     (async () => {
@@ -88,6 +90,10 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
       } },
     ]);
   }, [signOut, doSignOut]);
+
+  if (subScreen === 'ai') {
+    return <AISettingsScreen darkMode={darkMode} onBack={() => setSubScreen(null)} />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -149,7 +155,12 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
             <Row icon="globe-outline" label="Language" c={c} onPress={() => {}} />
           </Section>
 
-          <Section title="COMPLIANCE" c={c} delay={160}>
+          <Section title="AI & INTEGRATIONS" c={c} delay={150}>
+            <Row icon="sparkles-outline" label="LLM provider & API keys" c={c} onPress={() => setSubScreen('ai')} />
+            <Row icon="globe-outline" label="Web search provider" c={c} onPress={() => setSubScreen('ai')} />
+          </Section>
+
+          <Section title="COMPLIANCE" c={c} delay={180}>
             <Row icon="shield-checkmark-outline" label="VAT settings" c={c} onPress={() => {}} />
             <Row icon="receipt-outline" label="FTA integration" c={c} onPress={() => {}} />
             <Row icon="download-outline" label="Export data" c={c} onPress={() => {}} />
