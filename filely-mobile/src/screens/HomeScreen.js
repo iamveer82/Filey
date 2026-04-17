@@ -1,935 +1,950 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, RefreshControl,
-  TouchableOpacity, Platform, Dimensions, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  FlatList,
+  TextInput,
+  StatusBar,
+  Platform,
+  Dimensions,
 } from 'react-native';
-import Animated, {
-  FadeInDown, FadeInRight, FadeIn, SlideInRight,
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  withRepeat, withSequence, withDelay, interpolate,
-  Extrapolation, runOnJS, Easing,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  SlideInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+} from 'react-native-reanimated';
 import { Colors } from '../theme/colors';
-import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '../theme/tokens';
-import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = SCREEN_W - 48;
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/* ─── Category Icons (unchanged) ─────────────────────── */
-const CATEGORY_ICONS = {
-  Food: 'restaurant-outline', Transport: 'car-outline', Shopping: 'bag-outline',
-  Office: 'briefcase-outline', Utilities: 'flash-outline', Entertainment: 'film-outline',
-  Health: 'heart-outline', Travel: 'airplane-outline', Banking: 'business-outline',
-  General: 'receipt-outline',
-};
+const TABS = ['Dashboard', 'Cards', 'Analytics', 'Recurring'];
 
-/* ─── AmountText (unchanged) ─────────────────────────── */
-function AmountText({ amount, style }) {
-  const sign  = amount >= 0 ? '+' : '';
-  const color = amount >= 0 ? '#44e571' : '#FF4B6E';
-  return (
-    <Text style={[style, { color }]}>
-      {sign}{Math.abs(amount).toLocaleString('en-AE', { minimumFractionDigits: 2 })} AED
-    </Text>
-  );
-}
+const RECENT_SEND = [
+  { name: 'Alex',   color: '#FDE68A' },
+  { name: 'Priya',  color: '#FCA5A5' },
+  { name: 'Sam',    color: '#A7F3D0' },
+  { name: 'Liam',   color: '#C7D2FE' },
+  { name: 'Nora',   color: '#FBCFE8' },
+];
 
-/* ─── Animated Number Counter ────────────────────────── */
-function AnimatedCounter({ value, visible, style }) {
-  const displayValue = useSharedValue(0);
-  const opacity = useSharedValue(0);
+const ACTIVITY = [
+  { id: 'a1', name: 'Salary',       subtitle: 'Monthly pay',     amount: 143,  type: 'in',  icon: 'briefcase-outline' },
+  { id: 'a2', name: 'Amazon',       subtitle: 'Online order',    amount: -921, type: 'out', icon: 'bag-handle-outline' },
+];
 
-  useEffect(() => {
-    opacity.value = withTiming(1, { duration: 400 });
-    displayValue.value = withTiming(value, {
-      duration: 1200,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [value]);
+const BARS = [
+  { m: 'Mar', a: 52, b: 30 },
+  { m: 'Apr', a: 40, b: 48 },
+  { m: 'May', a: 58, b: 34 },
+  { m: 'Jun', a: 30, b: 52 },
+  { m: 'Jul', a: 62, b: 38 },
+  { m: 'Aug', a: 44, b: 56 },
+];
 
-  const [displayText, setDisplayText] = useState('0.00');
+const BILLS = [
+  { id: 'b1', day: '13th', mo: 'Aug', name: 'Figma',  amt: '$50' },
+  { id: 'b2', day: '15th', mo: 'Aug', name: 'Github', amt: '$11' },
+];
 
-  useEffect(() => {
-    if (!visible) return;
-    const steps = 30;
-    const stepDuration = 1200 / steps;
-    let current = 0;
-    const increment = value / steps;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        current = value;
-        clearInterval(timer);
-      }
-      setDisplayText(current.toLocaleString('en-AE', { minimumFractionDigits: 2 }));
-    }, stepDuration);
-    return () => clearInterval(timer);
-  }, [value, visible]);
+const CARDS = [
+  { id: 'c1', variant: 'blue',  label: 'Diamond',  holder: 'Erickson',     number: '1288 7068 2260 2640' },
+  { id: 'c2', variant: 'black', label: 'Platinum', holder: 'Aden Erickson', number: '1288 7068 2260 2640' },
+];
 
-  if (!visible) {
-    return <Text style={style}>{'••••••  AED'}</Text>;
-  }
+const RECURRING = [
+  { id: 'r1', name: 'Netflix',  freq: 'Monthly', amt: '$15.99', icon: 'play-circle-outline' },
+  { id: 'r2', name: 'Spotify',  freq: 'Monthly', amt: '$9.99',  icon: 'musical-notes-outline' },
+  { id: 'r3', name: 'iCloud',   freq: 'Monthly', amt: '$2.99',  icon: 'cloud-outline' },
+  { id: 'r4', name: 'Dropbox',  freq: 'Yearly',  amt: '$119',   icon: 'archive-outline' },
+];
 
-  return (
-    <Animated.Text style={[style, { opacity }]}>
-      {displayText} AED
-    </Animated.Text>
-  );
-}
-
-/* ─── Spring Press Button ────────────────────────────── */
-function SpringPressable({ children, onPress, style, accessibilityLabel, accessibilityRole }) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.92, { damping: 15, stiffness: 400 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 350 });
-  };
-
-  return (
-    <AnimatedTouchable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={0.9}
-      style={[style, animatedStyle]}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole={accessibilityRole || 'button'}
-    >
-      {children}
-    </AnimatedTouchable>
-  );
-}
-
-/* ─── Scroll Progress Bar ────────────────────────────── */
-function ScrollProgressBar({ scrollY, headerHeight, color }) {
-  const animatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(
-      scrollY.value,
-      [0, 800],
-      [0, 100],
-      Extrapolation.CLAMP,
-    );
-    return {
-      width: `${progress}%`,
-      opacity: interpolate(scrollY.value, [0, 20], [0, 1], Extrapolation.CLAMP),
-    };
-  });
-
-  return (
-    <Animated.View style={[styles.scrollProgressTrack, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
-      <Animated.View style={[styles.scrollProgressBar, { backgroundColor: color }, animatedStyle]} />
-    </Animated.View>
-  );
-}
-
-/* ─── Decorative Orb for Balance Card ────────────────── */
-function CardOrb({ size, color, top, left, right, bottom, opacity: orbOpacity }) {
+function Avatar({ name, color, size = 36 }) {
+  const initials = (name || '?').slice(0, 1).toUpperCase();
   return (
     <View
-      pointerEvents="none"
       style={{
-        position: 'absolute',
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: color,
-        opacity: orbOpacity || 0.12,
-        top, left, right, bottom,
+        backgroundColor: color || '#A7F3D0',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
       }}
-    />
+    >
+      <Text style={{ color: '#0B1435', fontWeight: '700', fontSize: size * 0.38 }}>
+        {initials}
+      </Text>
+    </View>
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   HomeScreen
-   ═══════════════════════════════════════════════════════ */
-export default function HomeScreen({ darkMode, onNavigateToScanner }) {
-  const c = darkMode ? Colors.dark : Colors.light;
-  const insets = useSafeAreaInsets();
-  const { orgId, profile } = useAuth();
-  const isWeb = Platform.OS === 'web';
+function PillTabs({ active, onChange }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 4 }}
+      style={{ flexGrow: 0 }}
+    >
+      {TABS.map((t) => {
+        const isActive = t === active;
+        return (
+          <Pressable
+            key={t}
+            onPress={() => onChange(t)}
+            hitSlop={8}
+            style={[
+              styles.pillTab,
+              isActive ? styles.pillTabActive : styles.pillTabInactive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.pillTabText,
+                { color: isActive ? '#3B6BFF' : 'rgba(255,255,255,0.78)' },
+              ]}
+            >
+              {t}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
 
-  const [dashboard, setDashboard] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [balanceVisible, setBalanceVisible] = useState(true);
-
-  /* ── Data Fetching ─────────────────────────────────── */
-  const fetchDashboard = async () => {
-    try {
-      if (!isWeb && orgId && orgId !== 'default') {
-        const { db } = require('../lib/supabase');
-        const data = await db.getDashboard(orgId);
-        setDashboard(data);
-      } else {
-        setDashboard(await api.getDashboard());
-      }
-    } catch {
-      try { setDashboard(await api.getDashboard()); } catch {}
-    }
-  };
-
-  useEffect(() => { fetchDashboard(); }, []);
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchDashboard();
-    setRefreshing(false);
-  };
-
-  const d = dashboard || {};
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-  const firstName = profile?.name?.split(' ')[0] || 'User';
-  const totalSpend = d.totalSpend || 0;
-  const totalVat   = d.totalVat   || 0;
-
-  /* ── Scroll-driven header parallax ─────────────────── */
-  const scrollY = useSharedValue(0);
-
-  const headerAnimatedStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      scrollY.value,
-      [0, 120, 200],
-      [1, 0.6, 0],
-      Extrapolation.CLAMP,
-    );
-    const translateY = interpolate(
-      scrollY.value,
-      [0, 200],
-      [0, -40],
-      Extrapolation.CLAMP,
-    );
-    return { opacity, transform: [{ translateY }] };
-  });
-
-  const handleScroll = (event) => {
-    scrollY.value = event.nativeEvent.contentOffset.y;
-  };
-
-  /* ── FAB pulse animation ───────────────────────────── */
-  const fabPulse = useSharedValue(1);
+function Bar({ a, b, label, delay }) {
+  const hA = useSharedValue(0);
+  const hB = useSharedValue(0);
 
   useEffect(() => {
-    fabPulse.value = withRepeat(
-      withSequence(
-        withTiming(1.06, { duration: 1800, easing: Easing.inOut(Easing.sine) }),
-        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sine) }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
+    hA.value = withDelay(delay, withTiming(a, { duration: 700 }));
+    hB.value = withDelay(delay + 80, withTiming(b, { duration: 700 }));
+  }, [a, b, delay, hA, hB]);
 
-  const fabAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabPulse.value }],
-  }));
-
-  const fabGlowStyle = useAnimatedStyle(() => {
-    const glowOpacity = interpolate(
-      fabPulse.value,
-      [1, 1.06],
-      [0.25, 0.55],
-      Extrapolation.CLAMP,
-    );
-    return { opacity: glowOpacity };
-  });
-
-  /* ── FAB press animation ───────────────────────────── */
-  const fabScale = useSharedValue(1);
-
-  const fabPressStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: fabPulse.value * fabScale.value },
-    ],
-  }));
-
-  const handleFabPressIn = () => {
-    fabScale.value = withSpring(0.88, { damping: 15, stiffness: 400 });
-  };
-
-  const handleFabPressOut = () => {
-    fabScale.value = withSpring(1, { damping: 12, stiffness: 350 });
-  };
+  const styleA = useAnimatedStyle(() => ({ height: hA.value }));
+  const styleB = useAnimatedStyle(() => ({ height: hB.value }));
 
   return (
-    <View style={[styles.root, { backgroundColor: c.bg }]}>
-      {/* ── Scroll Progress Bar ──────────────────────── */}
-      <View style={[styles.scrollProgressContainer, { top: insets.top }]}>
-        <ScrollProgressBar scrollY={scrollY} headerHeight={200} color={c.lime} />
+    <View style={{ alignItems: 'center', flex: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 120, gap: 4 }}>
+        <Animated.View style={[styles.barA, styleA]} />
+        <Animated.View style={[styles.barB, styleB]} />
       </View>
+      <Text style={styles.barLabel}>{label}</Text>
+    </View>
+  );
+}
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={c.lime}
-            progressBackgroundColor={c.card}
-          />
-        }
-      >
-        {/* ── Header with parallax fade ──────────────── */}
-        <Animated.View style={headerAnimatedStyle}>
-          <Animated.View
-            entering={FadeInDown.delay(80).duration(500).springify()}
-            style={[styles.header, { paddingTop: insets.top + 20 }]}
-          >
-            <View style={styles.headerLeft}>
-              <Animated.Text
-                entering={FadeInDown.delay(120).duration(500).springify()}
-                style={[styles.greetingLabel, { color: c.textMuted }]}
-              >
-                {greeting}
-              </Animated.Text>
-              <Animated.Text
-                entering={FadeInDown.delay(200).duration(600).springify()}
-                style={[styles.greetingName, { color: c.text }]}
-              >
-                {firstName}
-              </Animated.Text>
-            </View>
-            <Animated.View
-              entering={FadeIn.delay(400).duration(500)}
-              style={styles.headerRight}
-            >
-              <SpringPressable
-                style={[styles.iconBtn, {
-                  backgroundColor: c.cardElevated || c.card,
-                  borderColor: c.border,
-                }]}
-                accessibilityLabel="Search transactions"
-              >
-                <Ionicons name="search-outline" size={20} color={c.text} />
-              </SpringPressable>
-              <SpringPressable
-                style={[styles.iconBtn, {
-                  backgroundColor: c.cardElevated || c.card,
-                  borderColor: c.border,
-                }]}
-                accessibilityLabel="Notifications"
-              >
-                <Ionicons name="notifications-outline" size={20} color={c.text} />
-                <View style={[styles.notifDot, { borderColor: c.bg }]} />
-              </SpringPressable>
-            </Animated.View>
-          </Animated.View>
-        </Animated.View>
-
-        {/* ── Premium Balance Card ───────────────────── */}
-        <Animated.View
-          entering={FadeInDown.delay(150).duration(700).springify()}
-          style={[styles.balanceCard, Shadow.softLg]}
-        >
-          {/* Decorative orbs for depth */}
-          <CardOrb size={180} color="#4F8EFF" top={-60} right={-40} opacity={0.08} />
-          <CardOrb size={120} color="#44e571" bottom={-30} left={-20} opacity={0.06} />
-          <CardOrb size={80} color="#4F8EFF" top={40} left={60} opacity={0.05} />
-          <CardOrb size={60} color="#44e571" bottom={50} right={30} opacity={0.04} />
-
-          {/* Card top border accent line */}
-          <View style={styles.cardAccentLine} />
-
-          {/* Inner content */}
-          <View style={styles.balanceCardInner}>
-            {/* Card chip / brand mark */}
-            <View style={styles.cardTopRow}>
-              <View style={styles.cardChip}>
-                <View style={styles.cardChipInner} />
-              </View>
-              <View style={styles.cardBrandMark}>
-                <Text style={styles.cardBrandText}>FILEY</Text>
-                <View style={styles.cardBrandDot} />
-              </View>
-            </View>
-
-            {/* Balance */}
-            <View style={styles.balanceSection}>
-              <Text style={styles.balanceLabelText}>MONTHLY SPEND</Text>
-              <View style={styles.balanceRow}>
-                <AnimatedCounter
-                  value={totalSpend}
-                  visible={balanceVisible}
-                  style={styles.balanceAmount}
-                />
-                <SpringPressable
-                  onPress={() => setBalanceVisible(v => !v)}
-                  style={styles.eyeBtn}
-                  accessibilityLabel={balanceVisible ? 'Hide balance' : 'Show balance'}
-                >
-                  <Ionicons
-                    name={balanceVisible ? 'eye-outline' : 'eye-off-outline'}
-                    size={20}
-                    color="rgba(255,255,255,0.5)"
-                  />
-                </SpringPressable>
-              </View>
-
-              {/* VAT info row */}
-              <View style={styles.vatRow}>
-                <View style={styles.vatBadge}>
-                  <Ionicons name="trending-up" size={12} color="#44e571" />
-                </View>
-                <Text style={styles.vatText}>
-                  VAT Recoverable: {totalVat.toLocaleString('en-AE', { minimumFractionDigits: 2 })} AED
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            {[
-              { icon: 'camera', label: 'Scan', bg: '#44e571', iconColor: '#003516', onPress: onNavigateToScanner },
-              { icon: 'swap-horizontal', label: 'Transfer', bg: 'rgba(79,142,255,0.15)', iconColor: '#4F8EFF', borderColor: 'rgba(79,142,255,0.35)' },
-              { icon: 'document-text-outline', label: 'Report', bg: 'rgba(245,158,11,0.12)', iconColor: '#F59E0B', borderColor: 'rgba(245,158,11,0.25)' },
-              { icon: 'grid-outline', label: 'More', bg: 'rgba(255,255,255,0.06)', iconColor: 'rgba(255,255,255,0.65)', borderColor: 'rgba(255,255,255,0.10)' },
-            ].map((action, index) => (
-              <Animated.View
-                key={action.label}
-                entering={FadeInDown.delay(350 + index * 80).duration(500).springify()}
-              >
-                <SpringPressable
-                  onPress={action.onPress}
-                  style={styles.qaBtn}
-                  accessibilityLabel={action.label}
-                >
-                  <View style={[
-                    styles.qaBtnIcon,
-                    {
-                      backgroundColor: action.bg,
-                      borderWidth: action.borderColor ? 1 : 0,
-                      borderColor: action.borderColor || 'transparent',
-                    },
-                  ]}>
-                    <Ionicons name={action.icon} size={20} color={action.iconColor} />
-                  </View>
-                  <Text style={styles.qaBtnLabel}>{action.label}</Text>
-                </SpringPressable>
-              </Animated.View>
-            ))}
-          </View>
-        </Animated.View>
-
-        {/* ── Stats Row ──────────────────────────────── */}
-        <View style={styles.statsRow}>
-          {[
-            {
-              icon: 'shield-checkmark', iconColor: '#44e571',
-              iconBg: 'rgba(68,229,113,0.12)',
-              value: d.totalStored || 0, suffix: '',
-              label: 'Vault Receipts', delay: 250,
-            },
-            {
-              icon: 'scan-outline', iconColor: '#4F8EFF',
-              iconBg: 'rgba(79,142,255,0.12)',
-              value: d.scanCount || 0, suffix: `/${d.scanLimit || 50}`,
-              label: 'AI Scans', delay: 380,
-            },
-            {
-              icon: 'business-outline', iconColor: '#F59E0B',
-              iconBg: 'rgba(245,158,11,0.12)',
-              value: totalVat.toFixed(0), suffix: '',
-              label: 'VAT (AED)', delay: 510,
-            },
-          ].map((stat) => (
-            <Animated.View
-              key={stat.label}
-              entering={SlideInRight.delay(stat.delay).duration(550).springify()}
-              style={[styles.statCard, darkMode ? CardPresets.cardDark : CardPresets.cardLight]}
-            >
-              <View style={[styles.statIconWrap, { backgroundColor: stat.iconBg }]}>
-                <Ionicons name={stat.icon} size={20} color={stat.iconColor} />
-              </View>
-              <Text style={[styles.statValue, { color: c.text }]}>
-                {stat.value}
-                {stat.suffix ? <Text style={[styles.statMax, { color: c.textMuted }]}>{stat.suffix}</Text> : null}
-              </Text>
-              <Text style={[styles.statLabel, { color: c.textMuted }]}>{stat.label}</Text>
-            </Animated.View>
-          ))}
+function MiniCard({ variant, label, holder, number }) {
+  const isBlue = variant === 'blue';
+  const bg = isBlue ? '#3B6BFF' : '#111827';
+  const accentBg = isBlue ? '#2E5BFF' : '#1F2937';
+  return (
+    <View style={[styles.miniCard, { backgroundColor: bg }]}>
+      <View style={[styles.miniCardHighlight, { backgroundColor: accentBg }]} />
+      <View style={styles.cardTopRow}>
+        <Ionicons name="wifi" size={18} color="#FFFFFF" style={{ transform: [{ rotate: '90deg' }] }} />
+        <Text style={styles.miniCardLabel}>{label}</Text>
+      </View>
+      <Text style={styles.miniCardNumber}>{number}</Text>
+      <View style={styles.cardBottomRow}>
+        <View>
+          <Text style={styles.miniCardHolderLabel}>CARDHOLDER</Text>
+          <Text style={styles.miniCardHolder}>{holder}</Text>
         </View>
-
-        {/* ── Compliance Alert Card ──────────────────── */}
-        <Animated.View
-          entering={FadeInDown.delay(350).duration(600).springify()}
-          style={[styles.alertCard, {
-            backgroundColor: darkMode ? 'rgba(79,142,255,0.06)' : 'rgba(59,130,246,0.06)',
-            borderColor: darkMode ? 'rgba(79,142,255,0.18)' : 'rgba(59,130,246,0.18)',
-          }]}
-        >
-          <View style={styles.alertLeft}>
-            <View style={[styles.alertIcon, {
-              backgroundColor: darkMode ? 'rgba(79,142,255,0.15)' : 'rgba(59,130,246,0.12)',
-            }]}>
-              <Ionicons name="calendar-outline" size={20} color={darkMode ? '#4F8EFF' : '#3B82F6'} />
-            </View>
-            <View>
-              <Text style={[styles.alertTitle, { color: c.text }]}>UAE VAT Filing</Text>
-              <Text style={[styles.alertSub, { color: c.textMuted }]}>Next quarter deadline</Text>
-            </View>
-          </View>
-          <SpringPressable
-            style={styles.alertBtn}
-            accessibilityLabel="View VAT filing details"
-          >
-            <Text style={styles.alertBtnText}>View</Text>
-          </SpringPressable>
-        </Animated.View>
-
-        {/* ── Recent Transactions ────────────────────── */}
-        <Animated.View
-          entering={FadeIn.delay(450).duration(400)}
-          style={styles.sectionHeader}
-        >
-          <Text style={[styles.sectionTitle, { color: c.text }]}>Recent Activity</Text>
-          <SpringPressable accessibilityLabel="See all transactions">
-            <Text style={[styles.sectionLink, { color: darkMode ? '#4F8EFF' : '#3B82F6' }]}>See All</Text>
-          </SpringPressable>
-        </Animated.View>
-
-        {!d.recentTransactions || d.recentTransactions.length === 0 ? (
-          <Animated.View
-            entering={FadeInDown.delay(500).duration(600).springify()}
-            style={[styles.emptyCard, darkMode ? CardPresets.cardDark : CardPresets.cardLight]}
-          >
-            <View style={[styles.emptyIconWrap, { backgroundColor: c.accentLight }]}>
-              <Ionicons name="receipt-outline" size={32} color={c.textMuted} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>
-              No transactions yet
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: c.textMuted }]}>
-              Start scanning receipts to track expenses
-            </Text>
-          </Animated.View>
-        ) : (
-          d.recentTransactions.map((txn, i) => (
-            <Animated.View
-              key={txn.id || i}
-              entering={FadeInDown.delay(i * 70 + 500).duration(500).springify()}
-            >
-              <SpringPressable
-                style={[styles.txnRow, darkMode ? CardPresets.cardDark : CardPresets.cardLight]}
-                accessibilityLabel={`Transaction: ${txn.customName || txn.merchant}`}
-              >
-                <View style={[styles.txnAvatar, {
-                  backgroundColor: darkMode ? 'rgba(79,142,255,0.12)' : 'rgba(59,130,246,0.10)',
-                }]}>
-                  <Ionicons
-                    name={CATEGORY_ICONS[txn.category] || 'receipt-outline'}
-                    size={20}
-                    color={darkMode ? '#4F8EFF' : '#3B82F6'}
-                  />
-                </View>
-                <View style={styles.txnContent}>
-                  <Text style={[styles.txnMerchant, { color: c.text }]} numberOfLines={1}>
-                    {txn.customName || txn.merchant}
-                  </Text>
-                  <Text style={[styles.txnMeta, { color: c.textMuted }]}>
-                    {txn.date} {'\u00B7'} {txn.category}
-                  </Text>
-                </View>
-                <View style={styles.txnAmountWrap}>
-                  <AmountText amount={-Math.abs(txn.amount)} style={styles.txnAmount} />
-                  {txn.vat > 0 && (
-                    <Text style={[styles.txnVat, { color: c.textMuted }]}>VAT {txn.vat} AED</Text>
-                  )}
-                </View>
-              </SpringPressable>
-            </Animated.View>
-          ))
-        )}
-      </ScrollView>
-
-      {/* ── Floating Scan FAB with pulse glow ────────── */}
-      <View style={styles.fabContainer}>
-        {/* Glow layer behind */}
-        <Animated.View style={[styles.fabGlow, fabGlowStyle]} pointerEvents="none" />
-        <AnimatedTouchable
-          style={[styles.fab, Shadow.limeMd, fabPressStyle]}
-          onPress={onNavigateToScanner}
-          onPressIn={handleFabPressIn}
-          onPressOut={handleFabPressOut}
-          activeOpacity={0.9}
-          accessibilityLabel="Scan a receipt"
-          accessibilityRole="button"
-        >
-          <Ionicons name="camera" size={24} color="#003516" />
-          <Text style={styles.fabText}>Scan Receipt</Text>
-        </AnimatedTouchable>
+        <Text style={styles.miniCardVisa}>VISA</Text>
       </View>
     </View>
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   Styles
-   ═══════════════════════════════════════════════════════ */
+export default function HomeScreen({ navigation, darkMode = true }) {
+  const { profile } = useAuth();
+  const name = profile?.name || 'Friend';
+  const [active, setActive] = useState('Dashboard');
+
+  const fabScale = useSharedValue(1);
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }],
+  }));
+
+  const balance = useMemo(() => '$365,500', []);
+
+  return (
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#3B6BFF" />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 140 }}
+        stickyHeaderIndices={[]}
+      >
+        {/* Blue hero */}
+        <View style={styles.hero}>
+          <Animated.View
+            entering={FadeInDown.duration(500)}
+            style={styles.heroTopRow}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Avatar name={name} color="#FDE68A" size={44} />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.heroGreet}>Good Morning, {name}</Text>
+                  <Ionicons name="hand-left-outline" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                </View>
+                <Text style={styles.heroSubGreet}>Let's manage today's finance</Text>
+              </View>
+            </View>
+            <Pressable style={styles.bellBtn} hitSlop={8}>
+              <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
+              <View style={styles.bellDot} />
+            </Pressable>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(100).duration(500)} style={{ marginTop: 14 }}>
+            <PillTabs active={active} onChange={setActive} />
+          </Animated.View>
+
+          <View style={styles.heroContent}>
+            {active === 'Dashboard' && (
+              <Animated.View entering={FadeInUp.duration(500)} style={{ alignItems: 'center' }}>
+                <Text style={styles.balanceLabel}>Balance</Text>
+                <Text style={styles.balanceAmount}>{balance}</Text>
+                <View style={styles.savedBanner}>
+                  <Text style={styles.savedBannerText}>
+                    🎉 You have saved $10 in last 30 days
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                </View>
+              </Animated.View>
+            )}
+
+            {active === 'Analytics' && (
+              <Animated.View entering={FadeInUp.duration(500)} style={styles.analyticsBox}>
+                <View style={styles.analyticsHeader}>
+                  <Text style={styles.analyticsTitle}>Spending by</Text>
+                  <View style={styles.monthlyPill}>
+                    <Text style={styles.monthlyText}>Monthly</Text>
+                    <Ionicons name="chevron-down" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                  </View>
+                </View>
+                <View style={styles.chartRow}>
+                  <View style={styles.yAxis}>
+                    <Text style={styles.yLabel}>$60</Text>
+                    <Text style={styles.yLabel}>$40</Text>
+                    <Text style={styles.yLabel}>$20</Text>
+                  </View>
+                  <View style={{ flex: 1, flexDirection: 'row' }}>
+                    {BARS.map((b, i) => (
+                      <Bar key={b.m} a={b.a} b={b.b} label={b.m} delay={120 * i} />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.legendRow}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: '#FFFFFF' }]} />
+                    <Text style={styles.legendText}>Earned</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
+                    <Text style={styles.legendText}>Spent</Text>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
+
+            {active === 'Cards' && (
+              <Animated.View entering={FadeInUp.duration(500)}>
+                <FlatList
+                  horizontal
+                  data={CARDS}
+                  keyExtractor={(i) => i.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+                  renderItem={({ item }) => (
+                    <MiniCard
+                      variant={item.variant}
+                      label={item.label}
+                      holder={item.holder}
+                      number={item.number}
+                    />
+                  )}
+                />
+              </Animated.View>
+            )}
+
+            {active === 'Recurring' && (
+              <Animated.View entering={FadeInUp.duration(500)} style={{ paddingHorizontal: 20 }}>
+                {RECURRING.map((r) => (
+                  <View key={r.id} style={styles.recurringRow}>
+                    <View style={styles.recurringIcon}>
+                      <Ionicons name={r.icon} size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.recurringName}>{r.name}</Text>
+                      <Text style={styles.recurringFreq}>{r.freq}</Text>
+                    </View>
+                    <Text style={styles.recurringAmt}>{r.amt}</Text>
+                  </View>
+                ))}
+              </Animated.View>
+            )}
+          </View>
+        </View>
+
+        {/* White bottom sheet */}
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+
+          {active === 'Dashboard' && (
+            <>
+              <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Recent Send</Text>
+                  <Pressable hitSlop={8}>
+                    <Text style={styles.sectionLink}>See all</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.recentSendRow}>
+                  {RECENT_SEND.map((p, i) => (
+                    <View key={p.name} style={{ alignItems: 'center', marginRight: 16 }}>
+                      <Avatar name={p.name} color={p.color} size={52} />
+                      <Text style={styles.recentName}>{p.name}</Text>
+                    </View>
+                  ))}
+                  <Pressable style={styles.recentAdd} hitSlop={8}>
+                    <Ionicons name="add" size={22} color="#3B6BFF" />
+                  </Pressable>
+                </View>
+              </Animated.View>
+
+              <Animated.View entering={FadeInUp.delay(200).duration(400)}>
+                <View style={[styles.sectionHeader, { marginTop: 22 }]}>
+                  <Text style={styles.sectionTitle}>Current Activity</Text>
+                </View>
+                <View style={styles.searchRow}>
+                  <View style={styles.searchInputWrap}>
+                    <Ionicons name="search-outline" size={16} color="rgba(11,20,53,0.48)" />
+                    <TextInput
+                      placeholder="Search transactions"
+                      placeholderTextColor="rgba(11,20,53,0.48)"
+                      style={styles.searchInput}
+                    />
+                  </View>
+                  <Pressable style={styles.filterBtn} hitSlop={8}>
+                    <Ionicons name="options-outline" size={18} color="#FFFFFF" />
+                  </Pressable>
+                </View>
+
+                {ACTIVITY.map((a) => {
+                  const isIn = a.type === 'in';
+                  return (
+                    <View key={a.id} style={styles.activityRow}>
+                      <View style={[styles.activityIcon, { backgroundColor: isIn ? 'rgba(34,197,94,0.14)' : 'rgba(255,84,112,0.14)' }]}>
+                        <Ionicons name={a.icon} size={18} color={isIn ? '#22C55E' : '#FF5470'} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.activityName}>{a.name}</Text>
+                        <Text style={styles.activitySub}>{a.subtitle}</Text>
+                      </View>
+                      <Text style={[styles.activityAmt, { color: isIn ? '#22C55E' : '#FF5470' }]}>
+                        {isIn ? '+' : '-'}${Math.abs(a.amount)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </Animated.View>
+            </>
+          )}
+
+          {active === 'Analytics' && (
+            <>
+              <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Budget</Text>
+                </View>
+                <View style={styles.budgetCard}>
+                  <View style={styles.budgetIcon}>
+                    <Ionicons name="locate-outline" size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.budgetTitle}>Set your budget goal</Text>
+                    <Text style={styles.budgetSub}>Track monthly spending limits</Text>
+                  </View>
+                  <Pressable style={styles.budgetAdd} hitSlop={8}>
+                    <Ionicons name="add" size={20} color="#0B1435" />
+                  </Pressable>
+                </View>
+              </Animated.View>
+
+              <Animated.View entering={FadeInUp.delay(200).duration(400)}>
+                <View style={[styles.sectionHeader, { marginTop: 22 }]}>
+                  <Text style={styles.sectionTitle}>Bills Due</Text>
+                  <Pressable hitSlop={8}>
+                    <Text style={styles.sectionLink}>See all</Text>
+                  </Pressable>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12 }}
+                >
+                  {BILLS.map((b) => (
+                    <View key={b.id} style={styles.billCard}>
+                      <Text style={styles.billDay}>{b.day}</Text>
+                      <Text style={styles.billMo}>{b.mo}</Text>
+                      <Text style={styles.billName}>{b.name}</Text>
+                      <Text style={styles.billAmt}>{b.amt}</Text>
+                    </View>
+                  ))}
+                  <Pressable style={styles.billAddCard} hitSlop={8}>
+                    <Ionicons name="add" size={22} color="#3B6BFF" />
+                    <Text style={styles.billAddText}>Add a Bill</Text>
+                  </Pressable>
+                </ScrollView>
+              </Animated.View>
+            </>
+          )}
+
+          {active === 'Cards' && (
+            <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Card Details</Text>
+              </View>
+              <Text style={styles.bodyMuted}>Tap a card above to manage it.</Text>
+            </Animated.View>
+          )}
+
+          {active === 'Recurring' && (
+            <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Upcoming</Text>
+              </View>
+              <Text style={styles.bodyMuted}>Your recurring subscriptions renew automatically.</Text>
+            </Animated.View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Floating New Payment FAB */}
+      <View pointerEvents="box-none" style={styles.fabWrap}>
+        <AnimatedPressable
+          onPressIn={() => { fabScale.value = withSpring(0.94, { damping: 14, stiffness: 240 }); }}
+          onPressOut={() => { fabScale.value = withSpring(1, { damping: 14, stiffness: 240 }); }}
+          onPress={() => navigation?.navigate?.('NewPayment')}
+          style={[styles.fab, fabStyle]}
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text style={styles.fabText}>New Payment</Text>
+        </AnimatedPressable>
+      </View>
+    </View>
+  );
+}
+
+const HERO_H = 340;
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-
-  /* Scroll progress */
-  scrollProgressContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    height: 2,
+  root: {
+    flex: 1,
+    backgroundColor: '#3B6BFF',
   },
-  scrollProgressTrack: {
-    height: 2,
-    width: '100%',
+  hero: {
+    backgroundColor: '#3B6BFF',
+    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingBottom: 8,
   },
-  scrollProgressBar: {
-    height: 2,
-    borderRadius: 1,
-  },
-
-  /* Header */
-  header: {
+  heroTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: Spacing.xxl,
-    paddingBottom: Spacing.xl,
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  headerLeft: { gap: 4 },
-  greetingLabel: {
-    ...Typography.overline,
-    textTransform: 'uppercase',
+  heroGreet: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  greetingName: {
-    ...Typography.hero,
-    letterSpacing: -1,
+  heroSubGreet: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    marginTop: 2,
   },
-  headerRight: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: 8,
-  },
-  iconBtn: {
+  bellBtn: {
     width: 44,
     height: 44,
-    borderRadius: Radius.md,
-    borderWidth: BorderWidth.thin,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
-  notifDot: {
+  bellDot: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: '#FF4B6E',
-    borderWidth: 2,
+    top: 12,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF5470',
+    borderWidth: 1.5,
+    borderColor: '#3B6BFF',
   },
-
-  /* Balance Card */
-  balanceCard: {
-    marginHorizontal: Spacing.xxl,
-    borderRadius: Radius.xxl,
-    backgroundColor: '#111D35',
-    borderWidth: BorderWidth.thin,
-    borderColor: 'rgba(79,142,255,0.15)',
-    marginBottom: Spacing.xxl,
+  pillTab: {
+    height: 36,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    minWidth: 44,
+  },
+  pillTabActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  pillTabInactive: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  pillTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  heroContent: {
+    paddingTop: 18,
+    paddingBottom: 20,
+    minHeight: 180,
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  balanceAmount: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontWeight: '800',
+    letterSpacing: -1.5,
+    marginTop: 6,
+  },
+  savedBanner: {
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  savedBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  analyticsBox: {
+    paddingHorizontal: 20,
+  },
+  analyticsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  analyticsTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  monthlyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  monthlyText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 140,
+  },
+  yAxis: {
+    justifyContent: 'space-between',
+    height: 120,
+    marginRight: 8,
+  },
+  yLabel: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  barA: {
+    width: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  barB: {
+    width: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  barLabel: {
+    marginTop: 6,
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 18,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  legendText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  miniCard: {
+    width: 220,
+    height: 140,
+    borderRadius: 18,
+    padding: 16,
+    justifyContent: 'space-between',
     overflow: 'hidden',
   },
-  cardAccentLine: {
-    height: 3,
-    backgroundColor: '#4F8EFF',
-    opacity: 0.5,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
-  },
-  balanceCardInner: {
-    paddingTop: Spacing.xl,
-    paddingHorizontal: Spacing.xxl,
-    paddingBottom: Spacing.xxl,
+  miniCardHighlight: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    opacity: 0.6,
   },
   cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
   },
-  cardChip: {
-    width: 40,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,215,0,0.25)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  miniCardLabel: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.6,
   },
-  cardChipInner: {
-    width: 20,
-    height: 16,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.4)',
+  miniCardNumber: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 1.4,
   },
-  cardBrandMark: {
+  cardBottomRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
-  cardBrandText: {
+  miniCardHolderLabel: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 8,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+  },
+  miniCardHolder: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  miniCardVisa: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
-    color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 4,
+    fontStyle: 'italic',
   },
-  cardBrandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#44e571',
-    opacity: 0.6,
-  },
-  balanceSection: {
-    gap: Spacing.sm,
-  },
-  balanceLabelText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.4)',
-    letterSpacing: 2,
-  },
-  balanceRow: {
+  recurringRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
   },
-  balanceAmount: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -1,
-    flex: 1,
-  },
-  eyeBtn: {
-    width: 44,
-    height: 44,
+  recurringIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  vatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  recurringName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  recurringFreq: {
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: 12,
     marginTop: 2,
   },
-  vatBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(68,229,113,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vatText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#44e571',
-  },
-
-  /* Quick Actions */
-  quickActions: {
-    flexDirection: 'row',
-    borderTopWidth: BorderWidth.thin,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-  },
-  qaBtn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.xs + 2,
-  },
-  qaBtnIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qaBtnLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 0.3,
-  },
-
-  /* Stats Row */
-  statsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.xxl,
-    gap: Spacing.md,
-    marginBottom: Spacing.xxl,
-  },
-  statCard: {
-    flex: 1,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    gap: 6,
-  },
-  statIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statValue: { ...Typography.valueS },
-  statMax: { ...Typography.caption },
-  statLabel: { ...Typography.micro, textAlign: 'center' },
-
-  /* Alert Card */
-  alertCard: {
-    marginHorizontal: Spacing.xxl,
-    borderRadius: Radius.lg,
-    borderWidth: BorderWidth.thin,
-    padding: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.xxl,
-  },
-  alertLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    flex: 1,
-  },
-  alertIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertTitle: { ...Typography.bodyBold },
-  alertSub: { ...Typography.micro, marginTop: 2 },
-  alertBtn: {
-    backgroundColor: '#4F8EFF',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 10,
-    borderRadius: Radius.pill,
-  },
-  alertBtnText: {
+  recurringAmt: {
     color: '#FFFFFF',
-    ...Typography.btnSmall,
+    fontSize: 14,
+    fontWeight: '700',
   },
-
-  /* Section Header */
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -12,
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    minHeight: 420,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(11,20,53,0.14)',
+    marginBottom: 14,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xxl,
-    marginBottom: Spacing.md,
+    marginBottom: 10,
   },
-  sectionTitle: { ...Typography.cardTitle },
-  sectionLink: { ...Typography.bodySmall, fontWeight: '700' },
-
-  /* Transactions */
-  txnRow: {
-    marginHorizontal: Spacing.xxl,
-    marginBottom: Spacing.sm,
-    padding: Spacing.lg,
+  sectionTitle: {
+    color: '#0B1435',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  sectionLink: {
+    color: '#3B6BFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  recentSendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    paddingVertical: 6,
   },
-  txnAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.lg,
+  recentName: {
+    color: '#0B1435',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  recentAdd: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(59,107,255,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  txnContent: { flex: 1 },
-  txnMerchant: { ...Typography.bodyBold },
-  txnMeta: { ...Typography.micro, marginTop: 3 },
-  txnAmountWrap: { alignItems: 'flex-end' },
-  txnAmount: { ...Typography.bodyBold },
-  txnVat: { ...Typography.micro, marginTop: 2 },
-
-  /* Empty State */
-  emptyCard: {
-    marginHorizontal: Spacing.xxl,
-    paddingVertical: 48,
-    paddingHorizontal: Spacing.xxl,
+  searchRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    marginBottom: 10,
   },
-  emptyIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  searchInputWrap: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#F3F6FC',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(11,20,53,0.06)',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    color: '#0B1435',
+    fontSize: 14,
+  },
+  filterBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#3B6BFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginLeft: 8,
   },
-  emptyTitle: {
-    ...Typography.bodyBold,
-    fontSize: 16,
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(11,20,53,0.06)',
   },
-  emptySubtitle: {
-    ...Typography.bodySmall,
-    textAlign: 'center',
-    lineHeight: 20,
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  /* FAB */
-  fabContainer: {
+  activityName: {
+    color: '#0B1435',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  activitySub: {
+    color: 'rgba(11,20,53,0.58)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  activityAmt: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  budgetCard: {
+    backgroundColor: '#0B1435',
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  budgetIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  budgetTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  budgetSub: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  budgetAdd: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billCard: {
+    width: 120,
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: '#F3F6FC',
+    borderWidth: 1,
+    borderColor: 'rgba(11,20,53,0.06)',
+  },
+  billDay: {
+    color: '#0B1435',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  billMo: {
+    color: 'rgba(11,20,53,0.58)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: -2,
+    marginBottom: 10,
+  },
+  billName: {
+    color: '#0B1435',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  billAmt: {
+    color: '#3B6BFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  billAddCard: {
+    width: 120,
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: 'rgba(59,107,255,0.08)',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(59,107,255,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billAddText: {
+    color: '#3B6BFF',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  bodyMuted: {
+    color: 'rgba(11,20,53,0.58)',
+    fontSize: 13,
+  },
+  fabWrap: {
     position: 'absolute',
-    bottom: 36,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    bottom: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabGlow: {
-    position: 'absolute',
-    width: 200,
-    height: 54,
-    borderRadius: Radius.pill,
-    backgroundColor: '#44e571',
   },
   fab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#44e571',
-    paddingHorizontal: 28,
-    paddingVertical: 16,
-    borderRadius: Radius.pill,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,83,31,0.3)',
+    justifyContent: 'center',
+    width: 160,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3B6BFF',
+    shadowColor: '#3B6BFF',
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
   fabText: {
-    ...Typography.btnPrimary,
-    color: '#003516',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 6,
   },
 });
