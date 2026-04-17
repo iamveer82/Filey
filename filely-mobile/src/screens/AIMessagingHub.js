@@ -84,7 +84,16 @@ const QUICK_ACTIONS = [
 
 export default function AIMessagingHub() {
   const insets = useSafeAreaInsets();
-  const { profile, user } = useAuth();
+  const { profile, user, orgId, userId } = useAuth();
+  const submitterName = profile?.name || user?.email?.split('@')[0] || 'member';
+  const companyName = profile?.company || 'My Company';
+  const withOrgContext = (tx) => ({
+    ...tx,
+    orgId: orgId || 'default',
+    submittedBy: userId,
+    submittedByName: submitterName,
+    submittedAt: new Date().toISOString(),
+  });
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -126,13 +135,31 @@ export default function AIMessagingHub() {
     pushMessage({ role: 'user', content: text });
 
     try {
-      // Build convo from recent memory for context continuity.
       const history = messages.slice(-12)
         .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
         .map(m => ({ role: m.role, content: m.content }));
+
+      // RAG: inject tx context when prompt implies financial advice / summary.
+      let txContext = '';
+      const needsData = /advice|summary|spend|spent|spending|budget|savings|report|breakdown|category|vat|tax|owe|reclaim|deduction/i.test(text);
+      if (needsData) {
+        try {
+          const res = await api.getTransactions({ orgId });
+          const list = (res?.transactions || res || []).slice(-50);
+          if (list.length) {
+            const { summarizeVat } = require('../services/categories');
+            const sum = summarizeVat(list);
+            const top = sum.byCategory.slice(0, 6)
+              .map(c => `- ${c.label}: ${c.amt.toFixed(2)} AED (VAT ${c.vat.toFixed(2)}, ×${c.count})`)
+              .join('\n');
+            txContext = `\n\nUSER TRANSACTION CONTEXT (last ${list.length}):\nTotal: ${sum.totalAmt.toFixed(2)} AED · VAT paid: ${sum.totalVat.toFixed(2)} · Reclaimable: ${sum.reclaimable.toFixed(2)}\nTop categories:\n${top}\nCompany: ${companyName} · Submitter: ${submitterName}`;
+          }
+        } catch {}
+      }
+
       const sys = {
         role: 'system',
-        content: 'You are Filey, a UAE VAT-compliance assistant. Be concise. Cite [n] when using web results. User transactions follow FTA 5% VAT rules.',
+        content: `You are Filey, a UAE VAT-compliance assistant for ${companyName}. Be concise and direct. Cite [n] when using web results. UAE VAT is 5% (FTA). Users can reclaim VAT on qualifying business expenses only (fuel, utilities, telecom, software, travel, office, legal, hotel).${txContext}`,
       };
       const convo = [sys, ...history, { role: 'user', content: text }];
       const out = await llmSend(convo);
@@ -159,7 +186,7 @@ export default function AIMessagingHub() {
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, pushMessage]);
+  }, [input, loading, messages, pushMessage, orgId, companyName, submitterName]);
 
   const runScan = useCallback(async (source) => {
     setShowAttach(false);
@@ -182,6 +209,7 @@ export default function AIMessagingHub() {
         role: 'assistant',
         content: 'Receipt scanned. Here is what I extracted:',
         extractedTransaction: result.transaction,
+        imageUri: result.imageUri,
       });
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (e) {
@@ -255,10 +283,11 @@ export default function AIMessagingHub() {
 
   const staple = useCallback(async (tx) => {
     try {
-      await api.createTransaction(tx);
+      const enriched = withOrgContext(tx);
+      await api.createTransaction(enriched);
       pushMessage({
         role: 'system',
-        content: `Saved: ${tx.merchant || 'transaction'} · ${tx.amount} AED · ${categoryById(tx.category).label}`,
+        content: `Saved: ${tx.merchant || 'transaction'} · ${tx.amount} AED · ${categoryById(tx.category).label} · by ${submitterName}`,
       });
       // Mark source message as saved to hide editor
       setMessages(prev => prev.map(m =>
@@ -272,8 +301,8 @@ export default function AIMessagingHub() {
 
   const stapleFromQueue = useCallback(async (tx, msgId) => {
     try {
-      await api.createTransaction(tx);
-      pushMessage({ role: 'system', content: `Saved: ${tx.merchant || 'tx'} · ${tx.amount} AED` });
+      await api.createTransaction(withOrgContext(tx));
+      pushMessage({ role: 'system', content: `Saved: ${tx.merchant || 'tx'} · ${tx.amount} AED · by ${submitterName}` });
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, extractedSaved: true } : m));
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch { Alert.alert('Error', 'Failed to save'); }
@@ -443,6 +472,8 @@ export default function AIMessagingHub() {
               {m.extractedTransaction && !m.extractedSaved && (
                 <TransactionEditor
                   transaction={m.extractedTransaction}
+                  imageUri={m.imageUri}
+                  submitterName={submitterName}
                   onSave={(tx) => stapleFromQueue(tx, m.id)}
                 />
               )}

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/client';
 import { summarizeVat } from '../services/categories';
 import { exportCSV, exportPDF } from '../services/exportLedger';
+import { useAuth } from '../context/AuthContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -35,9 +36,10 @@ function Tap({ children, style, onPress, disabled }) {
 
 export default function VatSummaryModal({ visible, onClose }) {
   const insets = useSafeAreaInsets();
+  const { orgId, userId, profile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState(null);
-  const [txs, setTxs] = useState([]);
+  const [allTxs, setAllTxs] = useState([]);
+  const [scope, setScope] = useState('company'); // 'company' | 'mine'
   const [exporting, setExporting] = useState(null);
 
   useEffect(() => {
@@ -45,15 +47,30 @@ export default function VatSummaryModal({ visible, onClose }) {
     setLoading(true);
     (async () => {
       try {
-        const res = await api.getTransactions();
+        const res = await api.getTransactions({ orgId });
         const list = res?.transactions || res || [];
-        setTxs(list);
-        setSummary(summarizeVat(list));
+        setAllTxs(list);
       } catch (e) {
         Alert.alert('Error', 'Failed to load transactions');
       } finally { setLoading(false); }
     })();
-  }, [visible]);
+  }, [visible, orgId]);
+
+  const txs = scope === 'mine'
+    ? allTxs.filter(t => t.submittedBy === userId)
+    : allTxs;
+  const summary = summarizeVat(txs);
+
+  // Member breakdown (who submitted how many)
+  const byMember = Object.values(
+    allTxs.reduce((acc, t) => {
+      const k = t.submittedBy || 'unknown';
+      acc[k] = acc[k] || { id: k, name: t.submittedByName || 'Unknown', count: 0, amt: 0 };
+      acc[k].count += 1;
+      acc[k].amt += parseFloat(t.amount) || 0;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.amt - a.amt);
 
   const doExport = async (fmt) => {
     setExporting(fmt);
@@ -66,6 +83,7 @@ export default function VatSummaryModal({ visible, onClose }) {
   };
 
   const maxCatAmt = summary?.byCategory[0]?.amt || 1;
+  const companyLabel = profile?.company || 'Company';
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -74,7 +92,7 @@ export default function VatSummaryModal({ visible, onClose }) {
           <Animated.View entering={FadeIn.duration(300)}>
             <View style={s.topRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.kicker}>FTA VAT 5% · {new Date().toISOString().slice(0, 7)}</Text>
+                <Text style={s.kicker}>{companyLabel.toUpperCase()} · VAT 5% · {new Date().toISOString().slice(0, 7)}</Text>
                 <Text style={s.title}>VAT Summary</Text>
               </View>
               <Tap onPress={onClose} style={s.closeBtn}>
@@ -83,7 +101,7 @@ export default function VatSummaryModal({ visible, onClose }) {
             </View>
             {loading ? (
               <ActivityIndicator color="#FFF" style={{ marginTop: 40 }} />
-            ) : summary ? (
+            ) : summary && summary.count > 0 ? (
               <>
                 <View style={s.bigStat}>
                   <Text style={s.bigLabel}>TOTAL VAT PAID</Text>
@@ -106,10 +124,45 @@ export default function VatSummaryModal({ visible, onClose }) {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}>
-          {loading ? null : !summary || summary.count === 0 ? (
+          {loading ? null : allTxs.length === 0 ? (
             <Text style={s.empty}>No transactions in vault yet. Scan a receipt to get started.</Text>
           ) : (
             <>
+              <View style={s.scopeRow}>
+                <Pressable
+                  onPress={() => setScope('company')}
+                  style={[s.scopeChip, scope === 'company' && s.scopeChipActive]}
+                >
+                  <Ionicons name="business" size={13} color={scope === 'company' ? '#FFF' : '#6B7280'} />
+                  <Text style={[s.scopeText, scope === 'company' && s.scopeTextActive]}>Company · {allTxs.length}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setScope('mine')}
+                  style={[s.scopeChip, scope === 'mine' && s.scopeChipActive]}
+                >
+                  <Ionicons name="person" size={13} color={scope === 'mine' ? '#FFF' : '#6B7280'} />
+                  <Text style={[s.scopeText, scope === 'mine' && s.scopeTextActive]}>Mine · {allTxs.filter(t => t.submittedBy === userId).length}</Text>
+                </Pressable>
+              </View>
+
+              {scope === 'company' && byMember.length > 1 && (
+                <>
+                  <Text style={s.sectionTitle}>BY MEMBER</Text>
+                  <View style={s.memberGrid}>
+                    {byMember.slice(0, 6).map(mb => (
+                      <View key={mb.id} style={s.memberCard}>
+                        <View style={s.memberAvatar}>
+                          <Text style={s.memberInitial}>{mb.name[0]?.toUpperCase() || '?'}</Text>
+                        </View>
+                        <Text style={s.memberName} numberOfLines={1}>{mb.name}</Text>
+                        <Text style={s.memberAmt}>{mb.amt.toFixed(0)} AED</Text>
+                        <Text style={s.memberCount}>×{mb.count}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+
               <Text style={s.sectionTitle}>BY CATEGORY · {summary.count} TX</Text>
               {summary.byCategory.map((cat, i) => (
                 <Animated.View key={cat.id} entering={FadeInUp.delay(40 * i).duration(360)} style={s.catRow}>
@@ -207,4 +260,29 @@ const s = StyleSheet.create({
   exportText: { color: '#0B1435', fontSize: 13.5, fontWeight: '700' },
   foot: { textAlign: 'center', fontSize: 11, color: '#94A3B8', marginTop: 20 },
   empty: { color: '#6B7280', fontSize: 14, textAlign: 'center', marginTop: 40 },
+  scopeRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  scopeChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 14, backgroundColor: '#F4F6FB',
+    borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  scopeChipActive: { backgroundColor: '#3B6BFF', borderColor: '#3B6BFF' },
+  scopeText: { color: '#6B7280', fontSize: 13, fontWeight: '700' },
+  scopeTextActive: { color: '#FFF' },
+  memberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 },
+  memberCard: {
+    width: '31%', backgroundColor: '#F9FAFB',
+    borderRadius: 12, padding: 10, gap: 2,
+  },
+  memberAvatar: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#3B6BFF',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  memberInitial: { color: '#FFF', fontSize: 12, fontWeight: '800' },
+  memberName: { color: '#0B1435', fontSize: 11.5, fontWeight: '700' },
+  memberAmt: { color: '#0B1435', fontSize: 12.5, fontWeight: '700', marginTop: 2 },
+  memberCount: { color: '#6B7280', fontSize: 10, fontWeight: '600' },
 });

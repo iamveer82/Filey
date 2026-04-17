@@ -19,7 +19,7 @@ function csvEscape(v) {
  * transactions: [{ date, merchant, amount, vat, category, trn, notes }]
  */
 export async function exportCSV(transactions, opts = {}) {
-  const headers = ['Date', 'Merchant', 'Category', 'Amount (AED)', 'VAT (AED)', 'TRN', 'Notes'];
+  const headers = ['Date', 'Merchant', 'Category', 'Amount (AED)', 'VAT (AED)', 'TRN', 'Submitted By', 'Notes'];
   const rows = transactions.map(t => [
     t.date || '',
     t.merchant || '',
@@ -27,6 +27,7 @@ export async function exportCSV(transactions, opts = {}) {
     t.amount ?? '',
     t.vat ?? '',
     t.trn || '',
+    t.submittedByName || '',
     t.notes || '',
   ]);
   const body = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
@@ -59,6 +60,7 @@ export async function exportPDF(transactions, opts = {}) {
       <td>${escapeHtml(t.date)}</td>
       <td>${escapeHtml(t.merchant)}</td>
       <td>${escapeHtml(t.category)}</td>
+      <td>${escapeHtml(t.submittedByName || '')}</td>
       <td class="num">${escapeHtml(t.amount)}</td>
       <td class="num">${escapeHtml(t.vat)}</td>
     </tr>
@@ -92,7 +94,7 @@ export async function exportPDF(transactions, opts = {}) {
     </div>
     <table>
       <thead><tr>
-        <th>Date</th><th>Merchant</th><th>Category</th>
+        <th>Date</th><th>Merchant</th><th>Category</th><th>Submitted By</th>
         <th class="num">Amount</th><th class="num">VAT</th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>

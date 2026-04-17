@@ -3,7 +3,7 @@
  * Used inside AIMessagingHub chat bubbles (dark theme).
  */
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeIn, useSharedValue, useAnimatedStyle, withSpring,
@@ -28,7 +28,8 @@ function Tap({ onPress, style, children, disabled }) {
   );
 }
 
-export default function TransactionEditor({ transaction, onSave, onCancel, compact = false }) {
+export default function TransactionEditor({ transaction, imageUri, submitterName, onSave, onCancel, compact = false }) {
+  const [showImage, setShowImage] = useState(false);
   const [tx, setTx] = useState({
     merchant: transaction?.merchant || '',
     date: transaction?.date || new Date().toISOString().slice(0, 10),
@@ -72,7 +73,29 @@ export default function TransactionEditor({ transaction, onSave, onCancel, compa
           <Ionicons name={activeCat.icon} size={13} color="#fff" />
         </View>
         <Text style={s.title}>Edit before saving</Text>
+        {submitterName ? (
+          <View style={s.submitterPill}>
+            <Ionicons name="person" size={10} color="#9CA3AF" />
+            <Text style={s.submitterText} numberOfLines={1}>{submitterName}</Text>
+          </View>
+        ) : null}
+        {imageUri ? (
+          <Tap onPress={() => setShowImage(true)} style={s.thumbBtn}>
+            <Image source={{ uri: imageUri }} style={s.thumb} />
+          </Tap>
+        ) : null}
       </View>
+
+      {imageUri ? (
+        <Modal visible={showImage} transparent animationType="fade" onRequestClose={() => setShowImage(false)}>
+          <Pressable style={s.imageBackdrop} onPress={() => setShowImage(false)}>
+            <Image source={{ uri: imageUri }} style={s.imageFull} resizeMode="contain" />
+            <View style={s.imageClose}>
+              <Ionicons name="close-circle" size={36} color="#FFF" />
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
 
       <View style={s.field}>
         <Text style={s.label}>MERCHANT</Text>
@@ -230,4 +253,19 @@ const s = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   saveText: { color: '#0A0A0A', fontSize: 13.5, fontWeight: '700' },
+  submitterPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 8, backgroundColor: '#1F1F1F',
+    maxWidth: 110,
+  },
+  submitterText: { color: '#9CA3AF', fontSize: 10.5, fontWeight: '700' },
+  thumbBtn: { marginLeft: 'auto' },
+  thumb: { width: 38, height: 38, borderRadius: 8, backgroundColor: '#0A0A0A' },
+  imageBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imageFull: { width: '100%', height: '80%' },
+  imageClose: { position: 'absolute', top: 60, right: 20 },
 });
