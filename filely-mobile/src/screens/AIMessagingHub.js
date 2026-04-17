@@ -17,7 +17,10 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { scanReceipt } from '../services/receiptPipeline';
+import { scanReceipt, scanReceiptBulk } from '../services/receiptPipeline';
+import TransactionEditor from '../components/TransactionEditor';
+import VatSummaryModal from '../components/VatSummaryModal';
+import { categoryById } from '../services/categories';
 import { send as llmSend, getPreference as getLLMPref } from '../services/llmProvider';
 import { exportCSV, exportPDF } from '../services/exportLedger';
 
@@ -70,8 +73,10 @@ function TypingDots() {
 const QUICK_ACTIONS = [
   { id: 'qa_scan',    label: 'Scan receipt',   icon: 'scan',              action: 'camera' },
   { id: 'qa_upload',  label: 'Upload receipt', icon: 'image-outline',     action: 'gallery' },
+  { id: 'qa_bulk',    label: 'Bulk scan',      icon: 'albums-outline',    action: 'bulk' },
   { id: 'qa_pdf',     label: 'PDF invoice',    icon: 'document-outline',  action: 'pdf' },
   { id: 'qa_vat',     label: 'VAT help',       icon: 'shield-checkmark-outline', action: 'prompt', prompt: 'Explain UAE VAT in plain English.' },
+  { id: 'qa_vat_sum', label: 'VAT summary',    icon: 'calculator-outline', action: 'vatSummary' },
   { id: 'qa_report',  label: 'Monthly report', icon: 'bar-chart-outline', action: 'prompt', prompt: 'Summarize my spending for this month.' },
   { id: 'qa_advice',  label: 'Advice',         icon: 'bulb-outline',      action: 'prompt', prompt: 'Give me personalized financial advice based on my recent transactions.' },
   { id: 'qa_export',  label: 'Export ledger',  icon: 'download-outline',  action: 'export' },
@@ -85,6 +90,7 @@ export default function AIMessagingHub() {
   const [loading, setLoading] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [showVatSummary, setShowVatSummary] = useState(false);
   const scrollRef = useRef();
 
   const name = profile?.name || user?.email?.split('@')[0] || 'there';
@@ -216,6 +222,8 @@ export default function AIMessagingHub() {
   const handleQuickAction = useCallback((qa) => {
     if (qa.action === 'camera') runScan('camera');
     else if (qa.action === 'gallery') runScan('gallery');
+    else if (qa.action === 'bulk') runBulkScan();
+    else if (qa.action === 'vatSummary') setShowVatSummary(true);
     else if (qa.action === 'pdf') runPdfPicker();
     else if (qa.action === 'prompt') send(qa.prompt);
     else if (qa.action === 'export') {
@@ -225,7 +233,7 @@ export default function AIMessagingHub() {
         { text: 'PDF report', onPress: () => doExport('pdf') },
       ]);
     }
-  }, [runScan, runPdfPicker, send, pushMessage]);
+  }, [runScan, runPdfPicker, send, pushMessage, runBulkScan]);
 
   const doExport = useCallback(async (fmt) => {
     try {
@@ -250,11 +258,61 @@ export default function AIMessagingHub() {
       await api.createTransaction(tx);
       pushMessage({
         role: 'system',
-        content: `Saved to vault: ${tx.merchant} · ${tx.amount} AED`,
+        content: `Saved: ${tx.merchant || 'transaction'} · ${tx.amount} AED · ${categoryById(tx.category).label}`,
       });
+      // Mark source message as saved to hide editor
+      setMessages(prev => prev.map(m =>
+        m.extractedTransaction?.id === tx.id ? { ...m, extractedSaved: true } : m
+      ));
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch {
       Alert.alert('Error', 'Failed to save transaction');
+    }
+  }, [pushMessage]);
+
+  const stapleFromQueue = useCallback(async (tx, msgId) => {
+    try {
+      await api.createTransaction(tx);
+      pushMessage({ role: 'system', content: `Saved: ${tx.merchant || 'tx'} · ${tx.amount} AED` });
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, extractedSaved: true } : m));
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+    } catch { Alert.alert('Error', 'Failed to save'); }
+  }, [pushMessage]);
+
+  const runBulkScan = useCallback(async () => {
+    setShowAttach(false);
+    setScanning(true);
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+    pushMessage({ role: 'system', content: 'Bulk scan started. Pick up to 20 receipts.' });
+    try {
+      const { results, count } = await scanReceiptBulk(({ done, total }) => {
+        if (done > 0 && done < total) {
+          // Live progress update (optional, currently noop)
+        }
+      });
+      if (!count) {
+        pushMessage({ role: 'assistant', content: 'No images selected.' });
+        return;
+      }
+      const ok = results.filter(r => r.success);
+      const failed = results.length - ok.length;
+      pushMessage({
+        role: 'assistant',
+        content: `Processed ${count} receipt${count > 1 ? 's' : ''}. ${ok.length} extracted${failed ? `, ${failed} failed` : ''}. Review and save below.`,
+      });
+      for (const r of ok) {
+        pushMessage({
+          role: 'assistant',
+          content: '',
+          extractedTransaction: r.transaction,
+          imageUri: r.imageUri,
+        });
+      }
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+    } catch (e) {
+      pushMessage({ role: 'assistant', content: `Bulk scan failed: ${e.message}` });
+    } finally {
+      setScanning(false);
     }
   }, [pushMessage]);
 
@@ -382,40 +440,16 @@ export default function AIMessagingHub() {
                   {m.meta.webUsed ? '🌐 web · ' : ''}{m.meta.provider} · {m.meta.model}
                 </Text>
               )}
-              {m.extractedTransaction && (
-                <View style={styles.txCard}>
-                  <View style={styles.txHeader}>
-                    <View style={styles.txIcon}>
-                      <Ionicons name="receipt" size={14} color="#0A0A0A" />
-                    </View>
-                    <Text style={styles.txLabel}>EXTRACTED</Text>
-                  </View>
-                  <Text style={styles.txMerchant}>{m.extractedTransaction.merchant || 'Unknown merchant'}</Text>
-                  <View style={styles.txGrid}>
-                    <View style={styles.txCell}>
-                      <Text style={styles.txCellLabel}>Amount</Text>
-                      <Text style={styles.txCellValue}>{m.extractedTransaction.amount || '—'} AED</Text>
-                    </View>
-                    <View style={styles.txCell}>
-                      <Text style={styles.txCellLabel}>VAT</Text>
-                      <Text style={styles.txCellValue}>{m.extractedTransaction.vat || '0.00'} AED</Text>
-                    </View>
-                    <View style={styles.txCell}>
-                      <Text style={styles.txCellLabel}>Date</Text>
-                      <Text style={styles.txCellValue}>{m.extractedTransaction.date || '—'}</Text>
-                    </View>
-                    <View style={styles.txCell}>
-                      <Text style={styles.txCellLabel}>Category</Text>
-                      <Text style={styles.txCellValue}>{m.extractedTransaction.category || '—'}</Text>
-                    </View>
-                  </View>
-                  <SpringPressable
-                    onPress={() => staple(m.extractedTransaction)}
-                    style={styles.saveBtn}
-                  >
-                    <Ionicons name="save-outline" size={14} color="#0A0A0A" />
-                    <Text style={styles.saveBtnText}>Save to Vault</Text>
-                  </SpringPressable>
+              {m.extractedTransaction && !m.extractedSaved && (
+                <TransactionEditor
+                  transaction={m.extractedTransaction}
+                  onSave={(tx) => stapleFromQueue(tx, m.id)}
+                />
+              )}
+              {m.extractedTransaction && m.extractedSaved && (
+                <View style={styles.savedChip}>
+                  <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                  <Text style={styles.savedChipText}>Saved to Vault</Text>
                 </View>
               )}
             </Animated.View>
@@ -520,6 +554,8 @@ export default function AIMessagingHub() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <VatSummaryModal visible={showVatSummary} onClose={() => setShowVatSummary(false)} />
     </KeyboardAvoidingView>
   );
 }
@@ -635,6 +671,15 @@ const styles = StyleSheet.create({
   },
   citationText: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
   providerHint: { color: '#6B7280', fontSize: 10.5, marginTop: 6, fontStyle: 'italic' },
+  savedChip: {
+    marginTop: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(16,185,129,0.12)',
+    borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)',
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
+  },
+  savedChipText: { color: '#10B981', fontSize: 12, fontWeight: '700' },
 
   composer: {
     borderTopWidth: StyleSheet.hairlineWidth,

@@ -11,6 +11,7 @@ import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { recognizeText, isOcrAvailable } from './visionOcr';
 import { parseReceipt, isModelReady } from './gemmaInference';
+import { autoCategorize } from './categories';
 
 /**
  * Scan a receipt from camera or gallery.
@@ -88,6 +89,17 @@ export async function scanReceipt(source = 'gallery') {
     // Step 3: Parse with Gemma or local parser
     const transaction = await parseReceipt(ocrText);
 
+    // Step 4: Auto-categorize if parser didn't return a valid category
+    let category = transaction.category;
+    if (!category || category === 'other' || category === 'unknown') {
+      const cat = await autoCategorize({
+        merchant: transaction.merchant,
+        amount: transaction.amount,
+        ocrText,
+      });
+      category = cat.id;
+    }
+
     return {
       success: true,
       transaction: {
@@ -98,10 +110,11 @@ export async function scanReceipt(source = 'gallery') {
         vat: transaction.vat,
         trn: transaction.trn,
         currency: transaction.currency || 'AED',
-        category: transaction.category,
+        category,
         paymentMethod: transaction.paymentMethod,
         status: 'pending',
       },
+      imageUri: asset.uri,
       ocrText,
       ocrConfidence,
     };
@@ -150,6 +163,68 @@ export async function parseExpenseText(text) {
     ...parsed,
     status: 'pending',
   };
+}
+
+/**
+ * Bulk scan: pick multiple images, OCR+parse each sequentially.
+ * onProgress({done, total, current}) fires per image.
+ * Returns: { results: [{success, transaction?, error?}], count }
+ */
+export async function scanReceiptBulk(onProgress) {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    return { results: [], count: 0, error: 'Photo library permission required.' };
+  }
+  const pick = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true,
+    selectionLimit: 20,
+    base64: true,
+    quality: 0.8,
+  });
+  if (pick.canceled || !pick.assets?.length) return { results: [], count: 0 };
+
+  const results = [];
+  for (let i = 0; i < pick.assets.length; i++) {
+    const asset = pick.assets[i];
+    onProgress?.({ done: i, total: pick.assets.length, current: asset.uri });
+    try {
+      if (!isOcrAvailable()) {
+        results.push({ success: false, error: 'OCR not available', imageUri: asset.uri });
+        continue;
+      }
+      const ocr = await recognizeText(asset.uri);
+      if (!ocr.text?.trim()) {
+        results.push({ success: false, error: 'No text detected', imageUri: asset.uri });
+        continue;
+      }
+      const parsed = await parseReceipt(ocr.text);
+      let category = parsed.category;
+      if (!category || category === 'other' || category === 'unknown') {
+        const cat = await autoCategorize({ merchant: parsed.merchant, amount: parsed.amount, ocrText: ocr.text });
+        category = cat.id;
+      }
+      results.push({
+        success: true,
+        imageUri: asset.uri,
+        transaction: {
+          id: generateId(),
+          merchant: parsed.merchant,
+          date: parsed.date,
+          amount: parsed.amount,
+          vat: parsed.vat,
+          trn: parsed.trn,
+          currency: parsed.currency || 'AED',
+          category,
+          status: 'pending',
+        },
+      });
+    } catch (e) {
+      results.push({ success: false, error: e.message, imageUri: asset.uri });
+    }
+  }
+  onProgress?.({ done: pick.assets.length, total: pick.assets.length, current: null });
+  return { results, count: pick.assets.length };
 }
 
 function generateId() {
