@@ -22,6 +22,8 @@ import { checkDuplicate, recordSeen } from '../services/dedup';
 import { computeNudges } from '../services/nudges';
 import { extractMentions, resolveMentions, notifyMentions } from '../services/mentions';
 import { checkCap } from '../services/policy';
+import { suggestFollowups, detectAnomaly } from '../services/aiInsights';
+import { maybeBuildWeeklyDigest } from '../services/weeklyDigest';
 import TransactionEditor from '../components/TransactionEditor';
 import VatSummaryModal from '../components/VatSummaryModal';
 import { categoryById } from '../services/categories';
@@ -117,6 +119,7 @@ export default function AIMessagingHub() {
   const [showVatSummary, setShowVatSummary] = useState(false);
   const [activeThread, setActiveThread] = useState(null);
   const [showThreads, setShowThreads] = useState(false);
+  const [followups, setFollowups] = useState([]);
   const scrollRef = useRef();
   const abortRef = useRef(null);
   const lastUserPromptRef = useRef(null);
@@ -159,15 +162,20 @@ export default function AIMessagingHub() {
     setActiveThread(all.find(t => t.id === id) || null);
   }, []);
 
-  // Proactive nudges on mount (one-shot, cooldown guarded internally)
+  // Proactive nudges + weekly digest on mount
   useEffect(() => {
     let mounted = true;
     const t = setTimeout(async () => {
       try {
         const nudges = await computeNudges({ orgId });
-        if (!mounted || !nudges?.length) return;
-        for (const n of nudges) {
-          pushMessage({ role: 'system', kind: 'nudge', severity: n.severity, content: n.text });
+        if (mounted && nudges?.length) {
+          for (const n of nudges) {
+            pushMessage({ role: 'system', kind: 'nudge', severity: n.severity, content: n.text });
+          }
+        }
+        const digest = await maybeBuildWeeklyDigest({ orgId });
+        if (mounted && digest?.text) {
+          pushMessage({ role: 'assistant', kind: 'digest', content: digest.text, meta: { digestStats: digest.stats } });
         }
       } catch {}
     }, 1400);
@@ -230,6 +238,11 @@ export default function AIMessagingHub() {
         ? { ...m, content: out.text || m.content || 'No response.', meta: out.meta, streaming: false }
         : m
       ));
+      // Generate followup chips (non-blocking)
+      const pref = await getLLMPref().catch(() => ({}));
+      suggestFollowups(out.text || '', text, { provider: pref.provider })
+        .then(chips => setFollowups(chips || []))
+        .catch(() => {});
     } catch (e) {
       const aborted = e.name === 'AbortError' || /abort/i.test(e.message || '');
       setMessages(prev => prev.map(m => m.id === streamId
@@ -314,6 +327,7 @@ export default function AIMessagingHub() {
     setLoading(true);
     lastUserPromptRef.current = text;
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    setFollowups([]);
     pushMessage({ role: 'user', content: text });
 
     // @mentions — resolve + notify
@@ -534,6 +548,24 @@ export default function AIMessagingHub() {
     return true;
   }, [orgId, userId]);
 
+  const runAnomalyCheck = useCallback(async (tx) => {
+    try {
+      const res = await api.getOrgTransactions?.(orgId, { submittedBy: userId })
+        || await api.getTransactions({});
+      const rows = Array.isArray(res) ? res : res?.transactions || [];
+      const mine = rows.filter(r => !r.submittedBy || r.submittedBy === userId);
+      const { anomaly, reasons, severity } = detectAnomaly(tx, mine);
+      if (anomaly) {
+        pushMessage({
+          role: 'system',
+          kind: 'anomaly',
+          severity,
+          content: `⚠ Anomaly: ${reasons.join(' · ')}`,
+        });
+      }
+    } catch {}
+  }, [orgId, userId, pushMessage]);
+
   const staple = useCallback(async (tx) => {
     const ok = await dedupGuard(tx);
     if (!ok) return;
@@ -541,6 +573,7 @@ export default function AIMessagingHub() {
       const enriched = withOrgContext(tx);
       await api.createTransaction(enriched);
       await recordSeen(tx, { submittedByName: submitterName });
+      runAnomalyCheck(tx);
       pushMessage({
         role: 'system',
         content: `Saved: ${tx.merchant || 'transaction'} · ${tx.amount} AED · ${categoryById(tx.category).label} · by ${submitterName}`,
@@ -560,6 +593,7 @@ export default function AIMessagingHub() {
     try {
       await api.createTransaction(withOrgContext(tx));
       await recordSeen(tx, { submittedByName: submitterName });
+      runAnomalyCheck(tx);
       pushMessage({ role: 'system', content: `Saved: ${tx.merchant || 'tx'} · ${tx.amount} AED · by ${submitterName}` });
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, extractedSaved: true } : m));
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
@@ -828,6 +862,21 @@ export default function AIMessagingHub() {
           ))}
         </ScrollView>
 
+        {followups.length > 0 && !loading && (
+          <Animated.View entering={FadeIn.duration(240)} style={styles.followupWrap}>
+            {followups.map((q, i) => (
+              <SpringPressable
+                key={`${i}-${q}`}
+                onPress={() => { setFollowups([]); send(q); }}
+                style={styles.followupChip}
+              >
+                <Ionicons name="sparkles" size={11} color="#93C5FD" />
+                <Text style={styles.followupText} numberOfLines={1}>{q}</Text>
+              </SpringPressable>
+            ))}
+          </Animated.View>
+        )}
+
         <View style={styles.inputBar}>
           <SpringPressable
             onPress={() => setShowAttach(true)}
@@ -956,6 +1005,19 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2A2A2A',
   },
   regenText: { color: '#E5E7EB', fontSize: 11, fontWeight: '600' },
+  followupWrap: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 7,
+    paddingHorizontal: 16, paddingVertical: 8,
+  },
+  followupChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 11, paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: 'rgba(147,197,253,0.08)',
+    borderWidth: 1, borderColor: 'rgba(147,197,253,0.2)',
+    maxWidth: '100%',
+  },
+  followupText: { color: '#BFDBFE', fontSize: 12, fontWeight: '600' },
   topBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingBottom: 14,
