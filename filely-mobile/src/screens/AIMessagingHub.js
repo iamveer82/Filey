@@ -20,6 +20,8 @@ import { useAuth } from '../context/AuthContext';
 import { scanReceipt, scanReceiptBulk, scanReceiptMerged } from '../services/receiptPipeline';
 import { checkDuplicate, recordSeen } from '../services/dedup';
 import { computeNudges } from '../services/nudges';
+import { extractMentions, resolveMentions, notifyMentions } from '../services/mentions';
+import { checkCap } from '../services/policy';
 import TransactionEditor from '../components/TransactionEditor';
 import VatSummaryModal from '../components/VatSummaryModal';
 import { categoryById } from '../services/categories';
@@ -105,6 +107,7 @@ export default function AIMessagingHub() {
     submittedBy: userId,
     submittedByName: submitterName,
     submittedAt: new Date().toISOString(),
+    status: tx.status || 'pending',
   });
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -313,6 +316,30 @@ export default function AIMessagingHub() {
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     pushMessage({ role: 'user', content: text });
 
+    // @mentions — resolve + notify
+    const handles = extractMentions(text);
+    if (handles.length) {
+      try {
+        const members = await resolveMentions(handles, orgId);
+        if (members.length) {
+          await notifyMentions(members, {
+            fromName: submitterName,
+            text,
+            threadId: activeThread?.id,
+          });
+          pushMessage({
+            role: 'system',
+            content: `🔔 Notified ${members.map(m => m.name).join(', ')}`,
+          });
+        } else {
+          pushMessage({
+            role: 'system',
+            content: `No match for @${handles.join(', @')}. Check team list.`,
+          });
+        }
+      } catch {}
+    }
+
     // Auto-title thread from first user message
     if (!titleSetRef.current) {
       const title = deriveTitle(text);
@@ -331,7 +358,7 @@ export default function AIMessagingHub() {
       await runTurn(text);
     }
     setLoading(false);
-  }, [input, loading, activeThread, pushMessage, runTurn, runAgenticTurn]);
+  }, [input, loading, activeThread, orgId, submitterName, pushMessage, runTurn, runAgenticTurn]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -472,6 +499,23 @@ export default function AIMessagingHub() {
 
   const dedupGuard = useCallback(async (tx) => {
     try {
+      const cap = await checkCap({ orgId, userId, tx });
+      if (cap.warn) {
+        const ok = await new Promise((resolve) => {
+          Alert.alert(
+            'Policy cap warning',
+            `Saving this puts you at ${cap.afterThis.toFixed(0)} AED on ${cap.label} this month, over the ${cap.cap} AED cap (+${cap.overBy.toFixed(0)}). Continue?`,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Save over cap', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+        if (!ok) return false;
+      }
+    } catch {}
+
+    try {
       const dup = await checkDuplicate(tx, { orgId });
       if (dup.duplicate) {
         const m = dup.match || {};
@@ -488,7 +532,7 @@ export default function AIMessagingHub() {
       }
     } catch {}
     return true;
-  }, [orgId]);
+  }, [orgId, userId]);
 
   const staple = useCallback(async (tx) => {
     const ok = await dedupGuard(tx);

@@ -107,6 +107,8 @@ export function AuthProvider({ children }) {
     updateProfile,
     orgId:  profile?.org_id || 'default',
     userId: user?.id        || 'admin',
+    role:   profile?.role   || 'member',
+    isManager: (profile?.role === 'manager' || profile?.role === 'admin'),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
