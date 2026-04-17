@@ -26,9 +26,15 @@ import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { send as llmSend, getPreference as getLLMPref } from '../services/llmProvider';
 import { exportCSV, exportPDF } from '../services/exportLedger';
+import ThreadPicker from '../components/ThreadPicker';
+import {
+  ensureActiveThread, msgKey, memKey, setActiveThreadId as setActiveThreadIdPersist,
+  deriveTitle, renameThread, touchThread, createThread,
+} from '../services/threads';
+import { TOOL_SCHEMAS, toAnthropicTools, runTool, normalizeToolCalls } from '../services/aiTools';
 
-const MEMORY_KEY = '@filey/ai_chat_memory_v1';
 const MAX_MEMORY = 40;
+const TOOL_INTENT_RE = /\b(export|download|email).*(csv|pdf|ledger|report)\b|\b(show|open|display).*(vat|summary|reclaim)\b|\b(find|search|look up|list).*(receipt|transaction|expense)\b|\b(save|add|log|record).*(receipt|tx|transaction|to vault)\b/i;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -103,29 +109,56 @@ export default function AIMessagingHub() {
   const [showAttach, setShowAttach] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [showVatSummary, setShowVatSummary] = useState(false);
+  const [activeThread, setActiveThread] = useState(null);
+  const [showThreads, setShowThreads] = useState(false);
   const scrollRef = useRef();
   const abortRef = useRef(null);
   const lastUserPromptRef = useRef(null);
+  const titleSetRef = useRef(false);
 
   const name = profile?.name || user?.email?.split('@')[0] || 'there';
 
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(MEMORY_KEY);
+        const t = await ensureActiveThread();
+        setActiveThread(t);
+        const raw = await AsyncStorage.getItem(msgKey(t.id));
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) setMessages(parsed);
+          if (Array.isArray(parsed)) {
+            setMessages(parsed);
+            titleSetRef.current = !!parsed.find(m => m.role === 'user');
+          }
         }
       } catch {}
     })();
   }, []);
 
   useEffect(() => {
-    if (messages.length === 0) return;
+    if (!activeThread || messages.length === 0) return;
     const recent = messages.slice(-MAX_MEMORY);
-    AsyncStorage.setItem(MEMORY_KEY, JSON.stringify(recent)).catch(() => {});
-  }, [messages]);
+    AsyncStorage.setItem(msgKey(activeThread.id), JSON.stringify(recent)).catch(() => {});
+  }, [messages, activeThread]);
+
+  const switchThread = useCallback(async (id) => {
+    await setActiveThreadIdPersist(id);
+    const raw = await AsyncStorage.getItem(msgKey(id));
+    const parsed = raw ? JSON.parse(raw) : [];
+    setMessages(Array.isArray(parsed) ? parsed : []);
+    titleSetRef.current = (Array.isArray(parsed) ? parsed : []).some(m => m.role === 'user');
+    // Refresh row meta
+    const { listThreads } = require('../services/threads');
+    const all = await listThreads();
+    setActiveThread(all.find(t => t.id === id) || null);
+  }, []);
+
+  const newThread = useCallback(async () => {
+    const t = await createThread('New chat');
+    setActiveThread(t);
+    setMessages([]);
+    titleSetRef.current = false;
+  }, []);
 
   const pushMessage = useCallback((m) => {
     setMessages(prev => [...prev, { id: genId(), ts: Date.now(), ...m }]);
@@ -187,17 +220,100 @@ export default function AIMessagingHub() {
     }
   }, [messages, orgId, companyName, submitterName]);
 
+  const runAgenticTurn = useCallback(async (text, historyOverride) => {
+    const history = (historyOverride ?? messages).slice(-10)
+      .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const pref = await getLLMPref();
+    const provider = pref.provider;
+    const tools = provider === 'anthropic' ? toAnthropicTools() : TOOL_SCHEMAS;
+
+    const sys = {
+      role: 'system',
+      content: `You are Filey, UAE VAT assistant for ${companyName}. Call tools when user asks to save, export, search vault, or view VAT summary. Keep replies short after tools run. VAT is 5% (FTA). Submitter: ${submitterName}.`,
+    };
+    const convo = [sys, ...history, { role: 'user', content: text }];
+
+    abortRef.current = new AbortController();
+    try {
+      const first = await llmSend(convo, { signal: abortRef.current.signal, tools, maxTokens: 700 });
+      const calls = normalizeToolCalls(first.toolCalls, provider);
+
+      if (!calls.length) {
+        // Fallback to plain assistant reply
+        pushMessage({ role: 'assistant', content: first.text || '…', meta: first.meta });
+        return;
+      }
+
+      const ctx = { orgId, userId, submitterName, companyName };
+      const results = [];
+      for (const c of calls) {
+        pushMessage({ role: 'system', content: `⚙ ${c.name}…` });
+        const r = await runTool(c.name, c.args, ctx);
+        results.push({ call: c, out: r });
+        if (r.side?.type === 'open_vat_summary') setShowVatSummary(true);
+        if (r.ok) {
+          try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+        }
+      }
+
+      const resultSummary = results.map(r =>
+        `- ${r.call.name}(${JSON.stringify(r.call.args).slice(0, 120)}) → ${r.out.ok ? JSON.stringify(r.out.result).slice(0, 200) : 'ERR: ' + r.out.error}`
+      ).join('\n');
+
+      const wrap = [
+        ...convo,
+        { role: 'assistant', content: first.text || '(calling tools)' },
+        { role: 'user', content: `TOOL RESULTS:\n${resultSummary}\n\nConfirm to the user what happened in 1-2 sentences.` },
+      ];
+
+      const streamId = genId();
+      setMessages(prev => [...prev, { id: streamId, ts: Date.now(), role: 'assistant', content: '', streaming: true }]);
+      const final = await llmSend(wrap, {
+        signal: abortRef.current.signal,
+        onToken: (_d, acc) => setMessages(prev => prev.map(m => m.id === streamId ? { ...m, content: acc } : m)),
+      });
+      setMessages(prev => prev.map(m => m.id === streamId
+        ? { ...m, content: final.text || '✓ Done.', meta: final.meta, streaming: false }
+        : m
+      ));
+    } catch (e) {
+      const aborted = e.name === 'AbortError';
+      pushMessage({ role: 'assistant', content: aborted ? '_Stopped._' : `Agent error: ${e.message}` });
+    } finally {
+      abortRef.current = null;
+    }
+  }, [messages, orgId, userId, submitterName, companyName, pushMessage]);
+
   const send = useCallback(async (overrideText) => {
     const text = (overrideText ?? input).trim();
-    if (!text || loading) return;
+    if (!text || loading || !activeThread) return;
     setInput('');
     setLoading(true);
     lastUserPromptRef.current = text;
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     pushMessage({ role: 'user', content: text });
-    await runTurn(text);
+
+    // Auto-title thread from first user message
+    if (!titleSetRef.current) {
+      const title = deriveTitle(text);
+      renameThread(activeThread.id, title).catch(() => {});
+      setActiveThread(t => t ? { ...t, title } : t);
+      titleSetRef.current = true;
+    } else {
+      touchThread(activeThread.id).catch(() => {});
+    }
+
+    const pref = await getLLMPref().catch(() => ({ provider: 'gemma' }));
+    const canTool = pref.provider === 'openai' || pref.provider === 'anthropic' || pref.provider === 'openrouter';
+    if (canTool && TOOL_INTENT_RE.test(text)) {
+      await runAgenticTurn(text);
+    } else {
+      await runTurn(text);
+    }
     setLoading(false);
-  }, [input, loading, pushMessage, runTurn]);
+  }, [input, loading, activeThread, pushMessage, runTurn, runAgenticTurn]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -400,14 +516,11 @@ export default function AIMessagingHub() {
   }, [pushMessage]);
 
   const clearMemory = useCallback(() => {
-    Alert.alert('Clear memory', 'Remove all chat history on this device?', [
+    Alert.alert('New chat', 'Start a fresh thread? Current chat stays saved under its title.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: async () => {
-        setMessages([]);
-        await AsyncStorage.removeItem(MEMORY_KEY).catch(() => {});
-      } },
+      { text: 'New chat', onPress: newThread },
     ]);
-  }, []);
+  }, [newThread]);
 
   const showWelcome = messages.length === 0;
   const memoryCount = messages.filter(m => m.role !== 'system').length;
@@ -425,16 +538,22 @@ export default function AIMessagingHub() {
           <View style={styles.avatarDot}>
             <Ionicons name="sparkles" size={12} color="#0A0A0A" />
           </View>
-          <View>
-            <Text style={styles.topTitle}>Filey AI</Text>
+          <Pressable onPress={() => setShowThreads(true)} style={{ flex: 1 }}>
+            <Text style={styles.topTitle} numberOfLines={1}>
+              {activeThread?.title || 'Filey AI'}
+              <Text style={{ color: 'rgba(255,255,255,0.4)' }}>  ▾</Text>
+            </Text>
             <View style={styles.statusRow}>
               <View style={styles.liveDot} />
-              <Text style={styles.statusText}>Offline Gemma · {memoryCount} in memory</Text>
+              <Text style={styles.statusText}>{memoryCount} in memory · tap to switch</Text>
             </View>
-          </View>
+          </Pressable>
         </View>
+        <Pressable onPress={newThread} hitSlop={10} style={[styles.clearBtn, { marginRight: 8 }]}>
+          <Ionicons name="create-outline" size={18} color="rgba(255,255,255,0.6)" />
+        </Pressable>
         <Pressable onPress={clearMemory} hitSlop={10} style={styles.clearBtn}>
-          <Ionicons name="refresh-outline" size={18} color="rgba(255,255,255,0.6)" />
+          <Ionicons name="ellipsis-horizontal" size={18} color="rgba(255,255,255,0.6)" />
         </Pressable>
       </View>
 
@@ -670,6 +789,12 @@ export default function AIMessagingHub() {
       </Modal>
 
       <VatSummaryModal visible={showVatSummary} onClose={() => setShowVatSummary(false)} />
+      <ThreadPicker
+        visible={showThreads}
+        activeId={activeThread?.id}
+        onClose={() => setShowThreads(false)}
+        onPick={switchThread}
+      />
     </KeyboardAvoidingView>
   );
 }
