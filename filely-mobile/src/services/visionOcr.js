@@ -30,18 +30,25 @@ function getVisionModule() {
  * @param {string} imageUri — Local file URI (e.g., file:///path/to/image.jpg) or base64 data URI
  * @returns {Promise<{ text: string, confidence: number, regions: Array<{text: string, confidence: number, bounds: object}> }>}
  */
-export async function recognizeText(imageUri) {
+const DEFAULT_LANGS = ['ar-SA', 'en-US'];
+
+export async function recognizeText(imageUri, opts = {}) {
   // Web platform fallback — no OCR on web
   if (Platform.OS === 'web') {
     console.warn('[VisionOcr] Text recognition is not available on web platform.');
     return { text: '', confidence: 0, regions: [] };
   }
 
+  const languages = opts.languages || DEFAULT_LANGS;
+
   // Try native Vision module first
   const RNVisionOcr = getVisionModule();
   if (RNVisionOcr && typeof RNVisionOcr.recognizeText === 'function') {
     try {
-      const result = await RNVisionOcr.recognizeText(imageUri);
+      // Pass languages hint if module supports multi-lang signature; ignored otherwise
+      const result = RNVisionOcr.recognizeText.length >= 2
+        ? await RNVisionOcr.recognizeText(imageUri, { languages })
+        : await RNVisionOcr.recognizeText(imageUri);
       return {
         text: result.text || '',
         confidence: result.confidence || 0,

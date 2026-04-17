@@ -10,6 +10,8 @@
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { recognizeText, isOcrAvailable } from './visionOcr';
+import { compressIfLarge } from './imageCompressor';
+import { parseHijriDate } from './hijriDate';
 import { parseReceipt, isModelReady } from './gemmaInference';
 import { autoCategorize } from './categories';
 
@@ -49,12 +51,16 @@ export async function scanReceipt(source = 'gallery') {
 
     const asset = imageResult.assets[0];
 
+    // Compress if large — keeps OCR fast and upload cheap
+    const compressed = await compressIfLarge(asset.uri);
+    const workingUri = compressed.uri;
+
     // Step 2: Run OCR
     let ocrText = '';
     let ocrConfidence = 0;
 
     if (isOcrAvailable()) {
-      const ocrResult = await recognizeText(asset.uri);
+      const ocrResult = await recognizeText(workingUri);
       ocrText = ocrResult.text;
       ocrConfidence = ocrResult.confidence;
     } else if (Platform.OS === 'web') {
@@ -89,6 +95,12 @@ export async function scanReceipt(source = 'gallery') {
     // Step 3: Parse with Gemma or local parser
     const transaction = await parseReceipt(ocrText);
 
+    // Hijri date fallback — some UAE merchants print هـ only
+    if (!transaction.date) {
+      const hijri = parseHijriDate(ocrText);
+      if (hijri) transaction.date = hijri;
+    }
+
     // Step 4: Auto-categorize if parser didn't return a valid category
     let category = transaction.category;
     if (!category || category === 'other' || category === 'unknown') {
@@ -114,9 +126,10 @@ export async function scanReceipt(source = 'gallery') {
         paymentMethod: transaction.paymentMethod,
         status: 'pending',
       },
-      imageUri: asset.uri,
+      imageUri: workingUri,
       ocrText,
       ocrConfidence,
+      compressed: compressed.compressed,
     };
 
   } catch (error) {
