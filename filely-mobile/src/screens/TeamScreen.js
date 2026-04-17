@@ -89,7 +89,8 @@ function AdminGlowRing({ size }) {
     height: size + 10,
     borderRadius: 9999,
     borderWidth: 2,
-    borderColor: `rgba(68,229,113,${glowOpacity.value})`,
+    borderColor: 'rgba(68,229,113,1)',
+    opacity: glowOpacity.value,
   }));
 
   return <Animated.View style={glowStyle} />;

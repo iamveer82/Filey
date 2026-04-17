@@ -24,6 +24,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  interpolateColor,
   Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -271,9 +272,11 @@ export default function ComplianceVault({ darkMode }) {
   // Search-bar focus border animation
   const searchBorderAnim = useSharedValue(0);
   const searchBorderStyle = useAnimatedStyle(() => ({
-    borderColor: searchBorderAnim.value === 1
-      ? withSpring(c.accent, { damping: 20, stiffness: 150 })
-      : withSpring(c.border, { damping: 20, stiffness: 150 }),
+    borderColor: interpolateColor(
+      searchBorderAnim.value,
+      [0, 1],
+      [c.border, c.accent]
+    ),
   }));
 
   // ---- API calls (unchanged business logic) ----
@@ -332,11 +335,11 @@ export default function ComplianceVault({ darkMode }) {
   // Handle search focus
   const handleSearchFocus = () => {
     setSearchFocused(true);
-    searchBorderAnim.value = 1;
+    searchBorderAnim.value = withTiming(1, { duration: 250 });
   };
   const handleSearchBlur = () => {
     setSearchFocused(false);
-    searchBorderAnim.value = 0;
+    searchBorderAnim.value = withTiming(0, { duration: 250 });
   };
 
   // ---- Render ----

@@ -6,6 +6,7 @@ import 'react-native-url-polyfill/auto';
 import 'react-native-gesture-handler';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { registerRootComponent } from 'expo';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -26,10 +27,6 @@ import Animated, {
   withSpring,
   withTiming,
   interpolate,
-  Easing,
-  FadeIn,
-  FadeOut,
-  SlideInUp,
 } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -44,7 +41,7 @@ import ComplianceVault from './src/screens/ComplianceVault';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Themes ────────────────────────────────────────────────────────────────────
 
@@ -444,7 +441,7 @@ function AppContent() {
             },
             headerTintColor: c.text,
             // Extra bottom padding so content doesn't hide behind floating bar
-            contentStyle: {
+            sceneStyle: {
               paddingBottom: 0,
             },
           }}
@@ -571,3 +568,5 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+registerRootComponent(App);
