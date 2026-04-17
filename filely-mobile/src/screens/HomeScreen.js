@@ -32,11 +32,11 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const TABS = ['Dashboard', 'Cards', 'Analytics', 'Recurring'];
 
 const RECENT_SEND = [
-  { name: 'Alex',   color: '#FDE68A' },
-  { name: 'Priya',  color: '#FCA5A5' },
-  { name: 'Sam',    color: '#A7F3D0' },
-  { name: 'Liam',   color: '#C7D2FE' },
-  { name: 'Nora',   color: '#FBCFE8' },
+  { name: 'Agnes',  color: '#FDE68A' },
+  { name: 'Isyana', color: '#FCA5A5' },
+  { name: 'Nurdin', color: '#A7F3D0' },
+  { name: 'Budi',   color: '#C7D2FE' },
+  { name: 'Broto',  color: '#FBCFE8' },
 ];
 
 const ACTIVITY = [
@@ -92,6 +92,34 @@ function Avatar({ name, color, size = 36 }) {
   );
 }
 
+function PillTab({ t, isActive, onPress }) {
+  const scale = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.View style={anim}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.94, { damping: 14, stiffness: 420 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 320 }); }}
+        hitSlop={8}
+        style={[
+          styles.pillTab,
+          isActive ? styles.pillTabActive : styles.pillTabInactive,
+        ]}
+      >
+        <Text
+          style={[
+            styles.pillTabText,
+            { color: isActive ? '#3B6BFF' : 'rgba(255,255,255,0.78)' },
+          ]}
+        >
+          {t}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 function PillTabs({ active, onChange }) {
   return (
     <ScrollView
@@ -100,29 +128,9 @@ function PillTabs({ active, onChange }) {
       contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 4 }}
       style={{ flexGrow: 0 }}
     >
-      {TABS.map((t) => {
-        const isActive = t === active;
-        return (
-          <Pressable
-            key={t}
-            onPress={() => onChange(t)}
-            hitSlop={8}
-            style={[
-              styles.pillTab,
-              isActive ? styles.pillTabActive : styles.pillTabInactive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.pillTabText,
-                { color: isActive ? '#3B6BFF' : 'rgba(255,255,255,0.78)' },
-              ]}
-            >
-              {t}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {TABS.map((t) => (
+        <PillTab key={t} t={t} isActive={t === active} onPress={() => onChange(t)} />
+      ))}
     </ScrollView>
   );
 }
