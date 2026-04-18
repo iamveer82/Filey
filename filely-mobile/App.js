@@ -30,6 +30,10 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { initTelemetry } from './src/services/telemetry';
+
+initTelemetry();
+
 import LoginScreen from './src/screens/LoginScreen';
 import AIInitializationScreen from './src/screens/AIInitializationScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';

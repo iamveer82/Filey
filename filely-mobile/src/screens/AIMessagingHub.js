@@ -35,6 +35,7 @@ import { exportCSV, exportPDF } from '../services/exportLedger';
 import { exportPeppolBatch } from '../services/eInvoiceExport';
 import { seedVersion } from '../services/txVersioning';
 import ThreadPicker from '../components/ThreadPicker';
+import ErrorBoundary from '../components/ErrorBoundary';
 import {
   ensureActiveThread, msgKey, memKey, setActiveThreadId as setActiveThreadIdPersist,
   deriveTitle, renameThread, touchThread, createThread,
@@ -728,6 +729,7 @@ export default function AIMessagingHub() {
         </Pressable>
       </View>
 
+      <ErrorBoundary>
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
@@ -866,6 +868,7 @@ export default function AIMessagingHub() {
           </Animated.View>
         )}
       </ScrollView>
+      </ErrorBoundary>
 
       <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
         <ScrollView
