@@ -33,6 +33,7 @@ import { Share } from 'react-native';
 import { send as llmSend, getPreference as getLLMPref } from '../services/llmProvider';
 import { exportCSV, exportPDF } from '../services/exportLedger';
 import { exportPeppolBatch } from '../services/eInvoiceExport';
+import { pickPdf, convertPdfToWord, convertPdfToExcel } from '../services/pdfConverter';
 import { seedVersion } from '../services/txVersioning';
 import ThreadPicker from '../components/ThreadPicker';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -99,6 +100,8 @@ const QUICK_ACTIONS = [
   { id: 'qa_report',  label: 'Monthly report', icon: 'bar-chart-outline', action: 'prompt', prompt: 'Summarize my spending for this month.' },
   { id: 'qa_advice',  label: 'Advice',         icon: 'bulb-outline',      action: 'prompt', prompt: 'Give me personalized financial advice based on my recent transactions.' },
   { id: 'qa_export',  label: 'Export ledger',  icon: 'download-outline',  action: 'export' },
+  { id: 'qa_pdf_word',  label: 'PDF → Word',   icon: 'document-text-outline', action: 'pdfToWord' },
+  { id: 'qa_pdf_excel', label: 'PDF → Excel',  icon: 'grid-outline',          action: 'pdfToExcel' },
 ];
 
 export default function AIMessagingHub() {
@@ -487,6 +490,8 @@ export default function AIMessagingHub() {
     else if (qa.action === 'vatSummary') setShowVatSummary(true);
     else if (qa.action === 'pdf') runPdfPicker();
     else if (qa.action === 'prompt') send(qa.prompt);
+    else if (qa.action === 'pdfToWord') runPdfConvert('word');
+    else if (qa.action === 'pdfToExcel') runPdfConvert('excel');
     else if (qa.action === 'export') {
       Alert.alert('Export ledger', 'Choose a format', [
         { text: 'Cancel', style: 'cancel' },
@@ -495,7 +500,23 @@ export default function AIMessagingHub() {
         { text: 'e-Invoice XML (PEPPOL)', onPress: () => doExport('peppol') },
       ]);
     }
-  }, [runScan, runPdfPicker, send, pushMessage, runBulkScan, runMergeScan]);
+  }, [runScan, runPdfPicker, send, pushMessage, runBulkScan, runMergeScan, runPdfConvert]);
+
+  const runPdfConvert = useCallback(async (target) => {
+    try {
+      const asset = await pickPdf();
+      if (!asset) return;
+      pushMessage({ role: 'system', content: `Converting ${asset.name || 'PDF'} → ${target === 'word' ? 'Word (.rtf)' : 'Excel (.csv)'}…` });
+      const res = target === 'word'
+        ? await convertPdfToWord(asset)
+        : await convertPdfToExcel(asset);
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      const extra = res.rowCount != null ? ` · ${res.rowCount} rows` : '';
+      pushMessage({ role: 'system', content: `Done — shared ${res.format.toUpperCase()}${extra}.` });
+    } catch (e) {
+      pushMessage({ role: 'assistant', content: `Conversion failed: ${e.message || e}` });
+    }
+  }, [pushMessage]);
 
   const doExport = useCallback(async (fmt) => {
     try {
