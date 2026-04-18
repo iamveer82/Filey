@@ -15,7 +15,7 @@ const VALID_PREFIXES = ['100', '200', '300', '400', '500'];
 
 export function isTrnFormatValid(trn) {
   if (!trn) return false;
-  const clean = String(trn).replace(/\s+/g, '');
+  const clean = String(trn).replace(/[\s-]+/g, '');
   if (!/^\d{15}$/.test(clean)) return false;
   if (!VALID_PREFIXES.includes(clean.slice(0, 3))) return false;
   return true;
@@ -24,7 +24,7 @@ export function isTrnFormatValid(trn) {
 /** Luhn-style checksum across 14 digits, last digit = check. */
 export function isTrnChecksumValid(trn) {
   if (!isTrnFormatValid(trn)) return false;
-  const clean = String(trn).replace(/\s+/g, '');
+  const clean = String(trn).replace(/[\s-]+/g, '');
   const digits = clean.split('').map(Number);
   const check = digits[14];
   let sum = 0;
@@ -41,7 +41,7 @@ export function isTrnChecksumValid(trn) {
 
 export function validateTrn(trn) {
   if (!trn) return { valid: false, reason: 'empty' };
-  const clean = String(trn).replace(/\s+/g, '');
+  const clean = String(trn).replace(/[\s-]+/g, '');
   if (!/^\d{15}$/.test(clean)) {
     return { valid: false, reason: `must be 15 digits (got ${clean.length})` };
   }
