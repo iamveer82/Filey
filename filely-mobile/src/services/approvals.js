@@ -8,6 +8,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../api/client';
+import { resolveApprover, getDeputy, isActive } from './delegation';
 
 const auditKey = (orgId) => `@filey/approvals_audit_${orgId || 'default'}`;
 
@@ -40,6 +41,7 @@ export async function approve(tx, actor) {
     actorName: actor.submitterName || 'manager',
     action: 'approve',
     reason: '',
+    onBehalfOf: actor.onBehalfOf || null,
     ts: Date.now(),
   };
   try {
@@ -56,6 +58,7 @@ export async function reject(tx, actor, reason) {
     actorName: actor.submitterName || 'manager',
     action: 'reject',
     reason: reason || '',
+    onBehalfOf: actor.onBehalfOf || null,
     ts: Date.now(),
   };
   try {
@@ -70,3 +73,22 @@ export async function bulkApprove(txList, actor) {
   for (const tx of txList) entries.push(await approve(tx, actor));
   return entries;
 }
+
+/**
+ * Approve on behalf of a manager — checks active deputy delegation.
+ * If actor IS the active deputy for manager, stamps `onBehalfOf: managerId`.
+ * Returns null if actor is not authorised.
+ */
+export async function approveAsDeputy(tx, actor, managerId) {
+  const deputy = await getDeputy(managerId);
+  if (!isActive(deputy) || deputy.deputyId !== actor.userId) return null;
+  return approve(tx, { ...actor, onBehalfOf: managerId });
+}
+
+export async function rejectAsDeputy(tx, actor, managerId, reason) {
+  const deputy = await getDeputy(managerId);
+  if (!isActive(deputy) || deputy.deputyId !== actor.userId) return null;
+  return reject(tx, { ...actor, onBehalfOf: managerId }, reason);
+}
+
+export { resolveApprover };

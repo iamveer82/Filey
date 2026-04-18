@@ -2,7 +2,7 @@
  * Inline transaction editor — edit extracted fields before saving to vault.
  * Used inside AIMessagingHub chat bubbles (dark theme).
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -11,6 +11,7 @@ import Animated, {
 import { CATEGORIES, categoryById } from '../services/categories';
 import { validateTrn } from '../services/trnValidator';
 import { RECLAIM_PERCENT, RECLAIM_REASON, reclaimableVat } from '../services/vatRules';
+import { listProjects } from '../services/projects';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -30,7 +31,7 @@ function Tap({ onPress, style, children, disabled }) {
   );
 }
 
-export default function TransactionEditor({ transaction, imageUri, submitterName, onSave, onCancel, compact = false }) {
+export default function TransactionEditor({ transaction, imageUri, submitterName, orgId, onSave, onCancel, compact = false }) {
   const [showImage, setShowImage] = useState(false);
   const [tx, setTx] = useState({
     merchant: transaction?.merchant || '',
@@ -41,8 +42,16 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
     category: transaction?.category || 'other',
     notes: transaction?.notes || '',
     reclaimPct: transaction?.reclaimPct,
+    projectId: transaction?.projectId || null,
   });
   const [saving, setSaving] = useState(false);
+  const [projects, setProjects] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    listProjects(orgId).then(p => { if (alive) setProjects(p); });
+    return () => { alive = false; };
+  }, [orgId]);
 
   const activeCat = useMemo(() => categoryById(tx.category), [tx.category]);
   const trnCheck = useMemo(() => tx.trn ? validateTrn(tx.trn) : null, [tx.trn]);
@@ -217,6 +226,39 @@ export default function TransactionEditor({ transaction, imageUri, submitterName
           );
         })}
       </ScrollView>
+
+      {projects.length > 0 && (
+        <>
+          <Text style={[s.label, { marginTop: 4 }]}>PROJECT / CLIENT</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catRow}>
+            <Tap
+              onPress={() => set('projectId', null)}
+              style={[s.catChip, {
+                backgroundColor: !tx.projectId ? '#64748B' : '#1F1F1F',
+                borderColor: !tx.projectId ? '#64748B' : '#2A2A2A',
+              }]}
+            >
+              <Text style={[s.catLabel, { color: !tx.projectId ? '#fff' : '#9CA3AF' }]}>None</Text>
+            </Tap>
+            {projects.map(p => {
+              const active = tx.projectId === p.id;
+              return (
+                <Tap
+                  key={p.id}
+                  onPress={() => set('projectId', p.id)}
+                  style={[s.catChip, {
+                    backgroundColor: active ? p.color : '#1F1F1F',
+                    borderColor: active ? p.color : '#2A2A2A',
+                  }]}
+                >
+                  <Ionicons name="folder" size={12} color={active ? '#fff' : p.color} />
+                  <Text style={[s.catLabel, { color: active ? '#fff' : '#E5E7EB' }]}>{p.name}</Text>
+                </Tap>
+              );
+            })}
+          </ScrollView>
+        </>
+      )}
 
       {!compact && (
         <View style={s.field}>
