@@ -66,6 +66,8 @@ export function detectAnomaly(tx, memberHistory = []) {
     const amt = parseFloat(tx.amount) || 0;
     if (sd > 0 && amt > mean + 3 * sd) {
       reasons.push(`${amt.toFixed(0)} AED is ${((amt - mean) / sd).toFixed(1)}σ above your ${categoryById(tx.category).label} mean (${mean.toFixed(0)})`);
+    } else if (sd === 0 && mean > 0 && amt > mean * 2) {
+      reasons.push(`${amt.toFixed(0)} AED is ${(amt / mean).toFixed(1)}× your usual ${categoryById(tx.category).label} (${mean.toFixed(0)})`);
     }
     if (sd > 0 && amt > mean * 2 && amt - mean > 200) {
       // looser fallback if 3σ not triggered
@@ -75,7 +77,7 @@ export function detectAnomaly(tx, memberHistory = []) {
     }
   }
 
-  const severity = reasons.length === 0 ? 'none' : reasons.some(r => /σ|new/.test(r)) ? 'warn' : 'info';
+  const severity = reasons.length === 0 ? 'none' : reasons.some(r => /σ|new|×|usual/.test(r)) ? 'warn' : 'info';
   return { anomaly: reasons.length > 0, reasons, severity };
 }
 
