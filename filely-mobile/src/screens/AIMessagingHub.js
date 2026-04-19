@@ -44,7 +44,23 @@ import {
 import { TOOL_SCHEMAS, toAnthropicTools, runTool, normalizeToolCalls } from '../services/aiTools';
 
 const MAX_MEMORY = 40;
-const TOOL_INTENT_RE = /\b(export|download|email).*(csv|pdf|ledger|report)\b|\b(show|open|display).*(vat|summary|reclaim)\b|\b(find|search|look up|list).*(receipt|transaction|expense|project|deputy|nudge|anomaly)\b|\b(save|add|log|record).*(receipt|tx|transaction|to vault|movement)\b|\b(paid|received|sent|got|transferred|owe|bought|spent)\b.*\b\d/i;
+function parseMovementsFallback(text) {
+  const out = [];
+  const clauses = text.split(/\s+and\s+|,\s*/i);
+  for (const clause of clauses) {
+    const mOut = clause.match(/\b(paid|sent|gave|transferred|owe|spent)\b\s*([0-9][0-9,\.]*)\s*(?:aed|dhs|dirhams?|rs|rupees?|inr|usd|\$)?\s*(?:to\s+)?([A-Za-z][\w\s]{0,30})?/i);
+    const mIn = clause.match(/\b(received|got|collected)\b\s*([0-9][0-9,\.]*)\s*(?:aed|dhs|dirhams?|rs|rupees?|inr|usd|\$)?\s*(?:from\s+)?([A-Za-z][\w\s]{0,30})?/i);
+    const pick = mOut ? { m: mOut, dir: 'out' } : mIn ? { m: mIn, dir: 'in' } : null;
+    if (!pick) continue;
+    const amount = parseFloat(pick.m[2].replace(/,/g, ''));
+    if (!amount) continue;
+    const counterparty = (pick.m[3] || 'Unknown').trim().replace(/\s+(and|,).*$/i, '');
+    out.push({ direction: pick.dir, amount, counterparty: counterparty || 'Unknown' });
+  }
+  return out;
+}
+
+const TOOL_INTENT_RE =/\b(export|download|email).*(csv|pdf|ledger|report)\b|\b(show|open|display).*(vat|summary|reclaim)\b|\b(find|search|look up|list).*(receipt|transaction|expense|project|deputy|nudge|anomaly)\b|\b(save|add|log|record).*(receipt|tx|transaction|to vault|movement)\b|\b(paid|received|sent|got|transferred|owe|bought|spent)\b.*\b\d/i;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -280,6 +296,7 @@ HARD RULES:
 - received/got X from Y → log_money_movement(direction:"in", amount:X, counterparty:"Y")
 - Multiple in one sentence → multiple parallel tool calls. Never ask user to clarify.
 - Missing counterparty → use "Unknown". Missing amount → ask ONLY then.
+- Amount is always the GROSS total (VAT-inclusive). Do not split or subtract VAT.
 - Never ask about VAT, category, date, currency, notes. Defaults are fine.
 - save_transaction (VAT receipt flow) ONLY when user says "receipt" or "invoice".
 - Reply ≤10 words after tool runs. Format: "Logged: -15,000 to Ravi, +10,000 from Veer."`,
@@ -292,7 +309,19 @@ HARD RULES:
       const calls = normalizeToolCalls(first.toolCalls, provider);
 
       if (!calls.length) {
-        // Fallback to plain assistant reply
+        // Regex fallback — provider/model didn't call tools. Parse message directly.
+        const parsed = parseMovementsFallback(text);
+        if (parsed.length) {
+          const { addTx: addLedgerTx } = require('../services/localLedger');
+          for (const m of parsed) {
+            pushMessage({ role: 'system', content: `⚙ log_money_movement (auto)…` });
+            await addLedgerTx(m);
+          }
+          try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+          const summary = parsed.map(m => `${m.direction === 'in' ? '+' : '-'}${m.amount.toLocaleString()} ${m.direction === 'in' ? 'from' : 'to'} ${m.counterparty}`).join(', ');
+          pushMessage({ role: 'assistant', content: `Logged: ${summary}.` });
+          return;
+        }
         pushMessage({ role: 'assistant', content: first.text || '…', meta: first.meta });
         return;
       }
