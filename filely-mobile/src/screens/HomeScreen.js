@@ -32,8 +32,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Modal, Switch } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { listTx as listLedgerTx, LEDGER_EVENT } from '../services/localLedger';
-import { DeviceEventEmitter } from 'react-native';
+import { listTx as listLedgerTx, LEDGER_EVENT, subscribeLedger } from '../services/localLedger';
+import { DeviceEventEmitter, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -493,18 +493,30 @@ export default function HomeScreen({ navigation, darkMode = true }) {
   const [showFilter, setShowFilter] = useState(false);
   const [filter, setFilter] = useState({ period: 'all', minAmount: '', maxAmount: '' });
 
-  const reloadLedger = async () => {
-    try { setLedger(await listLedgerTx({ limit: 100 })); } catch {}
-  };
+  const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(useCallback(() => { reloadLedger(); }, []));
+  const reloadLedger = useCallback(async () => {
+    try {
+      const next = await listLedgerTx({ limit: 100 });
+      setLedger(next);
+    } catch {}
+  }, []);
+
+  useFocusEffect(useCallback(() => { reloadLedger(); }, [reloadLedger]));
 
   useEffect(() => {
     reloadLedger();
+    const unsub = subscribeLedger(() => { reloadLedger(); });
     const sub = DeviceEventEmitter.addListener(LEDGER_EVENT, () => { reloadLedger(); });
-    const poll = setInterval(reloadLedger, 2000);
-    return () => { sub.remove(); clearInterval(poll); };
-  }, []);
+    const poll = setInterval(reloadLedger, 1500);
+    return () => { unsub(); sub.remove(); clearInterval(poll); };
+  }, [reloadLedger]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reloadLedger();
+    setRefreshing(false);
+  }, [reloadLedger]);
 
   const filteredLedger = useMemo(() => {
     const now = new Date();
@@ -564,6 +576,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
         stickyHeaderIndices={[]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
       >
         {/* Blue hero */}
         <View style={styles.hero}>

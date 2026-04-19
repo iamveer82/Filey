@@ -10,6 +10,16 @@ import { DeviceEventEmitter } from 'react-native';
 const KEY = '@filey/ledger_v1';
 export const LEDGER_EVENT = 'filey/ledger_changed';
 
+const subscribers = new Set();
+export function subscribeLedger(cb) {
+  subscribers.add(cb);
+  return () => subscribers.delete(cb);
+}
+function notify(payload) {
+  for (const cb of subscribers) { try { cb(payload); } catch {} }
+  try { DeviceEventEmitter.emit(LEDGER_EVENT, payload); } catch {}
+}
+
 export async function listTx(filter = {}) {
   try {
     const raw = await AsyncStorage.getItem(KEY);
@@ -40,17 +50,17 @@ export async function addTx({ direction, amount, counterparty, note, category, d
   const cur = await listTx();
   const next = [entry, ...cur].slice(0, 500);
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
-  DeviceEventEmitter.emit(LEDGER_EVENT, { action: 'add', entry });
+  notify({ action: 'add', entry });
   return entry;
 }
 
 export async function removeTx(id) {
   const cur = await listTx();
   await AsyncStorage.setItem(KEY, JSON.stringify(cur.filter(t => t.id !== id)));
-  DeviceEventEmitter.emit(LEDGER_EVENT, { action: 'remove', id });
+  notify({ action: 'remove', id });
 }
 
 export async function clearAll() {
   await AsyncStorage.removeItem(KEY);
-  DeviceEventEmitter.emit(LEDGER_EVENT, { action: 'clear' });
+  notify({ action: 'clear' });
 }
