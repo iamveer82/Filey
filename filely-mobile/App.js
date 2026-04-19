@@ -156,6 +156,7 @@ function AnimatedTabIcon({ routeName, focused, darkMode }) {
           name={iconName}
           size={focused ? 22 : 24}
           color={focused ? '#FFFFFF' : inactiveColor}
+          style={routeName === 'Clip' ? { transform: [{ scaleX: -1 }] } : undefined}
         />
       </Animated.View>
     </View>
