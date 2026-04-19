@@ -6,6 +6,8 @@
  * Storage: @filey/tx_versions_<txId> = [{ts, actorId, actorName, before, after, reason}]
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sync } from './cloudSync';
+import { db } from '../lib/supabase';
 
 const key = (txId) => `@filey/tx_versions_${txId}`;
 
@@ -28,6 +30,11 @@ export async function seedVersion(txId, { ocrText, imageUri, parsed, actorId, ac
     snapshot: parsed,
   };
   await AsyncStorage.setItem(key(txId), JSON.stringify([entry]));
+  sync(() => db.appendTxVersion({
+    tx_id: txId, actor_id: actorId || null, actor_name: actorName || null,
+    action: 'create', ocr_text: ocrText || null, image_uri: imageUri || null,
+    snapshot: parsed || {}, ts: new Date(entry.ts).toISOString(),
+  }));
 }
 
 /** Append an edit version. Stores diff + new snapshot. */
@@ -47,6 +54,11 @@ export async function appendVersion(txId, { before, after, actorId, actorName, r
     snapshot: after,
   });
   await AsyncStorage.setItem(key(txId), JSON.stringify(list.slice(-50)));
+  sync(() => db.appendTxVersion({
+    tx_id: txId, actor_id: actorId || null, actor_name: actorName || null,
+    action: 'edit', reason: reason || null, diff, snapshot: after || {},
+    ts: new Date().toISOString(),
+  }));
 }
 
 export async function getVersions(txId) {

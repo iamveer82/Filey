@@ -10,6 +10,8 @@
  */
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
+import { sync } from './cloudSync';
+import { supabase, db } from '../lib/supabase';
 
 const SECRET_KEY = 'filey.share.secret';
 const SHARE_BASE = 'https://filey.app/share/';
@@ -57,12 +59,19 @@ export async function createShareLink({ orgId, from, to, ttlDays = 30, scopes = 
   const secret = await getSecret();
   const sig = await hmac(json, secret);
   const token = b64url(`${json}.${sig}`);
-  return {
-    url: `${SHARE_BASE}${token}`,
-    token,
-    expiresAt: new Date(exp).toISOString(),
-    scopes,
-  };
+  const expiresAt = new Date(exp).toISOString();
+  sync(async () => {
+    const { data } = await supabase.auth.getUser();
+    await db.createShareLink({
+      org_id: orgId,
+      created_by: data?.user?.id || null,
+      token,
+      from_date: from || null,
+      to_date: to || null,
+      expires_at: expiresAt,
+    });
+  });
+  return { url: `${SHARE_BASE}${token}`, token, expiresAt, scopes };
 }
 
 export async function verifyLink(token) {

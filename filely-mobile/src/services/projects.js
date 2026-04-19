@@ -5,6 +5,8 @@
  * Storage: @filey/projects_<orgId> = [{id, name, client, color, archived}]
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sync } from './cloudSync';
+import { db } from '../lib/supabase';
 
 const key = (orgId) => `@filey/projects_${orgId || 'default'}`;
 
@@ -26,6 +28,10 @@ export async function addProject(orgId, { name, client }) {
   const entry = { id, name, client: client || null, color, archived: false, createdAt: Date.now() };
   list.push(entry);
   await AsyncStorage.setItem(key(orgId), JSON.stringify(list));
+  sync(() => db.upsertProject({
+    id: entry.id, org_id: orgId, name: entry.name,
+    client: entry.client, color: entry.color, archived: false,
+  }));
   return entry;
 }
 
@@ -34,6 +40,7 @@ export async function archiveProject(orgId, projectId) {
   const list = raw ? JSON.parse(raw) : [];
   const next = list.map(p => p.id === projectId ? { ...p, archived: true } : p);
   await AsyncStorage.setItem(key(orgId), JSON.stringify(next));
+  sync(() => db.archiveProject(projectId));
 }
 
 export async function projectById(orgId, projectId) {

@@ -8,6 +8,8 @@
  *   @filey/referral_credits   = { premiumUntil: ISO }
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sync } from './cloudSync';
+import { supabase, db } from '../lib/supabase';
 
 const CODE_KEY = '@filey/my_referral_code';
 const REDEEMED_KEY = '@filey/referral_redeemed';
@@ -27,6 +29,10 @@ export async function getMyCode(userId) {
   } catch {}
   const code = makeCode(userId);
   try { await AsyncStorage.setItem(CODE_KEY, code); } catch {}
+  sync(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user?.id) await db.saveReferralCode(data.user.id, code);
+  });
   return code;
 }
 
@@ -47,6 +53,10 @@ export async function grantYearOfPremium() {
   until.setFullYear(until.getFullYear() + 1);
   const entry = { premiumUntil: until.toISOString() };
   await AsyncStorage.setItem(CREDITS_KEY, JSON.stringify(entry));
+  sync(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user?.id) await db.upsertPremiumCredits(data.user.id, entry.premiumUntil);
+  });
   return entry;
 }
 
@@ -80,5 +90,9 @@ export async function redeemCode(code) {
   const granted = await grantYearOfPremium();
   list.push({ code, at: Date.now(), grantedUntil: granted.premiumUntil });
   await AsyncStorage.setItem(REDEEMED_KEY, JSON.stringify(list));
+  sync(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user?.id) await db.recordRedemption(data.user.id, code, granted.premiumUntil);
+  });
   return { ok: true, grantedUntil: granted.premiumUntil };
 }

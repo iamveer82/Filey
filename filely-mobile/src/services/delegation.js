@@ -6,6 +6,8 @@
  * Storage: @filey/deputy_<managerId> = {deputyId, deputyName, start, end, note}
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sync } from './cloudSync';
+import { db } from '../lib/supabase';
 
 const key = (managerId) => `@filey/deputy_${managerId}`;
 
@@ -13,11 +15,16 @@ export async function setDeputy(managerId, { deputyId, deputyName, start, end, n
   if (!managerId || !deputyId) throw new Error('managerId + deputyId required');
   const entry = { deputyId, deputyName, start, end, note: note || null, setAt: Date.now() };
   await AsyncStorage.setItem(key(managerId), JSON.stringify(entry));
+  sync(() => db.setDeputy({
+    manager_id: managerId, deputy_id: deputyId, deputy_name: deputyName,
+    start_date: start || null, end_date: end || null, note: note || null,
+  }));
   return entry;
 }
 
 export async function clearDeputy(managerId) {
   await AsyncStorage.removeItem(key(managerId));
+  sync(() => db.clearDeputy(managerId));
 }
 
 export async function getDeputy(managerId) {
