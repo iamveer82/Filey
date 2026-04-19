@@ -15,6 +15,7 @@ import { detectAnomaly, suggestFollowups } from './aiInsights';
 import { computeNudges } from './nudges';
 import { reclaimableVat, splitReclaim } from './vatRules';
 import { exportPeppolBatch } from './eInvoiceExport';
+import { addTx as addLedgerTx, listTx as listLedgerTx } from './localLedger';
 
 export const TOOL_SCHEMAS = [
   {
@@ -217,6 +218,41 @@ export const TOOL_SCHEMAS = [
   {
     type: 'function',
     function: {
+      name: 'log_money_movement',
+      description: 'Record a simple paid/received transaction on the home ledger (not a receipt). Use for statements like "I paid 15000 to Ravi" or "received 10000 from Veer".',
+      parameters: {
+        type: 'object',
+        properties: {
+          direction: { type: 'string', enum: ['in', 'out'], description: 'in = received, out = paid' },
+          amount: { type: 'number' },
+          counterparty: { type: 'string', description: 'Person or merchant name' },
+          note: { type: 'string' },
+          category: { type: 'string' },
+          date: { type: 'string', description: 'YYYY-MM-DD; defaults to today' },
+        },
+        required: ['direction', 'amount', 'counterparty'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_money_movements',
+      description: 'Read home-screen transactions with optional filters.',
+      parameters: {
+        type: 'object',
+        properties: {
+          dateFrom: { type: 'string' }, dateTo: { type: 'string' },
+          minAmount: { type: 'number' }, maxAmount: { type: 'number' },
+          direction: { type: 'string', enum: ['in', 'out'] },
+          limit: { type: 'number' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'list_categories',
       description: 'List all expense categories with FTA reclaim percentages.',
       parameters: { type: 'object', properties: {} },
@@ -378,6 +414,24 @@ export async function runTool(name, args, ctx = {}) {
         const list = await apiClient.getTransactions({});
         const rows = Array.isArray(list) ? list : list?.transactions || [];
         return { ok: true, result: splitReclaim(rows) };
+      }
+
+      case 'log_money_movement': {
+        const entry = await addLedgerTx({
+          direction: args.direction, amount: args.amount,
+          counterparty: args.counterparty, note: args.note,
+          category: args.category, date: args.date,
+        });
+        return { ok: true, result: entry, side: { type: 'ledger_added', entry } };
+      }
+
+      case 'list_money_movements': {
+        const list = await listLedgerTx({
+          dateFrom: args.dateFrom, dateTo: args.dateTo,
+          minAmount: args.minAmount, maxAmount: args.maxAmount,
+          direction: args.direction, limit: args.limit || 50,
+        });
+        return { ok: true, result: { count: list.length, items: list } };
       }
 
       case 'list_categories': {

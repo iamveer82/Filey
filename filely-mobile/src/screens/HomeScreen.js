@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Modal, Switch } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { listTx as listLedgerTx } from '../services/localLedger';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -485,6 +487,37 @@ export default function HomeScreen({ navigation, darkMode = true }) {
   const [active, setActive] = useState('Dashboard');
   const [metricIds, setMetricIds] = useState(DEFAULT_METRIC_IDS);
   const [showCustomize, setShowCustomize] = useState(false);
+  const [ledger, setLedger] = useState([]);
+  const [txSearch, setTxSearch] = useState('');
+  const [showFilter, setShowFilter] = useState(false);
+  const [filter, setFilter] = useState({ period: 'all', minAmount: '', maxAmount: '' });
+
+  const reloadLedger = async () => {
+    try { setLedger(await listLedgerTx({ limit: 100 })); } catch {}
+  };
+
+  useFocusEffect(useCallback(() => { reloadLedger(); }, []));
+
+  const filteredLedger = useMemo(() => {
+    const now = new Date();
+    const periodMap = {
+      today: new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(),
+      week:  now.getTime() - 7 * 86400000,
+      month: now.getTime() - 30 * 86400000,
+      year:  now.getTime() - 365 * 86400000,
+    };
+    const cutoff = periodMap[filter.period];
+    const min = parseFloat(filter.minAmount) || 0;
+    const max = parseFloat(filter.maxAmount) || Infinity;
+    const q = txSearch.trim().toLowerCase();
+    return ledger.filter(t => {
+      if (cutoff && (t.ts || 0) < cutoff) return false;
+      const amt = Math.abs(+t.amount) || 0;
+      if (amt < min || amt > max) return false;
+      if (q && !((t.counterparty || '').toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [ledger, filter, txSearch]);
 
   useEffect(() => {
     (async () => {
@@ -671,35 +704,45 @@ export default function HomeScreen({ navigation, darkMode = true }) {
 
               <Animated.View entering={FadeInUp.delay(200).duration(400)}>
                 <View style={[styles.sectionHeader, { marginTop: 22 }]}>
-                  <Text style={styles.sectionTitle}>Current Activity</Text>
+                  <Text style={styles.sectionTitle}>Transactions</Text>
                 </View>
                 <View style={styles.searchRow}>
                   <View style={styles.searchInputWrap}>
                     <Ionicons name="search-outline" size={16} color="rgba(11,20,53,0.48)" />
                     <TextInput
+                      value={txSearch}
+                      onChangeText={setTxSearch}
                       placeholder="Search transactions"
                       placeholderTextColor="rgba(11,20,53,0.48)"
                       style={styles.searchInput}
                     />
                   </View>
-                  <Pressable style={styles.filterBtn} hitSlop={8}>
+                  <Pressable style={styles.filterBtn} hitSlop={8} onPress={() => setShowFilter(true)} accessibilityRole="button" accessibilityLabel="Filter transactions">
                     <Ionicons name="options-outline" size={18} color="#FFFFFF" />
                   </Pressable>
                 </View>
 
-                {ACTIVITY.map((a) => {
-                  const isIn = a.type === 'in';
+                {filteredLedger.length === 0 && (
+                  <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                    <Text style={{ color: 'rgba(11,20,53,0.48)', fontSize: 13 }}>
+                      No transactions yet. Ask Filey AI "I paid 500 AED to Ravi" to log one.
+                    </Text>
+                  </View>
+                )}
+
+                {filteredLedger.map((a) => {
+                  const isIn = a.direction === 'in';
                   return (
                     <View key={a.id} style={styles.activityRow}>
                       <View style={[styles.activityIcon, { backgroundColor: isIn ? 'rgba(34,197,94,0.14)' : 'rgba(255,84,112,0.14)' }]}>
-                        <Ionicons name={a.icon} size={18} color={isIn ? '#22C55E' : '#FF5470'} />
+                        <Ionicons name={isIn ? 'arrow-down-outline' : 'arrow-up-outline'} size={18} color={isIn ? '#22C55E' : '#FF5470'} />
                       </View>
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.activityName}>{a.name}</Text>
-                        <Text style={styles.activitySub}>{a.subtitle}</Text>
+                        <Text style={styles.activityName}>{a.counterparty}</Text>
+                        <Text style={styles.activitySub}>{a.note || a.category || a.date}</Text>
                       </View>
                       <Text style={[styles.activityAmt, { color: isIn ? '#22C55E' : '#FF5470' }]}>
-                        {isIn ? '+' : '-'}${Math.abs(a.amount)}
+                        {isIn ? '+' : '-'}{Math.abs(+a.amount).toLocaleString()}
                       </Text>
                     </View>
                   );
@@ -796,9 +839,90 @@ export default function HomeScreen({ navigation, darkMode = true }) {
         ids={metricIds}
         setIds={persistMetrics}
       />
+
+      <Modal visible={showFilter} transparent animationType="slide" onRequestClose={() => setShowFilter(false)}>
+        <Pressable style={filterStyles.backdrop} onPress={() => setShowFilter(false)}>
+          <Pressable style={filterStyles.sheet} onPress={() => {}}>
+            <View style={filterStyles.handle} />
+            <Text style={filterStyles.title}>Filter transactions</Text>
+
+            <Text style={filterStyles.label}>TIME PERIOD</Text>
+            <View style={filterStyles.chipRow}>
+              {[
+                { k: 'all', l: 'All time' },
+                { k: 'today', l: 'Today' },
+                { k: 'week', l: '7 days' },
+                { k: 'month', l: '30 days' },
+                { k: 'year', l: '1 year' },
+              ].map(o => {
+                const on = filter.period === o.k;
+                return (
+                  <Pressable
+                    key={o.k}
+                    onPress={() => setFilter(f => ({ ...f, period: o.k }))}
+                    style={[filterStyles.chip, on && filterStyles.chipOn]}
+                  >
+                    <Text style={[filterStyles.chipText, on && filterStyles.chipTextOn]}>{o.l}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={filterStyles.label}>AMOUNT RANGE</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                value={filter.minAmount}
+                onChangeText={(v) => setFilter(f => ({ ...f, minAmount: v.replace(/[^0-9.]/g, '') }))}
+                placeholder="Min"
+                placeholderTextColor="rgba(11,20,53,0.4)"
+                keyboardType="numeric"
+                style={filterStyles.input}
+              />
+              <TextInput
+                value={filter.maxAmount}
+                onChangeText={(v) => setFilter(f => ({ ...f, maxAmount: v.replace(/[^0-9.]/g, '') }))}
+                placeholder="Max"
+                placeholderTextColor="rgba(11,20,53,0.4)"
+                keyboardType="numeric"
+                style={filterStyles.input}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+              <Pressable
+                onPress={() => { setFilter({ period: 'all', minAmount: '', maxAmount: '' }); }}
+                style={filterStyles.resetBtn}
+              >
+                <Text style={filterStyles.resetText}>Reset</Text>
+              </Pressable>
+              <Pressable onPress={() => setShowFilter(false)} style={filterStyles.applyBtn}>
+                <Text style={filterStyles.applyText}>Apply</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
+
+const filterStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
+  handle: { alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(11,20,53,0.15)', marginBottom: 14 },
+  title: { fontSize: 18, fontWeight: '700', color: '#0B1435', marginBottom: 18 },
+  label: { fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)', backgroundColor: '#F7F8FB' },
+  chipOn: { backgroundColor: '#3B6BFF', borderColor: '#3B6BFF' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#0B1435' },
+  chipTextOn: { color: '#FFFFFF' },
+  input: { flex: 1, borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#0B1435', backgroundColor: '#F7F8FB' },
+  resetBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#F0F2F8' },
+  resetText: { color: '#0B1435', fontWeight: '700', fontSize: 14 },
+  applyBtn: { flex: 2, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#3B6BFF' },
+  applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+});
 
 const HERO_H = 340;
 
@@ -1180,7 +1304,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     backgroundColor: '#F3F6FC',
-    borderRadius: 12,
+    borderRadius: 22,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1196,7 +1320,7 @@ const styles = StyleSheet.create({
   filterBtn: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 22,
     backgroundColor: '#3B6BFF',
     alignItems: 'center',
     justifyContent: 'center',
