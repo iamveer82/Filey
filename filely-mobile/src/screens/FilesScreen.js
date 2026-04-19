@@ -161,7 +161,7 @@ export default function FilesScreen({ darkMode }) {
                 <TouchableOpacity
                   key={cat}
                   onPress={() => setEditCat(cat)}
-                  style={[styles.catChip, { backgroundColor: editCat === cat ? '#3B6BFF' : c.surfaceLow, borderColor: editCat === cat ? '#2E5BFF' : c.border }]}
+                  style={[styles.catChip, { backgroundColor: editCat === cat ? '#2A63E2' : c.surfaceLow, borderColor: editCat === cat ? '#2E5BFF' : c.border }]}
                 >
                   <Text style={{ color: editCat === cat ? '#003516' : c.textSecondary, fontSize: 11, fontWeight: '700' }}>{cat}</Text>
                 </TouchableOpacity>
@@ -180,7 +180,7 @@ export default function FilesScreen({ darkMode }) {
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
             <View style={[styles.txnIcon, { backgroundColor: 'rgba(59,107,255,0.12)' }]}>
-              <Ionicons name={icon} size={20} color="#3B6BFF" />
+              <Ionicons name={icon} size={20} color="#2A63E2" />
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -202,7 +202,7 @@ export default function FilesScreen({ darkMode }) {
                 -{parseFloat(file.amount || 0).toLocaleString('en-AE', { minimumFractionDigits: 2 })} AED
               </Text>
               {parseFloat(file.vat) > 0 && (
-                <Text style={[styles.txnVat, { color: '#3B6BFF' }]}>VAT {parseFloat(file.vat).toFixed(2)}</Text>
+                <Text style={[styles.txnVat, { color: '#2A63E2' }]}>VAT {parseFloat(file.vat).toFixed(2)}</Text>
               )}
             </View>
             <TouchableOpacity
@@ -277,7 +277,7 @@ export default function FilesScreen({ darkMode }) {
           <TouchableOpacity
             key={tab.id}
             onPress={() => setActiveTab(tab.id)}
-            style={[styles.tab, { backgroundColor: activeTab === tab.id ? '#3B6BFF' : c.surfaceLow, borderColor: activeTab === tab.id ? '#2E5BFF' : c.border }]}
+            style={[styles.tab, { backgroundColor: activeTab === tab.id ? '#2A63E2' : c.surfaceLow, borderColor: activeTab === tab.id ? '#2E5BFF' : c.border }]}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === tab.id }}
           >
@@ -292,7 +292,7 @@ export default function FilesScreen({ darkMode }) {
           <TouchableOpacity
             key={cat}
             onPress={() => setFilter(cat)}
-            style={[styles.filterChip, { backgroundColor: filter === cat ? '#3B6BFF' : c.surfaceLow, borderColor: filter === cat ? '#2563EB' : c.border }]}
+            style={[styles.filterChip, { backgroundColor: filter === cat ? '#2A63E2' : c.surfaceLow, borderColor: filter === cat ? '#2563EB' : c.border }]}
             accessibilityRole="button"
             accessibilityState={{ selected: filter === cat }}
           >
@@ -310,7 +310,7 @@ export default function FilesScreen({ darkMode }) {
         <View style={[styles.summaryDivider, { backgroundColor: c.border }]} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryLabel, { color: c.textMuted }]}>VAT 5%</Text>
-          <Text style={[styles.summaryValue, { color: '#3B6BFF' }]}>{totalVat.toLocaleString('en-AE', { minimumFractionDigits: 2 })} AED</Text>
+          <Text style={[styles.summaryValue, { color: '#2A63E2' }]}>{totalVat.toLocaleString('en-AE', { minimumFractionDigits: 2 })} AED</Text>
         </View>
         <View style={[styles.summaryDivider, { backgroundColor: c.border }]} />
         <View style={styles.summaryItem}>
@@ -322,7 +322,7 @@ export default function FilesScreen({ darkMode }) {
       {/* ── List ──────────────────────────────────── */}
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#3B6BFF" />
+          <ActivityIndicator size="large" color="#2A63E2" />
         </View>
       ) : filtered.length === 0 ? (
         <View style={[styles.emptyCard, darkMode ? CardPresets.cardDark : CardPresets.cardLight, { marginHorizontal: Spacing.xxl }]}>
@@ -355,7 +355,7 @@ export default function FilesScreen({ darkMode }) {
 
               {exportData && (
                 <>
-                  <View style={[styles.tableHeader, { backgroundColor: '#3B6BFF' }]}>
+                  <View style={[styles.tableHeader, { backgroundColor: '#2A63E2' }]}>
                     <Text style={[styles.thText, { flex: 1.2 }]}>Date</Text>
                     <Text style={[styles.thText, { flex: 2 }]}>Merchant</Text>
                     <Text style={[styles.thText, { flex: 0.8 }]}>VAT</Text>
@@ -365,14 +365,14 @@ export default function FilesScreen({ darkMode }) {
                     <View key={i} style={[styles.tableRow, { borderColor: c.border }]}>
                       <Text style={[styles.tdText, { flex: 1.2, color: c.textSecondary }]}>{(t.date || '').substring(5)}</Text>
                       <Text style={[styles.tdText, { flex: 2, color: c.text, fontWeight: '700' }]} numberOfLines={1}>{t.merchant}</Text>
-                      <Text style={[styles.tdText, { flex: 0.8, color: '#3B6BFF' }]}>{(t.vat || 0).toFixed(1)}</Text>
+                      <Text style={[styles.tdText, { flex: 0.8, color: '#2A63E2' }]}>{(t.vat || 0).toFixed(1)}</Text>
                       <Text style={[styles.tdText, { flex: 1, color: c.text, textAlign: 'right', fontWeight: '600' }]}>{(t.amount || 0).toLocaleString()}</Text>
                     </View>
                   ))}
                   <View style={[styles.totalSection, { borderColor: c.border }]}>
                     {[
                       { label: 'Subtotal', value: exportData.subtotal },
-                      { label: 'VAT 5%', value: exportData.totalVat, color: '#3B6BFF' },
+                      { label: 'VAT 5%', value: exportData.totalVat, color: '#2A63E2' },
                       { label: 'Grand Total', value: exportData.grandTotal, large: true },
                     ].map(row => (
                       <View key={row.label} style={styles.totalRow}>
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.lg },
   title: { ...Typography.sectionTitle },
   subtitle: { ...Typography.micro, marginTop: 2 },
-  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#3B6BFF', paddingHorizontal: Spacing.lg, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: 'rgba(59,107,255,0.35)' },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#2A63E2', paddingHorizontal: Spacing.lg, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: 1, borderColor: 'rgba(59,107,255,0.35)' },
   exportBtnText: { color: '#003516', ...Typography.btnSmall },
 
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: Spacing.xxl, marginBottom: Spacing.md, borderRadius: Radius.md, borderWidth: 1, paddingHorizontal: Spacing.md, paddingVertical: 12 },
@@ -434,11 +434,11 @@ const styles = StyleSheet.create({
   txnAmount: { ...Typography.bodyBold },
   txnVat: { ...Typography.micro, marginTop: 2 },
   trnBadge: { backgroundColor: 'rgba(59,107,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  trnBadgeText: { fontSize: 9, fontWeight: '800', color: '#3B6BFF', letterSpacing: 0.5 },
+  trnBadgeText: { fontSize: 9, fontWeight: '800', color: '#2A63E2', letterSpacing: 0.5 },
 
   catChip: { paddingHorizontal: Spacing.md, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1 },
   editInput: { borderRadius: Radius.sm, padding: Spacing.md, borderWidth: 1, ...Typography.body },
-  confirmBtn: { flex: 1, backgroundColor: '#3B6BFF', borderRadius: Radius.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(59,107,255,0.35)' },
+  confirmBtn: { flex: 1, backgroundColor: '#2A63E2', borderRadius: Radius.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(59,107,255,0.35)' },
   confirmBtnText: { color: '#003516', ...Typography.btnSmall },
   cancelEditBtn: { flex: 1, borderRadius: Radius.md, paddingVertical: 12, borderWidth: 1, alignItems: 'center' },
 

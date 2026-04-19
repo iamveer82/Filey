@@ -71,7 +71,7 @@ export default function ThreadPicker({ visible, activeId, onClose, onPick }) {
                   delayLongPress={300}
                   style={[s.row, active && s.rowActive]}
                 >
-                  <Ionicons name={active ? 'chatbubble' : 'chatbubble-outline'} size={15} color={active ? '#3B6BFF' : '#9CA3AF'} />
+                  <Ionicons name={active ? 'chatbubble' : 'chatbubble-outline'} size={15} color={active ? '#2A63E2' : '#9CA3AF'} />
                   {isEdit ? (
                     <TextInput
                       value={draft}

@@ -208,7 +208,7 @@ const s = StyleSheet.create({
   merchant: { color: '#F9FAFB', fontSize: 14.5, fontWeight: '700' },
   sub: { color: '#9CA3AF', fontSize: 11.5, marginTop: 2 },
   amount: { color: '#F9FAFB', fontSize: 15, fontWeight: '800' },
-  vat: { color: '#3B6BFF', fontSize: 11, fontWeight: '700', marginTop: 1 },
+  vat: { color: '#2A63E2', fontSize: 11, fontWeight: '700', marginTop: 1 },
   notes: { color: '#D1D5DB', fontSize: 12, marginTop: 8, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
   approveBtn: { flex: 1, flexDirection: 'row', gap: 5, alignItems: 'center', justifyContent: 'center', height: 36, borderRadius: 12, backgroundColor: '#F9FAFB' },

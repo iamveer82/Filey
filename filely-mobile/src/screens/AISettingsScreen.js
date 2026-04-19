@@ -345,7 +345,7 @@ export default function AISettingsScreen({ darkMode, onBack }) {
 
 const s = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 40,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,

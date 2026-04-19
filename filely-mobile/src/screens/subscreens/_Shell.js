@@ -42,7 +42,7 @@ export function Card({ c, children, style }) {
 
 export const shellStyles = StyleSheet.create({
   btn: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
-  btnPrimary: { backgroundColor: '#3B6BFF' },
+  btnPrimary: { backgroundColor: '#2A63E2' },
   btnPrimaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   btnGhostText: { fontSize: 13, fontWeight: '700' },
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },

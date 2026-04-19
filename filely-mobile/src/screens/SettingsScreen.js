@@ -221,7 +221,7 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
 
 const s = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 48,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,

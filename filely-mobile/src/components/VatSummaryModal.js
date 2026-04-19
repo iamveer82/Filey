@@ -194,7 +194,7 @@ export default function VatSummaryModal({ visible, onClose }) {
                     </>
                   )}
                 </Tap>
-                <Tap onPress={() => doExport('pdf')} disabled={exporting === 'pdf'} style={[s.exportBtn, { backgroundColor: '#3B6BFF' }]}>
+                <Tap onPress={() => doExport('pdf')} disabled={exporting === 'pdf'} style={[s.exportBtn, { backgroundColor: '#2A63E2' }]}>
                   {exporting === 'pdf' ? <ActivityIndicator color="#FFF" /> : (
                     <>
                       <Ionicons name="document-text-outline" size={16} color="#FFF" />
@@ -216,7 +216,7 @@ export default function VatSummaryModal({ visible, onClose }) {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFF' },
   hero: {
-    backgroundColor: '#3B6BFF', paddingHorizontal: 20, paddingBottom: 22,
+    backgroundColor: '#2A63E2', paddingHorizontal: 20, paddingBottom: 22,
     borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
   },
   topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
@@ -267,7 +267,7 @@ const s = StyleSheet.create({
     borderRadius: 14, backgroundColor: '#F4F6FB',
     borderWidth: 1, borderColor: '#E5E7EB',
   },
-  scopeChipActive: { backgroundColor: '#3B6BFF', borderColor: '#3B6BFF' },
+  scopeChipActive: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
   scopeText: { color: '#6B7280', fontSize: 13, fontWeight: '700' },
   scopeTextActive: { color: '#FFF' },
   memberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 },
@@ -277,7 +277,7 @@ const s = StyleSheet.create({
   },
   memberAvatar: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },

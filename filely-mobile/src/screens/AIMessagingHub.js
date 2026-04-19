@@ -1015,7 +1015,7 @@ HARD RULES:
             <Text style={styles.attachTitle}>Add to chat</Text>
 
             <SpringPressable onPress={() => runScan('camera')} style={styles.attachRow}>
-              <View style={[styles.attachIcon, { backgroundColor: '#3B6BFF' }]}>
+              <View style={[styles.attachIcon, { backgroundColor: '#2A63E2' }]}>
                 <Ionicons name="camera" size={20} color="#FFFFFF" />
               </View>
               <View style={{ flex: 1 }}>
@@ -1079,7 +1079,7 @@ const mdStyles = {
   heading2: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
   heading3: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   link: { color: '#93C5FD' },
-  blockquote: { backgroundColor: '#1F1F1F', borderLeftWidth: 3, borderLeftColor: '#3B6BFF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  blockquote: { backgroundColor: '#1F1F1F', borderLeftWidth: 3, borderLeftColor: '#2A63E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
 };
 
 const styles = StyleSheet.create({
@@ -1182,7 +1182,7 @@ const styles = StyleSheet.create({
   },
   fileIcon: {
     width: 32, height: 32, borderRadius: 10,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     alignItems: 'center', justifyContent: 'center',
   },
   fileName: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '600' },

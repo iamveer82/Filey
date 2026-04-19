@@ -63,7 +63,7 @@ function Avatar({ name, size = 36, isAdmin, stackOffset }) {
       stackOffset ? { marginLeft: -12 } : null,
       isAdmin ? styles.avatarAdmin : styles.avatarMember,
     ]}>
-      <Text style={{ color: isAdmin ? '#3B6BFF' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
+      <Text style={{ color: isAdmin ? '#2A63E2' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
         {letter}
       </Text>
     </View>
@@ -195,8 +195,8 @@ export default function TeamScreen({ darkMode }) {
               style={styles.inviteChip}
               accessibilityLabel="Invite member"
             >
-              <Ionicons name="person-add" size={14} color="#3B6BFF" />
-              <Text style={{ color: '#3B6BFF', fontWeight: '700', fontSize: 12.5 }}>Invite</Text>
+              <Ionicons name="person-add" size={14} color="#2A63E2" />
+              <Text style={{ color: '#2A63E2', fontWeight: '700', fontSize: 12.5 }}>Invite</Text>
             </SpringPressable>
           </View>
 
@@ -225,7 +225,7 @@ export default function TeamScreen({ darkMode }) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: tab === v }}
               >
-                <Text style={[styles.pillText, { color: tab === v ? '#3B6BFF' : '#FFFFFF' }]}>{l}</Text>
+                <Text style={[styles.pillText, { color: tab === v ? '#2A63E2' : '#FFFFFF' }]}>{l}</Text>
               </SpringPressable>
             ))}
           </View>
@@ -415,7 +415,7 @@ export default function TeamScreen({ darkMode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 40,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   avatarStack: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#3B6BFF',
+    borderWidth: 2, borderColor: '#2A63E2',
   },
   avatarAdmin: { backgroundColor: '#FFFFFF' },
   avatarMember: { backgroundColor: 'rgba(255,255,255,0.2)' },
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#3B6BFF',
+    borderWidth: 2, borderColor: '#2A63E2',
   },
   pulseWrap: { width: 10, height: 10, alignItems: 'center', justifyContent: 'center' },
   pulseRing: {

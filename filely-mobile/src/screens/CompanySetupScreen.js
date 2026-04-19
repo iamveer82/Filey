@@ -155,7 +155,7 @@ export default function CompanySetupScreen({ darkMode, onComplete }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 48,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 28,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, height: 56, borderRadius: 28,
-    shadowColor: '#3B6BFF', shadowOpacity: 0.3, shadowRadius: 16,
+    shadowColor: '#2A63E2', shadowOpacity: 0.3, shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 }, elevation: 6,
   },
   submitText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },

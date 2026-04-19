@@ -714,7 +714,7 @@ export default function ChatScreen({ darkMode }) {
                       },
                     ]}
                   >
-                    <Ionicons name="sparkles" size={16} color={darkMode ? '#3B6BFF' : '#3B82F6'} />
+                    <Ionicons name="sparkles" size={16} color={darkMode ? '#2A63E2' : '#3B82F6'} />
                   </View>
 
                   <View style={styles.aiBubbleCol}>
@@ -778,7 +778,7 @@ export default function ChatScreen({ darkMode }) {
                   },
                 ]}
               >
-                <Ionicons name="sparkles" size={16} color={darkMode ? '#3B6BFF' : '#3B82F6'} />
+                <Ionicons name="sparkles" size={16} color={darkMode ? '#2A63E2' : '#3B82F6'} />
               </View>
               <View
                 style={[
@@ -1035,7 +1035,7 @@ const styles = StyleSheet.create({
   txnCardAccentBar: {
     width: 3,
     height: 36,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     borderRadius: 2,
   },
   txnCardOverline: {
@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
   },
   verifyBtn: {
     flex: 1,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     borderRadius: Radius.pill,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.pill,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: BorderWidth.thin,

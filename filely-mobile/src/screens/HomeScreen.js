@@ -11,7 +11,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -33,6 +33,7 @@ import { Modal, Switch } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { listTx as listLedgerTx, LEDGER_EVENT, subscribeLedger } from '../services/localLedger';
+import { listBills, addBill, removeBill, toggleReminder, subscribeBills } from '../services/bills';
 import { DeviceEventEmitter, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -78,7 +79,7 @@ const METRIC_LIBRARY = {
   m_balance: {
     id: 'm_balance', label: 'Total Balance', sub: 'All accounts',
     amount: 365500, prefix: '$', delta: '+2.4%', deltaUp: true,
-    icon: 'wallet', gradient: ['#3B6BFF', '#2E5BFF', '#1E3A8A'], chipLabel: 'PRIMARY',
+    icon: 'wallet', gradient: ['#2A63E2', '#2E5BFF', '#1E3A8A'], chipLabel: 'PRIMARY',
   },
   m_income: {
     id: 'm_income', label: 'Income', sub: 'This month',
@@ -162,7 +163,7 @@ function PillTab({ t, isActive, onPress }) {
         <Text
           style={[
             styles.pillTabText,
-            { color: isActive ? '#3B6BFF' : 'rgba(255,255,255,0.78)' },
+            { color: isActive ? '#2A63E2' : 'rgba(255,255,255,0.78)' },
           ]}
         >
           {t}
@@ -297,7 +298,7 @@ function MetricCarousel({ metrics, onOpenCustomize }) {
         <Ionicons name="albums-outline" size={28} color="rgba(255,255,255,0.7)" />
         <Text style={styles.emptyCarouselText}>No cards visible</Text>
         <Pressable onPress={onOpenCustomize} style={styles.emptyCarouselBtn}>
-          <Ionicons name="add" size={14} color="#3B6BFF" />
+          <Ionicons name="add" size={14} color="#2A63E2" />
           <Text style={styles.emptyCarouselBtnText}>Add a card</Text>
         </Pressable>
       </Animated.View>
@@ -416,7 +417,7 @@ function CustomizeSheet({ visible, onClose, ids, setIds }) {
                   <Switch
                     value={enabled}
                     onValueChange={() => toggle(id)}
-                    trackColor={{ false: '#E5E7EB', true: '#3B6BFF' }}
+                    trackColor={{ false: '#E5E7EB', true: '#2A63E2' }}
                     thumbColor="#FFFFFF"
                   />
                 </View>
@@ -461,7 +462,7 @@ function Bar({ a, b, label, delay }) {
 
 function MiniCard({ variant, label, holder, number }) {
   const isBlue = variant === 'blue';
-  const bg = isBlue ? '#3B6BFF' : '#111827';
+  const bg = isBlue ? '#2A63E2' : '#111827';
   const accentBg = isBlue ? '#2E5BFF' : '#1F2937';
   return (
     <View style={[styles.miniCard, { backgroundColor: bg }]}>
@@ -568,9 +569,32 @@ export default function HomeScreen({ navigation, darkMode = true }) {
 
   const balance = useMemo(() => '$365,500', []);
 
+  const [bills, setBills] = useState([]);
+  const [showAddBill, setShowAddBill] = useState(false);
+  const [newBill, setNewBill] = useState({ name: '', amount: '', dueDate: '', reminder: true });
+  const reloadBills = useCallback(async () => { try { setBills(await listBills()); } catch {} }, []);
+  useEffect(() => { reloadBills(); const un = subscribeBills(reloadBills); return un; }, [reloadBills]);
+  const saveBill = useCallback(async () => {
+    if (!newBill.name || !newBill.amount || !newBill.dueDate) return;
+    await addBill(newBill);
+    setNewBill({ name: '', amount: '', dueDate: '', reminder: true });
+    setShowAddBill(false);
+  }, [newBill]);
+
+  const brandIcon = (name) => {
+    const n = (name || '').toLowerCase();
+    if (n.includes('figma'))    return { lib: 'fa', icon: 'figma',    bg: '#F4F0FF', color: '#A259FF' };
+    if (n.includes('github'))   return { lib: 'fa', icon: 'github',   bg: '#ECECEC', color: '#0B1435' };
+    if (n.includes('spotify'))  return { lib: 'fa', icon: 'spotify',  bg: '#E6F9EE', color: '#1DB954' };
+    if (n.includes('netflix'))  return { lib: 'ion', icon: 'film-outline', bg: '#FFE5E5', color: '#E50914' };
+    if (n.includes('apple'))    return { lib: 'fa', icon: 'apple',    bg: '#F2F2F2', color: '#0B1435' };
+    if (n.includes('google'))   return { lib: 'fa', icon: 'google',   bg: '#FFF4E5', color: '#EA4335' };
+    return { lib: 'ion', icon: 'card-outline', bg: '#E8EFFF', color: '#2A63E2' };
+  };
+
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#3B6BFF" />
+      <StatusBar barStyle="light-content" backgroundColor="#2A63E2" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -618,10 +642,15 @@ export default function HomeScreen({ navigation, darkMode = true }) {
 
           <View style={styles.heroContent}>
             {active === 'Dashboard' && (
-              <MetricCarousel
-                metrics={visibleMetrics}
-                onOpenCustomize={() => setShowCustomize(true)}
-              />
+              <Animated.View entering={FadeInUp.duration(500)} style={styles.balanceBox}>
+                <Text style={styles.balanceLabel}>Balance</Text>
+                <Text style={styles.balanceValue}>{balance}</Text>
+                <View style={styles.savedPill}>
+                  <Ionicons name="sparkles" size={14} color="#FFFFFF" />
+                  <Text style={styles.savedText}>You have saved $10 in the last 30 days</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
+                </View>
+              </Animated.View>
             )}
 
             {active === 'Analytics' && (
@@ -718,7 +747,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                     </View>
                   ))}
                   <Pressable style={styles.recentAdd} hitSlop={8}>
-                    <Ionicons name="add" size={22} color="#3B6BFF" />
+                    <Ionicons name="add" size={22} color="#2A63E2" />
                   </Pressable>
                 </View>
               </Animated.View>
@@ -804,16 +833,59 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ gap: 12 }}
                 >
-                  {BILLS.map((b) => (
-                    <View key={b.id} style={styles.billCard}>
-                      <Text style={styles.billDay}>{b.day}</Text>
-                      <Text style={styles.billMo}>{b.mo}</Text>
-                      <Text style={styles.billName}>{b.name}</Text>
-                      <Text style={styles.billAmt}>{b.amt}</Text>
-                    </View>
-                  ))}
-                  <Pressable style={styles.billAddCard} hitSlop={8}>
-                    <Ionicons name="add" size={22} color="#3B6BFF" />
+                  {bills.length === 0 && (
+                    <>
+                      {[{ id:'p1', day:'13th', mo:'Aug', name:'Figma',  amount:50 },
+                        { id:'p2', day:'15th', mo:'Aug', name:'Github', amount:11 }].map(b => {
+                        const bi = brandIcon(b.name);
+                        return (
+                          <View key={b.id} style={styles.billCard}>
+                            <Text style={styles.billDay}>{b.day}</Text>
+                            <Text style={styles.billMo}>{b.mo}</Text>
+                            <View style={[styles.billLogo, { backgroundColor: bi.bg }]}>
+                              {bi.lib === 'fa'
+                                ? <FontAwesome5 name={bi.icon} size={20} color={bi.color} />
+                                : <Ionicons name={bi.icon} size={20} color={bi.color} />}
+                            </View>
+                            <Text style={styles.billName}>{b.name}</Text>
+                            <Text style={styles.billAmt}>${b.amount.toFixed(2)}</Text>
+                          </View>
+                        );
+                      })}
+                    </>
+                  )}
+                  {bills.map((b) => {
+                    const bi = brandIcon(b.name);
+                    const d = new Date(b.dueDate);
+                    const day = isNaN(d) ? b.dueDate : `${d.getDate()}`;
+                    const mo  = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short' });
+                    return (
+                      <Pressable
+                        key={b.id}
+                        onLongPress={() => removeBill(b.id)}
+                        style={styles.billCard}
+                      >
+                        <Text style={styles.billDay}>{day}</Text>
+                        <Text style={styles.billMo}>{mo}</Text>
+                        <View style={[styles.billLogo, { backgroundColor: bi.bg }]}>
+                          {bi.lib === 'fa'
+                            ? <FontAwesome5 name={bi.icon} size={20} color={bi.color} />
+                            : <Ionicons name={bi.icon} size={20} color={bi.color} />}
+                        </View>
+                        <Text style={styles.billName}>{b.name}</Text>
+                        <Text style={styles.billAmt}>${(+b.amount).toFixed(2)}</Text>
+                        <Pressable onPress={() => toggleReminder(b.id)} hitSlop={6} style={{ marginTop: 4 }}>
+                          <Ionicons
+                            name={b.reminder ? 'notifications' : 'notifications-off-outline'}
+                            size={14}
+                            color={b.reminder ? '#2A63E2' : 'rgba(11,20,53,0.4)'}
+                          />
+                        </Pressable>
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable style={styles.billAddCard} onPress={() => setShowAddBill(true)} hitSlop={8}>
+                    <Ionicons name="add" size={22} color="#2A63E2" />
                     <Text style={styles.billAddText}>Add a Bill</Text>
                   </Pressable>
                 </ScrollView>
@@ -923,6 +995,52 @@ export default function HomeScreen({ navigation, darkMode = true }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal visible={showAddBill} transparent animationType="fade" onRequestClose={() => setShowAddBill(false)}>
+        <Pressable style={styles.modalBg} onPress={() => setShowAddBill(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Add a Bill</Text>
+            <TextInput
+              placeholder="Name (e.g. Figma, Netflix)"
+              placeholderTextColor="rgba(11,20,53,0.4)"
+              style={styles.modalInput}
+              value={newBill.name}
+              onChangeText={(v) => setNewBill(b => ({ ...b, name: v }))}
+            />
+            <TextInput
+              placeholder="Amount (USD)"
+              keyboardType="numeric"
+              placeholderTextColor="rgba(11,20,53,0.4)"
+              style={styles.modalInput}
+              value={newBill.amount}
+              onChangeText={(v) => setNewBill(b => ({ ...b, amount: v }))}
+            />
+            <TextInput
+              placeholder="Due date (YYYY-MM-DD)"
+              placeholderTextColor="rgba(11,20,53,0.4)"
+              style={styles.modalInput}
+              value={newBill.dueDate}
+              onChangeText={(v) => setNewBill(b => ({ ...b, dueDate: v }))}
+            />
+            <View style={styles.modalRowBtn}>
+              <Text style={{ color: '#0B1435', fontWeight: '600' }}>Remind me</Text>
+              <Switch
+                value={newBill.reminder}
+                onValueChange={(v) => setNewBill(b => ({ ...b, reminder: v }))}
+                trackColor={{ true: '#2A63E2', false: '#CCC' }}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <Pressable onPress={() => setShowAddBill(false)} style={[styles.modalBtn, { backgroundColor: '#F3F4F6' }]}>
+                <Text style={{ color: '#0B1435', fontWeight: '700' }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={saveBill} style={[styles.modalBtn, { backgroundColor: '#2A63E2' }]}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Save</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -935,13 +1053,13 @@ const filterStyles = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)', backgroundColor: '#F7F8FB' },
-  chipOn: { backgroundColor: '#3B6BFF', borderColor: '#3B6BFF' },
+  chipOn: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
   chipText: { fontSize: 13, fontWeight: '600', color: '#0B1435' },
   chipTextOn: { color: '#FFFFFF' },
   input: { flex: 1, borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#0B1435', backgroundColor: '#F7F8FB' },
   resetBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#F0F2F8' },
   resetText: { color: '#0B1435', fontWeight: '700', fontSize: 14 },
-  applyBtn: { flex: 2, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#3B6BFF' },
+  applyBtn: { flex: 2, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#2A63E2' },
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 });
 
@@ -950,10 +1068,10 @@ const HERO_H = 340;
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
   },
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingTop: Platform.OS === 'ios' ? 56 : 36,
     paddingBottom: 8,
   },
@@ -989,7 +1107,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FF5470',
     borderWidth: 1.5,
-    borderColor: '#3B6BFF',
+    borderColor: '#2A63E2',
   },
   pillTab: {
     height: 36,
@@ -1094,6 +1212,40 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  balanceBox: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingHorizontal: 20,
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  balanceValue: {
+    color: '#FFFFFF',
+    fontSize: 40,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  savedPill: {
+    marginTop: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignSelf: 'stretch',
+  },
+  savedText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '500',
   },
   analyticsBox: {
     paddingHorizontal: 20,
@@ -1291,7 +1443,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   sectionLink: {
-    color: '#3B6BFF',
+    color: '#2A63E2',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1342,7 +1494,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
@@ -1434,7 +1586,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   billAmt: {
-    color: '#3B6BFF',
+    color: '#2A63E2',
     fontSize: 14,
     fontWeight: '800',
     marginTop: 4,
@@ -1451,10 +1603,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   billAddText: {
-    color: '#3B6BFF',
+    color: '#2A63E2',
     fontSize: 12,
     fontWeight: '700',
     marginTop: 6,
+  },
+  billLogo: {
+    width: 32, height: 32, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8,
+  },
+  modalBg: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', padding: 20,
+  },
+  modalCard: {
+    width: '100%', maxWidth: 380,
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0B1435', marginBottom: 14 },
+  modalInput: {
+    borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)',
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 14, color: '#0B1435', marginBottom: 10,
+  },
+  modalRowBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  modalBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
   },
   bodyMuted: {
     color: 'rgba(11,20,53,0.58)',
@@ -1474,8 +1652,8 @@ const styles = StyleSheet.create({
     width: 160,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#3B6BFF',
-    shadowColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
+    shadowColor: '#2A63E2',
     shadowOpacity: 0.45,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -1498,7 +1676,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
     marginTop: 4,
   },
-  emptyCarouselBtnText: { color: '#3B6BFF', fontSize: 13, fontWeight: '700' },
+  emptyCarouselBtnText: { color: '#2A63E2', fontSize: 13, fontWeight: '700' },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   customSheet: {
     backgroundColor: '#F3F6FC',
@@ -1521,7 +1699,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 12, backgroundColor: 'rgba(59,107,255,0.1)',
   },
-  resetText: { color: '#3B6BFF', fontWeight: '700', fontSize: 12.5 },
+  resetText: { color: '#2A63E2', fontWeight: '700', fontSize: 12.5 },
   customRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FFFFFF',
@@ -1547,8 +1725,8 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#3B6BFF', height: 52, borderRadius: 26,
-    shadowColor: '#3B6BFF', shadowOpacity: 0.3, shadowRadius: 14,
+    gap: 8, backgroundColor: '#2A63E2', height: 52, borderRadius: 26,
+    shadowColor: '#2A63E2', shadowOpacity: 0.3, shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
   saveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },

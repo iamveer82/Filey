@@ -8,7 +8,7 @@ export const CATEGORIES = [
   { id: 'fuel',       label: 'Fuel & Vehicle',     icon: 'car',               color: '#F59E0B', vatReclaim: true,  keywords: ['enoc', 'adnoc', 'emarat', 'petrol', 'fuel', 'diesel', 'shell', 'caltex'] },
   { id: 'food',       label: 'Food & Dining',      icon: 'restaurant',        color: '#F97316', vatReclaim: false, keywords: ['restaurant', 'cafe', 'coffee', 'lunch', 'dinner', 'mcdonalds', 'kfc', 'starbucks'] },
   { id: 'groceries',  label: 'Groceries',          icon: 'basket',            color: '#10B981', vatReclaim: false, keywords: ['carrefour', 'lulu', 'spinneys', 'choithrams', 'grocery', 'supermarket'] },
-  { id: 'office',     label: 'Office Supplies',    icon: 'briefcase',         color: '#3B6BFF', vatReclaim: true,  keywords: ['stationery', 'printer', 'paper', 'office', 'ikea', 'desk', 'chair'] },
+  { id: 'office',     label: 'Office Supplies',    icon: 'briefcase',         color: '#2A63E2', vatReclaim: true,  keywords: ['stationery', 'printer', 'paper', 'office', 'ikea', 'desk', 'chair'] },
   { id: 'utilities',  label: 'Utilities',          icon: 'flash',             color: '#EAB308', vatReclaim: true,  keywords: ['dewa', 'sewa', 'addc', 'fewa', 'electric', 'water', 'utility'] },
   { id: 'telecom',    label: 'Telecom & Internet', icon: 'wifi',              color: '#06B6D4', vatReclaim: true,  keywords: ['du', 'etisalat', 'telecom', 'internet', 'phone', 'mobile plan'] },
   { id: 'travel',     label: 'Travel & Transport', icon: 'airplane',          color: '#8B5CF6', vatReclaim: true,  keywords: ['emirates', 'flydubai', 'etihad', 'uber', 'careem', 'taxi', 'flight', 'metro', 'rta'] },

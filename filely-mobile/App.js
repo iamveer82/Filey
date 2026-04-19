@@ -58,7 +58,7 @@ const FilelyLightTheme = {
     card: '#FFFFFF',
     text: '#0F172A',
     border: 'rgba(15,23,42,0.08)',
-    primary: '#3B6BFF',
+    primary: '#2A63E2',
   },
 };
 
@@ -70,7 +70,7 @@ const FilelyDarkTheme = {
     card: '#141B2D',
     text: '#FFFFFF',
     border: 'rgba(255,255,255,0.08)',
-    primary: '#3B6BFF',
+    primary: '#2A63E2',
   },
 };
 
@@ -181,8 +181,8 @@ const tabIconStyles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#3B6BFF',
-    shadowColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
+    shadowColor: '#2A63E2',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 14,
@@ -203,7 +203,7 @@ function CustomTabBar({ state, descriptors, navigation, darkMode }) {
   const barBorder = darkMode
     ? 'rgba(255,255,255,0.06)'
     : 'rgba(15,23,42,0.06)';
-  const barShadowColor = darkMode ? '#3B6BFF' : '#000000';
+  const barShadowColor = darkMode ? '#2A63E2' : '#000000';
 
   return (
     <View style={[
@@ -367,8 +367,8 @@ function AppContent() {
     text:      darkMode ? '#FFFFFF'                 : '#0F172A',
     textMuted: darkMode ? 'rgba(255,255,255,0.35)'  : '#94A3B8',
     border:    darkMode ? 'rgba(255,255,255,0.08)'  : 'rgba(15,23,42,0.08)',
-    lime:      '#3B6BFF',
-    accent:    '#3B6BFF',
+    lime:      '#2A63E2',
+    accent:    '#2A63E2',
   };
 
   // ── Auth flow gates ─────────────────────────────────────────────────────────
@@ -376,7 +376,7 @@ function AppContent() {
   if (loading || checkingAi) {
     return (
       <View style={[gateStyles.center, { backgroundColor: c.bg }]}>
-        <ActivityIndicator size="large" color="#3B6BFF" />
+        <ActivityIndicator size="large" color="#2A63E2" />
       </View>
     );
   }
@@ -458,7 +458,7 @@ function AppContent() {
               headerTitle: 'Filey',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="wallet" size={22} color="#3B6BFF" />
+                  <Ionicons name="wallet" size={22} color="#2A63E2" />
                 </View>
               ),
               headerRight: () => (
@@ -476,7 +476,7 @@ function AppContent() {
               headerTitle: 'AI Hub',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="sparkles" size={22} color="#3B6BFF" />
+                  <Ionicons name="sparkles" size={22} color="#2A63E2" />
                 </View>
               ),
               headerRight: () => (
@@ -494,7 +494,7 @@ function AppContent() {
               headerTitle: 'Services',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="apps" size={22} color="#3B6BFF" />
+                  <Ionicons name="apps" size={22} color="#2A63E2" />
                 </View>
               ),
               headerRight: () => (
@@ -512,7 +512,7 @@ function AppContent() {
               headerTitle: 'Team Hub',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="people" size={22} color="#3B6BFF" />
+                  <Ionicons name="people" size={22} color="#2A63E2" />
                 </View>
               ),
               headerRight: () => (

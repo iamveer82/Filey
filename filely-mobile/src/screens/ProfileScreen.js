@@ -8,10 +8,10 @@ import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '.
 import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
-  { label: 'Account Details',       icon: 'person-outline',         section: 'User',    color: '#3B6BFF' },
-  { label: 'Organization Settings', icon: 'business-outline',       section: 'Org',     color: '#3B6BFF' },
+  { label: 'Account Details',       icon: 'person-outline',         section: 'User',    color: '#2A63E2' },
+  { label: 'Organization Settings', icon: 'business-outline',       section: 'Org',     color: '#2A63E2' },
   { label: 'Tax Certificates',      icon: 'document-text-outline',  section: 'Tax',     color: '#F59E0B' },
-  { label: 'Notification Prefs',    icon: 'notifications-outline',  section: 'User',    color: '#3B6BFF' },
+  { label: 'Notification Prefs',    icon: 'notifications-outline',  section: 'User',    color: '#2A63E2' },
   { label: 'Help & Support',        icon: 'help-circle-outline',    section: 'Support', color: '#FF4B6E' },
 ];
 
@@ -29,19 +29,19 @@ export default function ProfileScreen({ darkMode, onLogout }) {
       <View style={styles.header}>
         <Animated.View entering={FadeInDown.duration(600).springify()} style={[styles.profileHeader, { backgroundColor: 'rgba(59,107,255,0.06)', borderColor: 'rgba(59,107,255,0.15)' }]}>
           <View style={[styles.avatar, { backgroundColor: 'rgba(59,107,255,0.12)', borderColor: 'rgba(59,107,255,0.3)' }]}>
-            <Text style={[styles.avatarText, { color: '#3B6BFF' }]}>{profile?.name?.[0] || 'U'}</Text>
+            <Text style={[styles.avatarText, { color: '#2A63E2' }]}>{profile?.name?.[0] || 'U'}</Text>
           </View>
           <View style={{ flex: 1, marginLeft: 16 }}>
             <Text style={[styles.userName, { color: c.text }]}>{profile?.name || 'User Name'}</Text>
             <Text style={[styles.userEmail, { color: c.textSecondary }]}>{profile?.email || 'email@company.ae'}</Text>
             <View style={[styles.planBadge, { backgroundColor: 'rgba(59,107,255,0.12)', borderColor: 'rgba(59,107,255,0.2)' }]}>
-              <Text style={{ color: '#3B6BFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>
+              <Text style={{ color: '#2A63E2', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>
                 {(profile?.plan || 'basic').toUpperCase()}
               </Text>
             </View>
           </View>
           <TouchableOpacity
-            style={[styles.editBtn, { backgroundColor: '#3B6BFF', borderColor: 'rgba(59,107,255,0.35)' }]}
+            style={[styles.editBtn, { backgroundColor: '#2A63E2', borderColor: 'rgba(59,107,255,0.35)' }]}
             accessibilityRole="button"
             accessibilityLabel="Edit profile"
           >

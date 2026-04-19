@@ -70,7 +70,7 @@ export async function exportPDF(transactions, opts = {}) {
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, Helvetica, sans-serif; color: #0B1435; padding: 32px; }
-    .hero { background: #3B6BFF; color: #fff; padding: 24px; border-radius: 16px; margin-bottom: 24px; }
+    .hero { background: #2A63E2; color: #fff; padding: 24px; border-radius: 16px; margin-bottom: 24px; }
     .hero h1 { margin: 0; font-size: 26px; letter-spacing: -0.5px; }
     .hero p { margin: 4px 0 0; opacity: 0.85; font-size: 13px; }
     .stats { display: flex; gap: 14px; margin-bottom: 20px; }

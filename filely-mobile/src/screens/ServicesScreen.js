@@ -13,10 +13,10 @@ import apiClient from '../api/client';
 import { createShareLink } from '../services/publicShare';
 import { useAuth } from '../context/AuthContext';
 
-const BRAND = '#3B6BFF';
+const BRAND = '#2A63E2';
 
 const SERVICES = [
-  { id: 'scan',     title: 'Scan Receipt',     sub: 'OCR + auto-fill',           icon: 'scan-outline',            color: '#3B6BFF' },
+  { id: 'scan',     title: 'Scan Receipt',     sub: 'OCR + auto-fill',           icon: 'scan-outline',            color: '#2A63E2' },
   { id: 'pdfscan',  title: 'PDF Scanner',      sub: 'Turn photos into a PDF',    icon: 'document-outline',        color: '#6366F1' },
   { id: 'pdfword',  title: 'PDF → Word',       sub: 'Convert PDF to editable',   icon: 'document-text-outline',   color: '#8B5CF6' },
   { id: 'pdfexcel', title: 'PDF → Excel',      sub: 'Tables to spreadsheet',     icon: 'grid-outline',            color: '#10B981' },

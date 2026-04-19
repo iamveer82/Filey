@@ -10,7 +10,7 @@ import { db } from '../lib/supabase';
 
 const key = (orgId) => `@filey/projects_${orgId || 'default'}`;
 
-const DEFAULT_COLORS = ['#3B6BFF', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4', '#F43F5E', '#84CC16'];
+const DEFAULT_COLORS = ['#2A63E2', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4', '#F43F5E', '#84CC16'];
 
 export async function listProjects(orgId) {
   try {

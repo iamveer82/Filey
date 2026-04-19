@@ -176,7 +176,7 @@ export default function AIInitializationScreen({ darkMode, onComplete }) {
   }));
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#3B6BFF' }}>
+    <View style={{ flex: 1, backgroundColor: '#2A63E2' }}>
       <StatusBar style="light" />
       <View style={[styles.hero, { paddingTop: insets.top + 40 }]}>
         <Animated.View entering={FadeInUp.duration(700)} style={{ alignItems: 'center' }}>
