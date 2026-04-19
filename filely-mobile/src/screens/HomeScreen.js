@@ -34,6 +34,8 @@ import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { listTx as listLedgerTx, LEDGER_EVENT, subscribeLedger } from '../services/localLedger';
 import { listBills, addBill, removeBill, toggleReminder, subscribeBills } from '../services/bills';
+import IconPicker, { BrandIcon } from '../components/IconPicker';
+import { guessIconId } from '../assets/billIcons';
 import { DeviceEventEmitter, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -571,13 +573,13 @@ export default function HomeScreen({ navigation, darkMode = true }) {
 
   const [bills, setBills] = useState([]);
   const [showAddBill, setShowAddBill] = useState(false);
-  const [newBill, setNewBill] = useState({ name: '', amount: '', dueDate: '', reminder: true });
+  const [newBill, setNewBill] = useState({ name: '', amount: '', dueDate: '', reminder: true, iconId: 'misc' });
   const reloadBills = useCallback(async () => { try { setBills(await listBills()); } catch {} }, []);
   useEffect(() => { reloadBills(); const un = subscribeBills(reloadBills); return un; }, [reloadBills]);
   const saveBill = useCallback(async () => {
     if (!newBill.name || !newBill.amount || !newBill.dueDate) return;
     await addBill(newBill);
-    setNewBill({ name: '', amount: '', dueDate: '', reminder: true });
+    setNewBill({ name: '', amount: '', dueDate: '', reminder: true, iconId: 'misc' });
     setShowAddBill(false);
   }, [newBill]);
 
@@ -835,43 +837,28 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                 >
                   {bills.length === 0 && (
                     <>
-                      {[{ id:'p1', day:'13th', mo:'Aug', name:'Figma',  amount:50 },
-                        { id:'p2', day:'15th', mo:'Aug', name:'Github', amount:11 }].map(b => {
-                        const bi = brandIcon(b.name);
-                        return (
-                          <View key={b.id} style={styles.billCard}>
-                            <Text style={styles.billDay}>{b.day}</Text>
-                            <Text style={styles.billMo}>{b.mo}</Text>
-                            <View style={[styles.billLogo, { backgroundColor: bi.bg }]}>
-                              {bi.lib === 'fa'
-                                ? <FontAwesome5 name={bi.icon} size={20} color={bi.color} />
-                                : <Ionicons name={bi.icon} size={20} color={bi.color} />}
-                            </View>
-                            <Text style={styles.billName}>{b.name}</Text>
-                            <Text style={styles.billAmt}>${b.amount.toFixed(2)}</Text>
-                          </View>
-                        );
-                      })}
+                      {[{ id:'p1', day:'13th', mo:'Aug', name:'Figma',  amount:50, iconId: 'figma' },
+                        { id:'p2', day:'15th', mo:'Aug', name:'Github', amount:11, iconId: 'github' }].map(b => (
+                        <View key={b.id} style={styles.billCard}>
+                          <Text style={styles.billDay}>{b.day}</Text>
+                          <Text style={styles.billMo}>{b.mo}</Text>
+                          <BrandIcon iconId={b.iconId} size={32} />
+                          <Text style={styles.billName}>{b.name}</Text>
+                          <Text style={styles.billAmt}>${b.amount.toFixed(2)}</Text>
+                        </View>
+                      ))}
                     </>
                   )}
                   {bills.map((b) => {
-                    const bi = brandIcon(b.name);
                     const d = new Date(b.dueDate);
                     const day = isNaN(d) ? b.dueDate : `${d.getDate()}`;
                     const mo  = isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short' });
+                    const iconId = b.iconId || guessIconId(b.name);
                     return (
-                      <Pressable
-                        key={b.id}
-                        onLongPress={() => removeBill(b.id)}
-                        style={styles.billCard}
-                      >
+                      <Pressable key={b.id} onLongPress={() => removeBill(b.id)} style={styles.billCard}>
                         <Text style={styles.billDay}>{day}</Text>
                         <Text style={styles.billMo}>{mo}</Text>
-                        <View style={[styles.billLogo, { backgroundColor: bi.bg }]}>
-                          {bi.lib === 'fa'
-                            ? <FontAwesome5 name={bi.icon} size={20} color={bi.color} />
-                            : <Ionicons name={bi.icon} size={20} color={bi.color} />}
-                        </View>
+                        <BrandIcon iconId={iconId} size={32} />
                         <Text style={styles.billName}>{b.name}</Text>
                         <Text style={styles.billAmt}>${(+b.amount).toFixed(2)}</Text>
                         <Pressable onPress={() => toggleReminder(b.id)} hitSlop={6} style={{ marginTop: 4 }}>
@@ -1001,12 +988,14 @@ export default function HomeScreen({ navigation, darkMode = true }) {
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Add a Bill</Text>
             <TextInput
-              placeholder="Name (e.g. Figma, Netflix)"
+              placeholder="Name (e.g. Figma, Netflix, Rent)"
               placeholderTextColor="rgba(11,20,53,0.4)"
               style={styles.modalInput}
               value={newBill.name}
-              onChangeText={(v) => setNewBill(b => ({ ...b, name: v }))}
+              onChangeText={(v) => setNewBill(b => ({ ...b, name: v, iconId: guessIconId(v) || b.iconId }))}
             />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.6, marginTop: 4, marginBottom: 6 }}>LABEL ICON</Text>
+            <IconPicker value={newBill.iconId} onChange={(id) => setNewBill(b => ({ ...b, iconId: id }))} />
             <TextInput
               placeholder="Amount (USD)"
               keyboardType="numeric"

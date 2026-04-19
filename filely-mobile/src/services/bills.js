@@ -10,11 +10,12 @@ export async function listBills() {
   catch { return []; }
 }
 
-export async function addBill({ name, amount, dueDate, reminder = true, brand = null }) {
+export async function addBill({ name, amount, dueDate, reminder = true, iconId = 'misc', brand = null }) {
   if (!name || !amount || !dueDate) throw new Error('name + amount + dueDate required');
   const entry = {
     id: `bl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
     name, amount: +amount, dueDate, reminder: !!reminder,
+    iconId,
     brand: brand || name.toLowerCase(),
     createdAt: Date.now(),
   };
