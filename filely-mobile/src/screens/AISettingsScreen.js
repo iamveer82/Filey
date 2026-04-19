@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import {
   PROVIDERS, getPreference, setPreference, getKey, setKey, testKey,
+  getOllamaBaseUrl, setOllamaBaseUrl,
 } from '../services/llmProvider';
 import {
   WEB_PROVIDERS, getWebPreference, setWebPreference, getWebKey, setWebKey, testWebKey,
@@ -58,6 +59,8 @@ export default function AISettingsScreen({ darkMode, onBack }) {
   const [webKeys, setWebKeys] = useState({});
   const [testing, setTesting] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [ollamaUrl, setOllamaUrl] = useState('');
+  const [customModel, setCustomModel] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -71,6 +74,7 @@ export default function AISettingsScreen({ darkMode, onBack }) {
       const wk = {};
       for (const id of Object.keys(WEB_PROVIDERS)) wk[id] = (await getWebKey(id)) || '';
       setWebKeys(wk);
+      try { setOllamaUrl(await getOllamaBaseUrl()); } catch {}
       setLoaded(true);
     })();
   }, []);
@@ -190,6 +194,46 @@ export default function AISettingsScreen({ darkMode, onBack }) {
                 );
               })}
             </View>
+
+            <Text style={[s.label, { color: c.textMuted, marginTop: 12 }]}>CUSTOM MODEL NAME</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                value={customModel}
+                onChangeText={setCustomModel}
+                placeholder={`e.g. ${activeDef.models[0]}`}
+                placeholderTextColor={c.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[s.field, { flex: 1, backgroundColor: c.bg, color: c.text, borderColor: c.borderSubtle }]}
+              />
+              <SpringPressable
+                onPress={() => { if (customModel.trim()) { saveModel(customModel.trim()); setCustomModel(''); } }}
+                disabled={!customModel.trim()}
+                style={[s.testBtn, { backgroundColor: c.primary, opacity: customModel.trim() ? 1 : 0.5, flex: 0 }]}
+              >
+                <Text style={s.testBtnText}>Use</Text>
+              </SpringPressable>
+            </View>
+            <Text style={[s.helper, { color: c.textMuted }]}>Active: {pref.model}</Text>
+
+            {(pref.provider === 'ollama' || pref.provider === 'ollamacloud') && pref.provider === 'ollama' ? (
+              <>
+                <View style={[s.divider, { backgroundColor: c.borderSubtle }]} />
+                <Text style={[s.label, { color: c.textMuted }]}>OLLAMA BASE URL</Text>
+                <TextInput
+                  value={ollamaUrl}
+                  onChangeText={setOllamaUrl}
+                  onEndEditing={() => setOllamaBaseUrl(ollamaUrl)}
+                  placeholder="http://192.168.1.42:11434"
+                  placeholderTextColor={c.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  style={[s.field, { backgroundColor: c.bg, color: c.text, borderColor: c.borderSubtle }]}
+                />
+                <Text style={[s.helper, { color: c.textMuted }]}>Laptop LAN IP, not localhost. Run: OLLAMA_HOST=0.0.0.0:11434 ollama serve</Text>
+              </>
+            ) : null}
 
             {activeDef.keyName ? (
               <>

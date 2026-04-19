@@ -722,7 +722,7 @@ export default function AIMessagingHub() {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#0A0A0A' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <StatusBar style="light" />
 
@@ -891,7 +891,7 @@ export default function AIMessagingHub() {
       </ScrollView>
       </ErrorBoundary>
 
-      <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
+      <View style={[styles.composer, { paddingBottom: (Platform.OS === 'ios' ? 112 : 102) + (insets.bottom > 0 ? 0 : 4) }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

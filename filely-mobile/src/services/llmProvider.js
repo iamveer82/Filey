@@ -13,9 +13,32 @@ export const PROVIDERS = {
   anthropic: { id: 'anthropic', label: 'Anthropic',      keyName: 'llm_anthropic_key',  web: true,  models: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-opus-4-5'] },
   gemini:    { id: 'gemini',    label: 'Google Gemini',  keyName: 'llm_gemini_key',     web: true,  models: ['gemini-2.0-flash', 'gemini-1.5-pro'] },
   openrouter:{ id: 'openrouter',label: 'OpenRouter',     keyName: 'llm_openrouter_key', web: true,  models: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'meta-llama/llama-3.1-70b-instruct'] },
+  ollama:    { id: 'ollama',    label: 'Ollama (local)', keyName: null,                 web: false, models: ['llama3.2', 'llama3.1', 'qwen2.5', 'mistral', 'phi3', 'gemma2'] },
+  ollamacloud:{id: 'ollamacloud',label: 'Ollama Cloud',   keyName: 'llm_ollama_key',     web: false, models: ['glm-4.6:cloud', 'deepseek-v3.1:671b-cloud', 'qwen3-coder:480b-cloud', 'gpt-oss:120b-cloud', 'kimi-k2:1t-cloud'] },
 };
 
 const PREF_KEY = '@filey/llm_pref_v1';
+const OLLAMA_URL_KEY = '@filey/ollama_base_url';
+const DEFAULT_OLLAMA_URL = 'http://192.168.1.100:11434';
+
+export async function getOllamaBaseUrl() {
+  try {
+    const v = await AsyncStorage.getItem(OLLAMA_URL_KEY);
+    return v || DEFAULT_OLLAMA_URL;
+  } catch { return DEFAULT_OLLAMA_URL; }
+}
+
+export async function setOllamaBaseUrl(url) {
+  await AsyncStorage.setItem(OLLAMA_URL_KEY, url.replace(/\/+$/, ''));
+}
+
+export async function listOllamaModels() {
+  const base = await getOllamaBaseUrl();
+  const r = await fetch(`${base}/api/tags`);
+  if (!r.ok) throw new Error(`Ollama ${r.status}`);
+  const j = await r.json();
+  return (j.models || []).map(m => m.name);
+}
 
 export async function getPreference() {
   try {
@@ -184,6 +207,61 @@ async function callOpenRouter({ messages, model, key, maxTokens, signal, onToken
   return { text: j.choices?.[0]?.message?.content || '' };
 }
 
+async function callOllama({ messages, model, maxTokens, signal, onToken, key, cloud }) {
+  const base = cloud ? 'https://ollama.com' : await getOllamaBaseUrl();
+  const headers = { 'Content-Type': 'application/json' };
+  if (key) headers.Authorization = `Bearer ${key}`;
+  const body = {
+    model: model || 'llama3.2',
+    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    stream: !!onToken,
+    options: { num_predict: maxTokens || 1024, temperature: 0.7 },
+  };
+  const r = await fetch(`${base}/api/chat`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!r.ok) throw new Error(`Ollama ${r.status}: ${await r.text()}`);
+  if (onToken) {
+    const reader = r.body?.getReader?.();
+    if (!reader) {
+      const txt = await r.text();
+      let acc = '';
+      for (const line of txt.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const j = JSON.parse(line);
+          const delta = j.message?.content || '';
+          if (delta) { acc += delta; onToken(delta, acc); }
+        } catch {}
+      }
+      return { text: acc };
+    }
+    const dec = new TextDecoder();
+    let buf = '', acc = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const j = JSON.parse(line);
+          const delta = j.message?.content || '';
+          if (delta) { acc += delta; onToken(delta, acc); }
+        } catch {}
+      }
+    }
+    return { text: acc };
+  }
+  const j = await r.json();
+  return { text: j.message?.content || '' };
+}
+
 async function callGemma({ messages }) {
   // Offline Gemma via native module. Lazy import to avoid top-level crash.
   try {
@@ -258,6 +336,8 @@ export async function send(messages, opts = {}) {
     case 'anthropic':  out = await callAnthropic(args); break;
     case 'gemini':     out = await callGemini(args); break;
     case 'openrouter': out = await callOpenRouter(args); break;
+    case 'ollama':      out = await callOllama(args); break;
+    case 'ollamacloud': out = await callOllama({ ...args, cloud: true }); break;
     default: throw new Error(`Provider ${provider} not implemented`);
   }
 
