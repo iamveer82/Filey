@@ -44,7 +44,7 @@ import {
 import { TOOL_SCHEMAS, toAnthropicTools, runTool, normalizeToolCalls } from '../services/aiTools';
 
 const MAX_MEMORY = 40;
-const TOOL_INTENT_RE = /\b(export|download|email).*(csv|pdf|ledger|report)\b|\b(show|open|display).*(vat|summary|reclaim)\b|\b(find|search|look up|list).*(receipt|transaction|expense)\b|\b(save|add|log|record).*(receipt|tx|transaction|to vault)\b/i;
+const TOOL_INTENT_RE = /\b(export|download|email).*(csv|pdf|ledger|report)\b|\b(show|open|display).*(vat|summary|reclaim)\b|\b(find|search|look up|list).*(receipt|transaction|expense|project|deputy|nudge|anomaly)\b|\b(save|add|log|record).*(receipt|tx|transaction|to vault|movement)\b|\b(paid|received|sent|got|transferred|owe|bought|spent)\b.*\b\d/i;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 

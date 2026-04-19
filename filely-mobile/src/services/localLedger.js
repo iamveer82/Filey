@@ -5,8 +5,10 @@
  * Storage: @filey/ledger_v1 = [{id, ts, direction, amount, counterparty, note, category, date}]
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 
 const KEY = '@filey/ledger_v1';
+export const LEDGER_EVENT = 'filey/ledger_changed';
 
 export async function listTx(filter = {}) {
   try {
@@ -38,14 +40,17 @@ export async function addTx({ direction, amount, counterparty, note, category, d
   const cur = await listTx();
   const next = [entry, ...cur].slice(0, 500);
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  DeviceEventEmitter.emit(LEDGER_EVENT, { action: 'add', entry });
   return entry;
 }
 
 export async function removeTx(id) {
   const cur = await listTx();
   await AsyncStorage.setItem(KEY, JSON.stringify(cur.filter(t => t.id !== id)));
+  DeviceEventEmitter.emit(LEDGER_EVENT, { action: 'remove', id });
 }
 
 export async function clearAll() {
   await AsyncStorage.removeItem(KEY);
+  DeviceEventEmitter.emit(LEDGER_EVENT, { action: 'clear' });
 }

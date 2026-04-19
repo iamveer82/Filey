@@ -32,7 +32,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Modal, Switch } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { listTx as listLedgerTx } from '../services/localLedger';
+import { listTx as listLedgerTx, LEDGER_EVENT } from '../services/localLedger';
+import { DeviceEventEmitter } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -497,6 +498,11 @@ export default function HomeScreen({ navigation, darkMode = true }) {
   };
 
   useFocusEffect(useCallback(() => { reloadLedger(); }, []));
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(LEDGER_EVENT, () => { reloadLedger(); });
+    return () => sub.remove();
+  }, []);
 
   const filteredLedger = useMemo(() => {
     const now = new Date();
