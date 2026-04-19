@@ -431,6 +431,7 @@ function AppContent() {
             <CustomTabBar {...props} darkMode={darkMode} />
           )}
           screenOptions={{
+            headerShown: false,
             headerStyle: {
               backgroundColor: c.headerBg,
               shadowColor: 'transparent',
