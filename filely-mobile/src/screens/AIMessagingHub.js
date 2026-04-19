@@ -412,6 +412,22 @@ HARD RULES:
 
     const pref = await getLLMPref().catch(() => ({ provider: 'gemma' }));
     const canTool = pref.provider === 'openai' || pref.provider === 'anthropic' || pref.provider === 'openrouter';
+    const movementIntent = /\b(paid|received|sent|got|transferred|owe|bought|spent|gave|collected)\b.*\b\d/i.test(text);
+    if (movementIntent) {
+      const parsed = parseMovementsFallback(text);
+      if (parsed.length) {
+        const { addTx: addLedgerTx } = require('../services/localLedger');
+        for (const m of parsed) {
+          pushMessage({ role: 'system', content: `⚙ log_money_movement…` });
+          await addLedgerTx(m);
+        }
+        try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+        const summary = parsed.map(m => `${m.direction === 'in' ? '+' : '-'}${m.amount.toLocaleString()} ${m.direction === 'in' ? 'from' : 'to'} ${m.counterparty}`).join(', ');
+        pushMessage({ role: 'assistant', content: `Logged: ${summary}.` });
+        setLoading(false);
+        return;
+      }
+    }
     if (canTool && TOOL_INTENT_RE.test(text)) {
       await runAgenticTurn(text);
     } else {
