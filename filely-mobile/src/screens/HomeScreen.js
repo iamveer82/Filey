@@ -500,8 +500,10 @@ export default function HomeScreen({ navigation, darkMode = true }) {
   useFocusEffect(useCallback(() => { reloadLedger(); }, []));
 
   useEffect(() => {
+    reloadLedger();
     const sub = DeviceEventEmitter.addListener(LEDGER_EVENT, () => { reloadLedger(); });
-    return () => sub.remove();
+    const poll = setInterval(reloadLedger, 2000);
+    return () => { sub.remove(); clearInterval(poll); };
   }, []);
 
   const filteredLedger = useMemo(() => {

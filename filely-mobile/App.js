@@ -42,6 +42,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import AIMessagingHub from './src/screens/AIMessagingHub';
 import TeamScreen from './src/screens/TeamScreen';
 import ComplianceVault from './src/screens/ComplianceVault';
+import ServicesScreen from './src/screens/ServicesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -78,12 +79,12 @@ const FilelyDarkTheme = {
 const TAB_ICONS = {
   Home:     { active: 'home',             inactive: 'home-outline'             },
   Chat:     { active: 'chatbubbles',      inactive: 'chatbubbles-outline'      },
-  Vault:    { active: 'shield-checkmark', inactive: 'shield-checkmark-outline' },
+  Services: { active: 'apps',             inactive: 'apps-outline'             },
   Team:     { active: 'people',           inactive: 'people-outline'           },
   Settings: { active: 'settings',         inactive: 'settings-outline'         },
 };
 
-const TAB_KEYS = ['Home', 'Chat', 'Vault', 'Team', 'Settings'];
+const TAB_KEYS = ['Home', 'Chat', 'Services', 'Team', 'Settings'];
 
 // ─── Spring configs ────────────────────────────────────────────────────────────
 
@@ -486,14 +487,14 @@ function AppContent() {
             {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
-          {/* ── Vault ─────────────────────────────────────────────────── */}
+          {/* ── Services ──────────────────────────────────────────────── */}
           <Tab.Screen
-            name="Vault"
+            name="Services"
             options={{
-              headerTitle: '5-Year Vault',
+              headerTitle: 'Services',
               headerLeft: () => (
                 <View style={headerStyles.iconLeft}>
-                  <Ionicons name="shield-checkmark" size={22} color="#3B6BFF" />
+                  <Ionicons name="apps" size={22} color="#3B6BFF" />
                 </View>
               ),
               headerRight: () => (
@@ -501,7 +502,7 @@ function AppContent() {
               ),
             }}
           >
-            {(props) => <ComplianceVault {...props} darkMode={darkMode} />}
+            {(props) => <ServicesScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
 
           {/* ── Team ──────────────────────────────────────────────────── */}
