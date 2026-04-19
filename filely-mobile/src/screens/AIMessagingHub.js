@@ -271,7 +271,14 @@ export default function AIMessagingHub() {
 
     const sys = {
       role: 'system',
-      content: `You are Filey, UAE VAT assistant for ${companyName}. Call tools when user asks to save, export, search vault, or view VAT summary. Keep replies short after tools run. VAT is 5% (FTA). Submitter: ${submitterName}.`,
+      content: `You are Filey, finance assistant for ${companyName}. Submitter: ${submitterName}.
+
+RULES:
+1. When user mentions a money movement (paid/received/sent/got/transferred), immediately call log_money_movement. Do NOT ask for VAT, category, date, or clarification. Use direction + amount + counterparty from the message. Default date = today. Default category = null.
+2. Parse multiple movements in one message as multiple tool calls in parallel.
+3. Only call save_transaction (with VAT) when user explicitly says "receipt", "invoice", or attaches an image.
+4. After tool runs, reply in ONE short sentence confirming. No follow-up questions.
+5. VAT is 5% (UAE FTA) — reference only when user asks about VAT.`,
     };
     const convo = [sys, ...history, { role: 'user', content: text }];
 
