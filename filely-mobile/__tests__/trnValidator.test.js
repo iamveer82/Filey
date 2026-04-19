@@ -23,8 +23,14 @@ describe('validateTrn', () => {
     const r = validateTrn('');
     expect(r.valid).toBe(false);
   });
-  test('passes clean back', () => {
-    const r = validateTrn('100-123-456-789-012');
-    expect(r.clean).toBe('100123456789012');
+  test('passes clean back with valid checksum (100000000000008)', () => {
+    const r = validateTrn('100-000-000-000-008');
+    expect(r.valid).toBe(true);
+    expect(r.clean).toBe('100000000000008');
+  });
+  test('rejects bad checksum', () => {
+    const r = validateTrn('100123456789012');
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/checksum/);
   });
 });

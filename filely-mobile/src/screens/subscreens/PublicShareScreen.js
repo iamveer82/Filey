@@ -22,7 +22,7 @@ export default function PublicShareScreen({ darkMode, onBack }) {
     if (!orgId) { Alert.alert('Error', 'No org context'); return; }
     setGenerating(true);
     try {
-      const res = await createShareLink({ orgId, from: from || null, to: to || null, ttlDays: ttl });
+      const res = await createShareLink({ orgId, from: from.trim() || null, to: to.trim() || null, ttlDays: ttl });
       setLink(res);
     } catch (e) {
       Alert.alert('Error', e.message || 'Could not create link');

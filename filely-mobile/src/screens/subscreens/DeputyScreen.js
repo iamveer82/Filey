@@ -28,8 +28,8 @@ export default function DeputyScreen({ darkMode, onBack }) {
       await setDeputy(userId, {
         deputyId: deputyId.trim(),
         deputyName: deputyName.trim() || deputyId.trim(),
-        start: start || null,
-        end: end || null,
+        start: start.trim() || null,
+        end: end.trim() || null,
         note: note.trim() || null,
       });
       setDid(''); setDname(''); setStart(''); setEnd(''); setNote('');
