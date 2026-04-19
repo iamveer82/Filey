@@ -452,93 +452,19 @@ function AppContent() {
             },
           }}
         >
-          {/* ── Home ──────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Home"
-            options={{
-              headerTitle: 'Filey',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="wallet" size={22} color="#2A63E2" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Home">
             {(props) => <HomeScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Chat ──────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Chat"
-            options={{
-              headerTitle: 'AI Hub',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="sparkles" size={22} color="#2A63E2" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Chat">
             {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Services ──────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Services"
-            options={{
-              headerTitle: 'Services',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="apps" size={22} color="#2A63E2" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Services">
             {(props) => <ServicesScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Team ──────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Team"
-            options={{
-              headerTitle: 'Team Hub',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="people" size={22} color="#2A63E2" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Team">
             {(props) => <TeamScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Settings ──────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Settings"
-            options={{
-              headerTitle: 'Settings',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="settings" size={22} color={c.textMuted} />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Settings">
             {(props) => (
               <SettingsScreen {...props} darkMode={darkMode} onLogout={signOut} />
             )}
