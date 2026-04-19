@@ -79,12 +79,12 @@ const FilelyDarkTheme = {
 const TAB_ICONS = {
   Home:     { active: 'home',             inactive: 'home-outline'             },
   Chat:     { active: 'chatbubbles',      inactive: 'chatbubbles-outline'      },
-  Services: { active: 'apps',             inactive: 'apps-outline'             },
+  Clip:     { active: 'attach',           inactive: 'attach-outline'           },
   Team:     { active: 'people',           inactive: 'people-outline'           },
   Settings: { active: 'settings',         inactive: 'settings-outline'         },
 };
 
-const TAB_KEYS = ['Home', 'Chat', 'Services', 'Team', 'Settings'];
+const TAB_KEYS = ['Home', 'Chat', 'Clip', 'Team', 'Settings'];
 
 // ─── Spring configs ────────────────────────────────────────────────────────────
 
@@ -458,7 +458,7 @@ function AppContent() {
           <Tab.Screen name="Chat">
             {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
           </Tab.Screen>
-          <Tab.Screen name="Services">
+          <Tab.Screen name="Clip">
             {(props) => <ServicesScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
           <Tab.Screen name="Team">
