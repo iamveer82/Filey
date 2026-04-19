@@ -68,8 +68,8 @@ const BARS = [
 ];
 
 const BILLS = [
-  { id: 'b1', day: '13th', mo: 'Aug', name: 'Figma',  amt: '$50' },
-  { id: 'b2', day: '15th', mo: 'Aug', name: 'Github', amt: '$11' },
+  { id: 'b1', day: '13th', mo: 'Aug', name: 'Figma',  amt: 'AED 50' },
+  { id: 'b2', day: '15th', mo: 'Aug', name: 'Github', amt: 'AED 11' },
 ];
 
 const CARDS = [
@@ -80,22 +80,22 @@ const CARDS = [
 const METRIC_LIBRARY = {
   m_balance: {
     id: 'm_balance', label: 'Total Balance', sub: 'All accounts',
-    amount: 365500, prefix: '$', delta: '+2.4%', deltaUp: true,
+    amount: 365500, prefix: 'AED ', delta: '+2.4%', deltaUp: true,
     icon: 'wallet', gradient: ['#2A63E2', '#2E5BFF', '#1E3A8A'], chipLabel: 'PRIMARY',
   },
   m_income: {
     id: 'm_income', label: 'Income', sub: 'This month',
-    amount: 12480, prefix: '$', delta: '+18.2%', deltaUp: true,
+    amount: 12480, prefix: 'AED ', delta: '+18.2%', deltaUp: true,
     icon: 'arrow-down-circle', gradient: ['#16A34A', '#0F7A37', '#064E21'], chipLabel: 'INCOMING',
   },
   m_spend: {
     id: 'm_spend', label: 'Spending', sub: 'This month',
-    amount: 4832, prefix: '$', delta: '-6.8%', deltaUp: false,
+    amount: 4832, prefix: 'AED ', delta: '-6.8%', deltaUp: false,
     icon: 'arrow-up-circle', gradient: ['#0B1435', '#1A2654', '#0B1435'], chipLabel: 'OUTGOING',
   },
   m_savings: {
     id: 'm_savings', label: 'Savings', sub: 'Year-to-date',
-    amount: 48200, prefix: '$', delta: '+31.5%', deltaUp: true,
+    amount: 48200, prefix: 'AED ', delta: '+31.5%', deltaUp: true,
     icon: 'trending-up', gradient: ['#8B5CF6', '#6D28D9', '#4C1D95'], chipLabel: 'GROWTH',
   },
   m_vat: {
@@ -105,12 +105,12 @@ const METRIC_LIBRARY = {
   },
   m_invest: {
     id: 'm_invest', label: 'Investments', sub: 'Portfolio value',
-    amount: 89450, prefix: '$', delta: '+12.7%', deltaUp: true,
+    amount: 89450, prefix: 'AED ', delta: '+12.7%', deltaUp: true,
     icon: 'trending-up-outline', gradient: ['#EC4899', '#BE185D', '#831843'], chipLabel: 'EQUITY',
   },
   m_debt: {
     id: 'm_debt', label: 'Debt', sub: 'Outstanding',
-    amount: 12300, prefix: '$', delta: '-8.4%', deltaUp: true,
+    amount: 12300, prefix: 'AED ', delta: '-8.4%', deltaUp: true,
     icon: 'card-outline', gradient: ['#475569', '#1E293B', '#0F172A'], chipLabel: 'LIABILITY',
   },
 };
@@ -119,10 +119,10 @@ const DEFAULT_METRIC_IDS = ['m_balance', 'm_income', 'm_spend'];
 const STORAGE_KEY = '@filey/home_metrics_v1';
 
 const RECURRING = [
-  { id: 'r1', name: 'Netflix',  freq: 'Monthly', amt: '$15.99', icon: 'play-circle-outline' },
-  { id: 'r2', name: 'Spotify',  freq: 'Monthly', amt: '$9.99',  icon: 'musical-notes-outline' },
-  { id: 'r3', name: 'iCloud',   freq: 'Monthly', amt: '$2.99',  icon: 'cloud-outline' },
-  { id: 'r4', name: 'Dropbox',  freq: 'Yearly',  amt: '$119',   icon: 'archive-outline' },
+  { id: 'r1', name: 'Netflix',  freq: 'Monthly', amt: 'AED 15.99', icon: 'play-circle-outline' },
+  { id: 'r2', name: 'Spotify',  freq: 'Monthly', amt: 'AED 9.99',  icon: 'musical-notes-outline' },
+  { id: 'r3', name: 'iCloud',   freq: 'Monthly', amt: 'AED 2.99',  icon: 'cloud-outline' },
+  { id: 'r4', name: 'Dropbox',  freq: 'Yearly',  amt: 'AED 119',   icon: 'archive-outline' },
 ];
 
 function Avatar({ name, color, size = 36 }) {
@@ -198,7 +198,7 @@ function formatMoney(n, prefix) {
   return `${prefix}${Math.round(n).toLocaleString('en-US')}`;
 }
 
-function CountUpText({ to, prefix = '$', style }) {
+function CountUpText({ to, prefix = 'AED ', style }) {
   const v = useSharedValue(0);
   const [display, setDisplay] = useState(`${prefix}0`);
 
@@ -569,7 +569,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
     transform: [{ scale: fabScale.value }],
   }));
 
-  const balance = useMemo(() => '$365,500', []);
+  const balance = useMemo(() => 'AED 365,500', []);
 
   const [bills, setBills] = useState([]);
   const [showAddBill, setShowAddBill] = useState(false);
@@ -649,7 +649,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                 <Text style={styles.balanceValue}>{balance}</Text>
                 <View style={styles.savedPill}>
                   <Ionicons name="sparkles" size={14} color="#FFFFFF" />
-                  <Text style={styles.savedText}>You have saved $10 in the last 30 days</Text>
+                  <Text style={styles.savedText}>You have saved AED 10 in the last 30 days</Text>
                   <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
                 </View>
               </Animated.View>
@@ -666,9 +666,9 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                 </View>
                 <View style={styles.chartRow}>
                   <View style={styles.yAxis}>
-                    <Text style={styles.yLabel}>$60</Text>
-                    <Text style={styles.yLabel}>$40</Text>
-                    <Text style={styles.yLabel}>$20</Text>
+                    <Text style={styles.yLabel}>60</Text>
+                    <Text style={styles.yLabel}>40</Text>
+                    <Text style={styles.yLabel}>20</Text>
                   </View>
                   <View style={{ flex: 1, flexDirection: 'row' }}>
                     {BARS.map((b, i) => (
@@ -794,7 +794,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                         <Text style={styles.activitySub}>{a.note || a.category || a.date}</Text>
                       </View>
                       <Text style={[styles.activityAmt, { color: isIn ? '#22C55E' : '#FF5470' }]}>
-                        {isIn ? '+' : '-'}{Math.abs(+a.amount).toLocaleString()}
+                        {isIn ? '+' : '-'}AED {Math.abs(+a.amount).toLocaleString()}
                       </Text>
                     </View>
                   );
@@ -844,7 +844,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                           <Text style={styles.billMo}>{b.mo}</Text>
                           <BrandIcon iconId={b.iconId} size={32} />
                           <Text style={styles.billName}>{b.name}</Text>
-                          <Text style={styles.billAmt}>${b.amount.toFixed(2)}</Text>
+                          <Text style={styles.billAmt}>AED {b.amount.toFixed(2)}</Text>
                         </View>
                       ))}
                     </>
@@ -860,7 +860,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                         <Text style={styles.billMo}>{mo}</Text>
                         <BrandIcon iconId={iconId} size={32} />
                         <Text style={styles.billName}>{b.name}</Text>
-                        <Text style={styles.billAmt}>${(+b.amount).toFixed(2)}</Text>
+                        <Text style={styles.billAmt}>AED {(+b.amount).toFixed(2)}</Text>
                         <Pressable onPress={() => toggleReminder(b.id)} hitSlop={6} style={{ marginTop: 4 }}>
                           <Ionicons
                             name={b.reminder ? 'notifications' : 'notifications-off-outline'}
@@ -997,7 +997,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
             <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.6, marginTop: 4, marginBottom: 6 }}>LABEL ICON</Text>
             <IconPicker value={newBill.iconId} onChange={(id) => setNewBill(b => ({ ...b, iconId: id }))} />
             <TextInput
-              placeholder="Amount (USD)"
+              placeholder="Amount (AED)"
               keyboardType="numeric"
               placeholderTextColor="rgba(11,20,53,0.4)"
               style={styles.modalInput}
