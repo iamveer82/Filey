@@ -3,8 +3,18 @@
  * Format: OpenAI-style function tools. Adapters translate for Anthropic/Gemini.
  */
 import apiClient from '../api/client';
-import { summarizeVat, categoryById } from './categories';
+import { summarizeVat, categoryById, CATEGORIES } from './categories';
 import { exportCSV, exportPDF } from './exportLedger';
+import { searchVault as smartSearch } from './smartSearch';
+import { listProjects, addProject, groupByProject } from './projects';
+import { getDeputy, setDeputy, clearDeputy } from './delegation';
+import { getMyCode, getPremiumStatus } from './referral';
+import { createShareLink } from './publicShare';
+import { getVersions } from './txVersioning';
+import { detectAnomaly, suggestFollowups } from './aiInsights';
+import { computeNudges } from './nudges';
+import { reclaimableVat, splitReclaim } from './vatRules';
+import { exportPeppolBatch } from './eInvoiceExport';
 
 export const TOOL_SCHEMAS = [
   {
@@ -68,12 +78,148 @@ export const TOOL_SCHEMAS = [
       parameters: {
         type: 'object',
         properties: {
-          format: { type: 'string', enum: ['csv', 'pdf'] },
+          format: { type: 'string', enum: ['csv', 'pdf', 'peppol'] },
           scope: { type: 'string', enum: ['mine', 'company'] },
           period: { type: 'string' },
         },
         required: ['format'],
       },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'smart_search',
+      description: 'Natural-language search across saved receipts (fuzzy merchant/category/notes/date).',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_projects',
+      description: 'List active projects/clients for bill-back tagging.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_project',
+      description: 'Create a new project/client.',
+      parameters: { type: 'object', properties: { name: { type: 'string' }, client: { type: 'string' } }, required: ['name'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'project_breakdown',
+      description: 'Group all transactions by project with totals + reclaimable VAT.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_deputy',
+      description: 'Read current out-of-office deputy for a manager.',
+      parameters: { type: 'object', properties: { managerId: { type: 'string' } }, required: ['managerId'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_deputy',
+      description: 'Assign a deputy approver during leave date range.',
+      parameters: {
+        type: 'object',
+        properties: {
+          managerId: { type: 'string' },
+          deputyId: { type: 'string' }, deputyName: { type: 'string' },
+          start: { type: 'string', description: 'YYYY-MM-DD' },
+          end: { type: 'string', description: 'YYYY-MM-DD' },
+          note: { type: 'string' },
+        },
+        required: ['managerId', 'deputyId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'clear_deputy',
+      description: 'Remove a deputy assignment.',
+      parameters: { type: 'object', properties: { managerId: { type: 'string' } }, required: ['managerId'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_referral',
+      description: 'Return user referral code + premium status.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_share_link',
+      description: 'Generate a signed read-only ledger share URL for accountant.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: { type: 'string' }, to: { type: 'string' },
+          ttlDays: { type: 'number' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_tx_versions',
+      description: 'Audit trail for a transaction (OCR snapshot + edit diffs).',
+      parameters: { type: 'object', properties: { txId: { type: 'string' } }, required: ['txId'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'detect_anomalies',
+      description: 'Flag unusual spending vs history (3σ + zero-variance fallback).',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_followups',
+      description: 'Suggested next questions based on recent receipts.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_nudges',
+      description: 'Compute actionable nudges (missing TRN, near-cap, duplicate risk).',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'reclaim_split',
+      description: 'Break reclaimable VAT by category (FTA partial-reclaim rules).',
+      parameters: { type: 'object', properties: { period: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_categories',
+      description: 'List all expense categories with FTA reclaim percentages.',
+      parameters: { type: 'object', properties: {} },
     },
   },
 ];
@@ -138,8 +284,104 @@ export async function runTool(name, args, ctx = {}) {
         const rows = Array.isArray(list) ? list : list?.transactions || [];
         const opts = { period: args.period, company: ctx.companyName };
         if (args.format === 'csv') await exportCSV(rows, opts);
+        else if (args.format === 'peppol') await exportPeppolBatch(rows, opts);
         else await exportPDF(rows, opts);
         return { ok: true, result: { exported: rows.length, format: args.format } };
+      }
+
+      case 'smart_search': {
+        const list = await apiClient.getTransactions({});
+        const rows = Array.isArray(list) ? list : list?.transactions || [];
+        const hits = await smartSearch(args.query, rows, { limit: args.limit || 15 });
+        return { ok: true, result: { count: hits.length, hits } };
+      }
+
+      case 'list_projects': {
+        const projs = await listProjects(ctx.orgId);
+        return { ok: true, result: { projects: projs } };
+      }
+
+      case 'add_project': {
+        const p = await addProject(ctx.orgId, { name: args.name, client: args.client });
+        return { ok: true, result: p };
+      }
+
+      case 'project_breakdown': {
+        const [projs, list] = await Promise.all([
+          listProjects(ctx.orgId),
+          apiClient.getTransactions({}),
+        ]);
+        const rows = Array.isArray(list) ? list : list?.transactions || [];
+        return { ok: true, result: groupByProject(rows, projs) };
+      }
+
+      case 'get_deputy': {
+        const d = await getDeputy(args.managerId);
+        return { ok: true, result: d };
+      }
+
+      case 'set_deputy': {
+        const d = await setDeputy(args.managerId, {
+          deputyId: args.deputyId, deputyName: args.deputyName,
+          start: args.start, end: args.end, note: args.note,
+        });
+        return { ok: true, result: d };
+      }
+
+      case 'clear_deputy': {
+        await clearDeputy(args.managerId);
+        return { ok: true, result: { cleared: true } };
+      }
+
+      case 'get_referral': {
+        const [code, premium] = await Promise.all([
+          getMyCode(ctx.userId), getPremiumStatus(),
+        ]);
+        return { ok: true, result: { code, premium } };
+      }
+
+      case 'create_share_link': {
+        const link = await createShareLink({
+          orgId: ctx.orgId || 'default',
+          from: args.from, to: args.to,
+          ttlDays: args.ttlDays || 30,
+        });
+        return { ok: true, result: link };
+      }
+
+      case 'get_tx_versions': {
+        const versions = await getVersions(args.txId);
+        return { ok: true, result: { count: versions.length, versions } };
+      }
+
+      case 'detect_anomalies': {
+        const list = await apiClient.getTransactions({});
+        const rows = Array.isArray(list) ? list : list?.transactions || [];
+        const flagged = rows.map(t => ({ tx: t, anomaly: detectAnomaly(t, rows) }))
+          .filter(x => x.anomaly?.isAnomaly);
+        return { ok: true, result: { count: flagged.length, flagged: flagged.slice(0, 10) } };
+      }
+
+      case 'get_followups': {
+        const list = await apiClient.getTransactions({});
+        const rows = Array.isArray(list) ? list : list?.transactions || [];
+        return { ok: true, result: { suggestions: suggestFollowups(rows) } };
+      }
+
+      case 'get_nudges': {
+        const list = await apiClient.getTransactions({});
+        const rows = Array.isArray(list) ? list : list?.transactions || [];
+        return { ok: true, result: { nudges: computeNudges(rows) } };
+      }
+
+      case 'reclaim_split': {
+        const list = await apiClient.getTransactions({});
+        const rows = Array.isArray(list) ? list : list?.transactions || [];
+        return { ok: true, result: splitReclaim(rows) };
+      }
+
+      case 'list_categories': {
+        return { ok: true, result: { categories: CATEGORIES } };
       }
 
       default:
