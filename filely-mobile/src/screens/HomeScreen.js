@@ -782,7 +782,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                   </View>
                 )}
 
-                {filteredLedger.map((a) => {
+                {filteredLedger.slice(0, 10).map((a) => {
                   const isIn = a.direction === 'in';
                   return (
                     <View key={a.id} style={styles.activityRow}>
@@ -1057,7 +1057,7 @@ const HERO_H = 340;
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#FFFFFF',
   },
   hero: {
     backgroundColor: '#2A63E2',
