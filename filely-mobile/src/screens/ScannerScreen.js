@@ -231,9 +231,6 @@ export default function ScannerScreen({ navigation, route }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
 
-      {/* Wood texture background */}
-      <View style={styles.woodBackground} />
-
       {/* Camera preview */}
       <Camera
         ref={cameraRef}
@@ -346,17 +343,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-  },
-  // Wood texture background (procedural - dark brown gradient)
-  woodBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#3d2817',
-    backgroundImage: `
-      linear-gradient(135deg,
-        rgba(61,40,23,0.95) 0%,
-        rgba(45,30,20,0.9) 50%,
-        rgba(61,40,23,0.95) 100%)
-    `,
   },
   camera: {
     flex: 1,
