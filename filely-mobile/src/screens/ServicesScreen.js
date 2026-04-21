@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Platform, StatusBar, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Platform, StatusBar, TextInput, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
 import * as Sharing from 'expo-sharing';
@@ -12,6 +12,11 @@ import apiClient from '../api/client';
 import { createShareLink } from '../services/publicShare';
 import { useAuth } from '../context/AuthContext';
 import { listFiles, addFile, removeFile, subscribeFiles, formatWhen } from '../services/recentFiles';
+import { removeWatermarkInteractive } from '../services/watermarkRemover';
+import { signDocument } from '../services/esign';
+import { mergePdfsInteractive } from '../services/pdfMerger';
+import { compressPdfInteractive } from '../services/pdfCompressor';
+import { scanDocument, scanMultiPageDocument } from '../services/documentScanner';
 
 const BRAND = '#2A63E2';
 
@@ -52,8 +57,7 @@ export default function ServicesScreen({ navigation }) {
     setBusy(id);
     try {
       switch (id) {
-        case 'scan':
-        case 'scanReceipt': {
+        case 'scan': {
           const res = await scanReceipt('camera');
           if (res.success) {
             await addFile({ name: `Receipt ${res.transaction?.merchant || 'scan'}.pdf`, kind: 'receipt' });
@@ -61,9 +65,18 @@ export default function ServicesScreen({ navigation }) {
           } else if (res.error) Alert.alert('Scan failed', res.error);
           break;
         }
-        case 'pdfscan':
-          Alert.alert('PDF Scanner', 'Camera stream → bundles pages → saves PDF. Coming next.');
+        case 'scanReceipt': {
+          const res = await scanReceipt('gallery');
+          if (res.success) {
+            await addFile({ name: `Receipt ${res.transaction?.merchant || 'scan'}.pdf`, kind: 'receipt' });
+            Alert.alert('Scanned', `${res.transaction?.merchant || ''} ${res.transaction?.amount || ''} AED`);
+          } else if (res.error) Alert.alert('Scan failed', res.error);
           break;
+        }
+        case 'pdfscan': {
+          navigation.navigate('Scanner');
+          break;
+        }
         case 'pdfword': {
           const pick = await pickPdf();
           if (!pick) break;
@@ -84,24 +97,98 @@ export default function ServicesScreen({ navigation }) {
           }
           break;
         }
-        case 'sign':
-          Alert.alert('eSign PDF', 'Pick PDF → draw signature → embed. UI wiring pending.');
+        case 'sign': {
+          const res = await signDocument();
+          if (res.success) {
+            await addFile({ name: `Signed-${Date.now()}.pdf`, kind: 'pdf', uri: res.outputUri });
+            Alert.alert('Success', res.message || 'Document signed!');
+          } else if (res.error) {
+            Alert.alert('eSign failed', res.error);
+          }
           break;
-        case 'watermark':
-          Alert.alert('Watermark', 'Add text/image watermark to PDF. Coming next.');
+        }
+        case 'watermark': {
+          const res = await removeWatermarkInteractive();
+          if (res.success) {
+            if (res.outputUri) {
+              await addFile({ name: `Cleaned-${Date.now()}.png`, kind: 'image', uri: res.outputUri });
+            }
+            Alert.alert('Watermark', res.message || res.error || 'Done');
+          } else if (res.error) {
+            Alert.alert('Watermark failed', res.error);
+          }
           break;
-        case 'split':
-          Alert.alert('Split PDF', 'Split PDF by page range. Coming next.');
+        }
+        case 'split': {
+          const { splitPdfsInteractive } = require('../services/pdfMerger');
+          const pick = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+          if (pick.canceled || !pick.assets?.[0]) break;
+          const pdf = pick.assets[0];
+          // Default: split in half
+          const { NativeModules } = require('react-native');
+          const NativePdfTools = NativeModules.PdfTools;
+          let pageCount = 1;
+          if (NativePdfTools) {
+            try { const info = await NativePdfTools.getPageCount(pdf.uri); pageCount = info.pageCount || 1; } catch {}
+          }
+          const half = Math.ceil(pageCount / 2);
+          const ranges = [
+            { start: 1, end: half },
+            { start: half + 1, end: pageCount },
+          ];
+          const result = await splitPdfsInteractive(pdf.uri, ranges, pdf.name || 'split');
+          if (result.success) {
+            Alert.alert('Split complete', result.message);
+          } else if (result.error) {
+            Alert.alert('Split failed', result.error);
+          }
           break;
-        case 'merge':
-          Alert.alert('Merge PDF', 'Pick multiple PDFs → merge into one. Coming next.');
+        }
+        case 'merge': {
+          const res = await mergePdfsInteractive();
+          if (res.success) {
+            await addFile({ name: `Merged-${Date.now()}.pdf`, kind: 'pdf', uri: res.outputUri });
+            Alert.alert('Merge successful', res.message);
+          } else if (res.error) {
+            Alert.alert('Merge failed', res.error);
+          }
           break;
-        case 'protect':
-          Alert.alert('Protect PDF', 'Password-lock a PDF. Coming next.');
+        }
+        case 'protect': {
+          const protectPick = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+          if (protectPick.canceled || !protectPick.assets?.[0]) break;
+          const pdf2 = protectPick.assets[0];
+          const { NativeModules } = require('react-native');
+          const NativePdfTools2 = NativeModules.PdfTools;
+          if (NativePdfTools2) {
+            Alert.prompt(
+              'Password Protect',
+              'Enter a password to lock this PDF:',
+              async (password) => {
+                if (!password) return;
+                const res = await NativePdfTools2.protectPdf(pdf2.uri, password, pdf2.name || 'protected');
+                if (res.success) {
+                  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(res.uri, { mimeType: 'application/pdf', dialogTitle: 'Save Protected PDF' });
+                  Alert.alert('Protected', 'PDF locked with password.');
+                }
+              },
+              'secure-text'
+            );
+          } else {
+            Alert.alert('Error', 'Native PDF tools not available.');
+          }
           break;
-        case 'compress':
-          Alert.alert('Compress PDF', 'Shrink PDF file size. Coming next.');
+        }
+        case 'compress': {
+          const res = await compressPdfInteractive();
+          if (res.success) {
+            await addFile({ name: `Compressed-${Date.now()}.pdf`, kind: 'pdf', uri: res.outputUri });
+            Alert.alert('Compression successful', res.message);
+          } else if (res.error) {
+            Alert.alert('Compression failed', res.error);
+          }
           break;
+        }
         case 'all':
           setShowAll(v => !v);
           break;
@@ -166,152 +253,172 @@ export default function ServicesScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#2A63E2" />
 
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <View style={styles.brandMark}>
-            <Ionicons name="flash" size={16} color="#FFFFFF" />
-          </View>
-          <Text style={styles.brandTitle}>Filey</Text>
-        </View>
-        <Pressable hitSlop={10} style={styles.searchBtn}>
-          <Ionicons name="search-outline" size={20} color="#0B1435" />
-        </Pressable>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.grid}>
-          {TOOLS.map((t, i) => (
-            <Animated.View key={t.id} entering={FadeInUp.delay(60 + i * 30).duration(320)} style={styles.cell}>
-              <Pressable
-                onPress={() => handle(t.id)}
-                disabled={busy === t.id}
-                accessibilityRole="button"
-                accessibilityLabel={t.label}
-                style={({ pressed }) => [styles.toolBtn, { opacity: pressed ? 0.7 : 1 }]}
-              >
-                <View style={[styles.toolCircle, { backgroundColor: t.bg }]}>
-                  <Ionicons name={t.icon} size={24} color={t.tint} />
-                </View>
-                <Text style={styles.toolLabel} numberOfLines={2}>{t.label}</Text>
-              </Pressable>
-            </Animated.View>
-          ))}
-        </View>
-
-        {showAll && (
-          <Animated.View entering={FadeIn.duration(260)} style={styles.grid}>
-            {ALL_TOOLS.map((t, i) => (
-              <View key={t.id} style={styles.cell}>
+      {/* Blue section: tool grid only */}
+      <View style={styles.blueSection}>
+        {/* Tool grid - blue background */}
+        <View style={styles.scroll}>
+          <View style={styles.grid}>
+            {TOOLS.map((t, i) => (
+              <Animated.View key={t.id} entering={FadeInUp.delay(60 + i * 30).duration(320)} style={styles.cell}>
                 <Pressable
                   onPress={() => handle(t.id)}
                   disabled={busy === t.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.label}
                   style={({ pressed }) => [styles.toolBtn, { opacity: pressed ? 0.7 : 1 }]}
                 >
                   <View style={[styles.toolCircle, { backgroundColor: t.bg }]}>
-                    <Ionicons name={t.icon} size={22} color={t.tint} />
+                    <Ionicons name={t.icon} size={24} color={t.tint} />
                   </View>
                   <Text style={styles.toolLabel} numberOfLines={2}>{t.label}</Text>
                 </Pressable>
-              </View>
+              </Animated.View>
             ))}
-          </Animated.View>
-        )}
+          </View>
 
-        <View style={styles.recentHeader}>
-          <Text style={styles.recentTitle}>Recent Files</Text>
-          <Pressable hitSlop={8}>
-            <Ionicons name="arrow-forward" size={20} color={BRAND} />
+          {showAll && (
+            <Animated.View entering={FadeIn.duration(260)} style={styles.grid}>
+              {ALL_TOOLS.map((t, i) => (
+                <View key={t.id} style={styles.cell}>
+                  <Pressable
+                    onPress={() => handle(t.id)}
+                    disabled={busy === t.id}
+                    style={({ pressed }) => [styles.toolBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <View style={[styles.toolCircle, { backgroundColor: t.bg }]}>
+                      <Ionicons name={t.icon} size={22} color={t.tint} />
+                    </View>
+                    <Text style={styles.toolLabel} numberOfLines={2}>{t.label}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </Animated.View>
+          )}
+        </View>
+
+      </View>
+
+      {/* White section: Recent Files (scrollable) */}
+      <View style={styles.whiteSection}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.recentHeader}>
+            <Text style={styles.recentTitle}>Recent Files</Text>
+            <Pressable hitSlop={8}>
+              <Ionicons name="arrow-forward" size={20} color={BRAND} />
+            </Pressable>
+          </View>
+
+          {filteredFiles.length === 0 && (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>No files yet. Use a tool above — the result will land here.</Text>
+            </View>
+          )}
+
+          {filteredFiles.map((f) => {
+            const fi = fileIcon(f.kind);
+            return (
+              <View key={f.id} style={styles.fileCard}>
+                <View style={styles.fileThumb}>
+                  <Ionicons name={fi.icon} size={22} color={fi.tint} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
+                  <Text style={styles.fileDate}>{formatWhen(f.ts)}</Text>
+                </View>
+                <Pressable hitSlop={8} onPress={() => shareFile(f)} style={styles.fileIconBtn}>
+                  <Ionicons name="share-social-outline" size={18} color="#0B1435" />
+                </Pressable>
+                <Pressable hitSlop={8} onPress={() => removeFile(f.id)} style={styles.fileIconBtn}>
+                  <Ionicons name="ellipsis-vertical" size={18} color="#0B1435" />
+                </Pressable>
+              </View>
+            );
+          })}
+
+          <View style={{ height: 80 }} />
+        </ScrollView>
+
+        {/* FAB row - inside whiteSection for proper positioning */}
+        <View style={styles.fabRow}>
+          <Pressable onPress={() => handle('scan')} style={[styles.fab, { backgroundColor: '#4B7CF0' }]} accessibilityLabel="Scan with camera">
+            <Ionicons name="camera" size={22} color="#FFFFFF" />
+          </Pressable>
+          <Pressable onPress={uploadFile} style={[styles.fab, { backgroundColor: BRAND }]} accessibilityLabel="Upload file">
+            <Ionicons name="cloud-upload" size={22} color="#FFFFFF" />
           </Pressable>
         </View>
-
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={16} color="rgba(11,20,53,0.45)" />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search files"
-            placeholderTextColor="rgba(11,20,53,0.45)"
-            style={styles.searchInput}
-          />
-        </View>
-
-        {filteredFiles.length === 0 && (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No files yet. Use a tool above — the result will land here.</Text>
-          </View>
-        )}
-
-        {filteredFiles.map((f) => {
-          const fi = fileIcon(f.kind);
-          return (
-            <View key={f.id} style={styles.fileCard}>
-              <View style={styles.fileThumb}>
-                <Ionicons name={fi.icon} size={22} color={fi.tint} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
-                <Text style={styles.fileDate}>{formatWhen(f.ts)}</Text>
-              </View>
-              <Pressable hitSlop={8} onPress={() => shareFile(f)} style={styles.fileIconBtn}>
-                <Ionicons name="share-social-outline" size={18} color="#0B1435" />
-              </Pressable>
-              <Pressable hitSlop={8} onPress={() => removeFile(f.id)} style={styles.fileIconBtn}>
-                <Ionicons name="ellipsis-vertical" size={18} color="#0B1435" />
-              </Pressable>
-            </View>
-          );
-        })}
-
-        <View style={{ height: 120 }} />
-      </ScrollView>
-
-      <View style={styles.fabRow}>
-        <Pressable onPress={() => handle('scan')} style={[styles.fab, { backgroundColor: '#4B7CF0' }]} accessibilityLabel="Scan with camera">
-          <Ionicons name="camera" size={22} color="#FFFFFF" />
-        </Pressable>
-        <Pressable onPress={uploadFile} style={[styles.fab, { backgroundColor: BRAND }]} accessibilityLabel="Upload file">
-          <Ionicons name="cloud-upload" size={22} color="#FFFFFF" />
-        </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7F9FC' },
+  root: { flex: 1, backgroundColor: '#2A63E2' },
 
-  topBar: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+  blueSection: {
+    backgroundColor: '#2A63E2',
   },
+
+  hero: {
+    backgroundColor: 'transparent',
+    paddingTop: Platform.OS === 'ios' ? 64 : 44,
+    paddingBottom: 8,
+    paddingHorizontal: 20,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  heroTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandMark: {
-    width: 30, height: 30, borderRadius: 10,
-    backgroundColor: BRAND,
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
   },
-  brandTitle: { fontSize: 18, fontWeight: '800', color: '#0B1435', letterSpacing: -0.3 },
   searchBtn: {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#F2F4F8',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
+  searchBarHero: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 22,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  searchInputHero: {
+    flex: 1,
+    fontSize: 13.5,
+    color: '#FFFFFF',
+    padding: 0,
+  },
 
-  scroll: { paddingHorizontal: 20, paddingTop: 16 },
+  scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, marginBottom: 10 },
-  cell: { width: '25%', paddingHorizontal: 6, marginBottom: 16, alignItems: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -8, marginBottom: 4 },
+
+  whiteSection: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -20,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  cell: { width: '25%', paddingHorizontal: 8, marginBottom: 20, alignItems: 'center' },
   toolBtn: { alignItems: 'center', width: '100%' },
   toolCircle: {
     width: 56, height: 56, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   toolLabel: {
     fontSize: 11.5, fontWeight: '600',
@@ -319,28 +426,19 @@ const styles = StyleSheet.create({
   },
 
   recentHeader: {
-    marginTop: 14, marginBottom: 10,
+    marginTop: 4, marginBottom: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   recentTitle: { fontSize: 18, fontWeight: '800', color: '#0B1435', letterSpacing: -0.3 },
-
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FFFFFF', borderRadius: 14,
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)',
-    marginBottom: 12,
-  },
-  searchInput: { flex: 1, fontSize: 13.5, color: '#0B1435', padding: 0 },
 
   emptyBox: { paddingVertical: 24, alignItems: 'center' },
   emptyText: { color: 'rgba(11,20,53,0.5)', fontSize: 13, textAlign: 'center' },
 
   fileCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16, padding: 12, marginBottom: 10,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.05)',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: 'rgba(11,20,53,0.08)',
   },
   fileThumb: {
     width: 46, height: 54, borderRadius: 8,
