@@ -15,10 +15,24 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import ScannerOverlay from '../components/ScannerOverlay';
 import WoodBackground from '../components/WoodBackground';
-import { detectDocumentEdges, autoCropDocument, applyPerspectiveCorrection, enhanceDocumentImage, generatePdfFromImages } from '../services/documentScanner';
-import { recognizeText } from '../services/visionOcr';
-import { parseReceipt } from '../services/gemmaInference';
 import { addFile } from '../services/recentFiles';
+import DemoConfig from '../lib/demoMode';
+
+// Conditionally import demo vs real services
+const {
+  detectDocumentEdges, autoCropDocument, applyPerspectiveCorrection,
+  enhanceDocumentImage, generatePdfFromImages
+} = DemoConfig.enabled
+  ? require('../services/documentScanner.demo')
+  : require('../services/documentScanner');
+
+const { recognizeText } = DemoConfig.enabled
+  ? require('../services/visionOcr.demo')
+  : require('../services/visionOcr');
+
+const { parseReceipt } = DemoConfig.enabled
+  ? require('../services/gemmaInference.demo')
+  : require('../services/gemmaInference');
 
 const BRAND = '#2A63E2';
 const SCAN_MODES = [
@@ -265,6 +279,9 @@ export default function ScannerScreen({ navigation, route }) {
 
           <View style={styles.toolbarCenter}>
             <Text style={styles.toolbarTitle}>Scan Document</Text>
+            {DemoConfig.enabled && (
+              <Text style={styles.demoBadge}>DEMO MODE</Text>
+            )}
           </View>
 
           <Pressable onPress={toggleFlash} style={styles.toolbarButton}>
@@ -405,6 +422,16 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  demoBadge: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   // Camera container - centered with aspect ratio
