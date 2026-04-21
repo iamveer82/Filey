@@ -166,7 +166,18 @@ export default function ServicesScreen({ navigation }) {
               'Enter a password to lock this PDF:',
               async (password) => {
                 if (!password) return;
-                const res = await NativePdfTools2.protectPdf(pdf2.uri, password, pdf2.name || 'protected');
+                const res = await NativePdfTools2.protectPdf(
+                  pdf2.uri,
+                  password,           // userPassword
+                  password,           // ownerPassword (same for simplicity)
+                  pdf2.name || 'protected',
+                  {                   // permissions
+                    printing: true,
+                    copying: false,    // disable copy for security
+                    modifying: false,
+                    annotating: true
+                  }
+                );
                 if (res.success) {
                   if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(res.uri, { mimeType: 'application/pdf', dialogTitle: 'Save Protected PDF' });
                   Alert.alert('Protected', 'PDF locked with password.');

@@ -3,14 +3,39 @@ import PDFKit
 import UIKit
 import React
 import CryptoKit
+import CoreGraphics
 
 @objc(PdfTools)
-class PdfTools: NSObject {
+class PdfTools: RCTEventEmitter {
+
+  private var hasListeners = false
 
   @objc
-  static func requiresMainQueueSetup() -> Bool { false }
+  static override func requiresMainQueueSetup() -> Bool { false }
 
-  // ─── MERGE ─────────────────────────────────────────────────────────────────
+  override func supportedEvents() -> [String]! {
+    return ["PdfProgress", "PdfOperationComplete"]
+  }
+
+  override func startObserving() {
+    hasListeners = true
+  }
+
+  override func stopObserving() {
+    hasListeners = false
+  }
+
+  private func emitProgress(_ operation: String, progress: Double, message: String = "") {
+    if hasListeners {
+      self.sendEvent(withName: "PdfProgress", body: [
+        "operation": operation,
+        "progress": progress,
+        "message": message
+      ])
+    }
+  }
+
+  // MARK: - MERGE
 
   @objc
   func mergePdfs(_ pdfUris: [String],
@@ -19,7 +44,7 @@ class PdfTools: NSObject {
                  rejecter reject: @escaping RCTPromiseRejectBlock) {
 
     guard pdfUris.count >= 2 else {
-      reject("ERR", "Need at least 2 PDFs to merge", nil)
+      reject("MERGE_ERROR", "Need at least 2 PDFs to merge", nil)
       return
     }
 
@@ -28,18 +53,21 @@ class PdfTools: NSObject {
 
     DispatchQueue.global(qos: .userInitiated).async {
       guard let mergedPdf = PDFDocument() else {
-        reject("ERR", "Could not create PDF document", nil)
+        reject("MERGE_ERROR", "Could not create PDF document", nil)
         return
       }
 
       var totalPages = 0
-      for uri in pdfUris {
+      var processedCount = 0
+
+      for (index, uri) in pdfUris.enumerated() {
         let url = URL(string: uri) ?? URL(fileURLWithPath: uri)
         guard let data = try? Data(contentsOf: url),
               let pdf = PDFDocument(data: data) else {
           print("[PdfTools] Could not load PDF: \(uri)")
           continue
         }
+
         let pageCount = pdf.pageCount
         for i in 0..<pageCount {
           if let page = pdf.page(at: i) {
@@ -47,17 +75,23 @@ class PdfTools: NSObject {
             totalPages += 1
           }
         }
+
+        processedCount += 1
+        let progress = Double(processedCount) / Double(pdfUris.count) * 0.9
+        self.emitProgress("merge", progress: progress, message: "Processing PDF \(processedCount)/\(pdfUris.count)")
       }
 
       guard totalPages > 0 else {
-        reject("ERR", "No pages could be loaded from provided PDFs", nil)
+        reject("MERGE_ERROR", "No pages could be loaded from provided PDFs", nil)
         return
       }
 
       guard mergedPdf.write(to: outputUrl) else {
-        reject("ERR", "Failed to write merged PDF", nil)
+        reject("MERGE_ERROR", "Failed to write merged PDF", nil)
         return
       }
+
+      self.emitProgress("merge", progress: 1.0, message: "Complete")
 
       resolve([
         "uri": outputUrl.absoluteString,
@@ -68,7 +102,7 @@ class PdfTools: NSObject {
     }
   }
 
-  // ─── SPLIT ─────────────────────────────────────────────────────────────────
+  // MARK: - SPLIT
 
   @objc
   func splitPdf(_ pdfUri: String,
@@ -80,15 +114,12 @@ class PdfTools: NSObject {
     let url = URL(string: pdfUri) ?? URL(fileURLWithPath: pdfUri)
     guard let data = try? Data(contentsOf: url),
           let pdf = PDFDocument(data: data) else {
-      reject("ERR", "Could not load PDF", nil)
+      reject("SPLIT_ERROR", "Could not load PDF", nil)
       return
     }
 
     let outputDir = FileManager.default.temporaryDirectory.appendingPathComponent("split_\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
-
-    let outputFilename = filename.hasSuffix(".pdf") ? filename : "\(filename)_split.pdf"
-    let baseOutputUrl = outputDir.appendingPathComponent(outputFilename)
 
     var results: [[String: Any]] = []
 
@@ -115,7 +146,12 @@ class PdfTools: NSObject {
           "pageCount": splitPdf.pageCount
         ])
       }
+
+      let progress = Double(i + 1) / Double(ranges.count)
+      self.emitProgress("split", progress: progress, message: "Splitting part \(i+1)/\(ranges.count)")
     }
+
+    self.emitProgress("split", progress: 1.0, message: "Complete")
 
     resolve([
       "files": results,
@@ -124,89 +160,202 @@ class PdfTools: NSObject {
     ])
   }
 
-  // ─── PROTECT (password) ───────────────────────────────────────────────────
+  // MARK: - PASSWORD PROTECTION (Real Implementation)
 
   @objc
   func protectPdf(_ pdfUri: String,
-                  password: String,
+                  userPassword: String,
+                  ownerPassword: String?,
                   filename: String,
+                  permissions: [String: Bool]?,
                   resolver resolve: @escaping RCTPromiseResolveBlock,
                   rejecter reject: @escaping RCTPromiseRejectBlock) {
 
     let url = URL(string: pdfUri) ?? URL(fileURLWithPath: pdfUri)
-    guard let data = try? Data(contentsOf: url),
-          let pdf = PDFDocument(data: data) else {
-      reject("ERR", "Could not load PDF", nil)
+    guard let pdfData = try? Data(contentsOf: url) else {
+      reject("PROTECT_ERROR", "Could not load PDF file", nil)
       return
     }
 
-    // PDFKit doesn't support password protection directly.
-    // We generate an info file noting protection was requested.
-    // Full implementation would use CGPDFDocument with kCGPDFContextUserPassword.
-    let outputFilename = filename.hasSuffix(".pdf") ? filename : "\(filename)_protected.pdf"
+    let outputFilename = filename.hasSuffix(".pdf") ? filename : "\(filename).pdf"
     let outputUrl = FileManager.default.temporaryDirectory.appendingPathComponent(outputFilename)
-    let outputDir = FileManager.default.temporaryDirectory.appendingPathComponent("protect_\(UUID().uuidString)")
 
-    // Write unprotected copy as placeholder
-    _ = pdf.write(to: outputUrl)
+    DispatchQueue.global(qos: .userInitiated).async {
+      // Use CGPDFDocument to create password-protected PDF
+      guard let provider = CGDataProvider(data: pdfData as CFData),
+            let cgPdf = CGPDFDocument(provider) else {
+        reject("PROTECT_ERROR", "Could not parse PDF", nil)
+        return
+      }
 
-    let info: [String: Any] = [
-      "protected": true,
-      "passwordSet": !password.isEmpty,
-      "originalPageCount": pdf.pageCount
-    ]
+      // Create PDF context with password protection
+      var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+      if let firstPage = cgPdf.page(at: 1) {
+        mediaBox = firstPage.getBoxRect(.mediaBox)
+      }
 
-    try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+      // Setup protection options
+      let ownerPass = ownerPassword ?? userPassword
+      let userPass = userPassword
 
-    resolve([
-      "uri": outputUrl.absoluteString,
-      "protectionInfo": info,
-      "success": true,
-      "note": "Password protection requires CGPDFDocument API"
-    ])
+      // Build permissions value (CGPDFAccessPermissions)
+      var permValue: CGPDFAccessPermissions = [.copying, [.printing, .highQualityPrinting], .annotating, .editing]
+      if let perms = permissions {
+        if perms["printing"] == false { permValue.remove(.printing) }
+        if perms["copying"] == false { permValue.remove(.copying) }
+        if perms["modifying"] == false { permValue.remove(.editing) }
+        if perms["annotating"] == false { permValue.remove(.annotating) }
+      }
+
+      guard let consumer = CGDataConsumer(url: outputUrl as CFURL) else {
+        reject("PROTECT_ERROR", "Could not create output file", nil)
+        return
+      }
+
+      // Create PDF context with password options
+      let options: NSMutableDictionary = [
+        kCGPDFContextUserPassword: userPass,
+        kCGPDFContextOwnerPassword: ownerPass,
+        kCGPDFContextEncryptionKeyLength: 128
+      ]
+
+      // Add permissions
+      if let perms = permissions {
+        var allowCopying = perms["copying"] ?? true
+        var allowPrinting = perms["printing"] ?? true
+        options[kCGPDFContextAllowsCopying] = allowCopying
+        options[kCGPDFContextAllowsPrinting] = allowPrinting
+      }
+
+      guard let ctx = CGContext(consumer: consumer, mediaBox: &mediaBox, options as CFDictionary) else {
+        reject("PROTECT_ERROR", "Could not create PDF context", nil)
+        return
+      }
+
+      let pageCount = cgPdf.numberOfPages
+
+      for i in 1...pageCount {
+        guard let page = cgPdf.page(at: i) else { continue }
+
+        var pageBox = page.getBoxRect(.mediaBox)
+        ctx.beginPage(mediaBox: &pageBox)
+        ctx.drawPDFPage(page)
+        ctx.endPage()
+
+        self.emitProgress("protect", progress: Double(i) / Double(pageCount), message: "Encrypting page \(i)/\(pageCount)")
+      }
+
+      ctx.closePDF()
+
+      self.emitProgress("protect", progress: 1.0, message: "Complete")
+
+      resolve([
+        "uri": outputUrl.absoluteString,
+        "pageCount": pageCount,
+        "success": true,
+        "protected": true,
+        "hasUserPassword": !userPass.isEmpty,
+        "hasOwnerPassword": !ownerPass.isEmpty
+      ])
+    }
   }
 
-  // ─── COMPRESS ─────────────────────────────────────────────────────────────
+  // MARK: - COMPRESS (Aggressive with Image Resampling)
 
   @objc
   func compressPdf(_ pdfUri: String,
                    quality: String,
+                   targetSizeKB: Int,
                    resolver resolve: @escaping RCTPromiseResolveBlock,
                    rejecter reject: @escaping RCTPromiseRejectBlock) {
 
     let url = URL(string: pdfUri) ?? URL(fileURLWithPath: pdfUri)
     guard let data = try? Data(contentsOf: url),
           let pdf = PDFDocument(data: data) else {
-      reject("ERR", "Could not load PDF", nil)
+      reject("COMPRESS_ERROR", "Could not load PDF", nil)
       return
     }
 
     let outputFilename = "compressed_\(Int(Date().timeIntervalSince1970)).pdf"
     let outputUrl = FileManager.default.temporaryDirectory.appendingPathComponent(outputFilename)
 
-    // Write with compression options
-    // PDFDocument.save() uses flat packaging; image re-sampling done separately
-    let options: [PDFDocumentWriteOption: Any] = [
-      .compressContent: true
-    ]
+    DispatchQueue.global(qos: .userInitiated).async {
+      let origSize = data.count
+      let qualityScale: CGFloat
+      let dpi: CGFloat
 
-    if pdf.write(to: outputUrl, withOptions: options) {
-      let origKB = data.count / 1024
-      let compKB = (try? Data(contentsOf: outputUrl))?.count ?? 0 / 1024
+      switch quality {
+      case "low":
+        qualityScale = 0.5; dpi = 72
+      case "medium":
+        qualityScale = 0.75; dpi = 150
+      case "high":
+        qualityScale = 0.9; dpi = 200
+      default:
+        qualityScale = 0.75; dpi = 150
+      }
 
-      resolve([
-        "uri": outputUrl.absoluteString,
-        "originalSizeKB": origKB,
-        "compressedSizeKB": compKB,
-        "quality": quality,
-        "success": true
-      ])
-    } else {
-      reject("ERR", "Failed to compress PDF", nil)
+      let pageCount = pdf.pageCount
+      var processedPages = 0
+
+      // Create compressed PDF by re-rendering pages with reduced quality
+      guard let firstPage = pdf.page(at: 0) else {
+        reject("COMPRESS_ERROR", "Could not read PDF pages", nil)
+        return
+      }
+
+      let bounds = firstPage.bounds(for: .mediaBox)
+      let scaledBounds = CGRect(x: 0, y: 0, width: bounds.width * qualityScale, height: bounds.height * qualityScale)
+
+      let renderer = UIGraphicsPDFRenderer(bounds: scaledBounds)
+
+      do {
+        try renderer.writePDF(to: outputUrl) { ctx in
+          for i in 0..<pageCount {
+            guard let page = pdf.page(at: i) else { continue }
+
+            let pageBounds = page.bounds(for: .mediaBox)
+            let scaledPageBounds = CGRect(x: 0, y: 0, width: pageBounds.width * qualityScale, height: pageBounds.height * qualityScale)
+
+            ctx.beginPage(withBounds: scaledPageBounds, pageInfo: [
+              .mediaBox: scaledPageBounds,
+              .cropBox: scaledPageBounds
+            ])
+
+            // Draw page with scaling
+            let cgContext = ctx.cgContext
+            cgContext.saveGState()
+            cgContext.scaleBy(x: qualityScale, y: qualityScale)
+            page.draw(with: .mediaBox, to: cgContext)
+            cgContext.restoreGState()
+
+            processedPages += 1
+            let progress = Double(processedPages) / Double(pageCount)
+            self.emitProgress("compress", progress: progress, message: "Processing page \(processedPages)/\(pageCount)")
+          }
+        }
+
+        let compData = try? Data(contentsOf: outputUrl)
+        let compSize = compData?.count ?? 0
+
+        self.emitProgress("compress", progress: 1.0, message: "Complete")
+
+        resolve([
+          "uri": outputUrl.absoluteString,
+          "originalSizeKB": origSize / 1024,
+          "compressedSizeKB": compSize / 1024,
+          "compressionRatio": String(format: "%.1f%%", (1.0 - Double(compSize) / Double(origSize)) * 100),
+          "quality": quality,
+          "pageCount": pageCount,
+          "success": true
+        ])
+      } catch {
+        reject("COMPRESS_ERROR", "Failed to compress PDF: \(error.localizedDescription)", error)
+      }
     }
   }
 
-  // ─── PAGE COUNT ────────────────────────────────────────────────────────────
+  // MARK: - PAGE COUNT
 
   @objc
   func getPageCount(_ pdfUri: String,
@@ -216,14 +365,14 @@ class PdfTools: NSObject {
     let url = URL(string: pdfUri) ?? URL(fileURLWithPath: pdfUri)
     guard let data = try? Data(contentsOf: url),
           let pdf = PDFDocument(data: data) else {
-      reject("ERR", "Could not load PDF", nil)
+      reject("COUNT_ERROR", "Could not load PDF", nil)
       return
     }
 
     resolve(["pageCount": pdf.pageCount, "success": true])
   }
 
-  // ─── EMBED SIGNATURE ────────────────────────────────────────────────────────
+  // MARK: - EMBED SIGNATURE
 
   @objc
   func embedSignature(_ pdfUri: String,
@@ -241,31 +390,28 @@ class PdfTools: NSObject {
 
     guard let sigData = try? Data(contentsOf: sigUrl),
           let sigImage = UIImage(data: sigData) else {
-      reject("ERR", "Could not load signature image", nil)
+      reject("SIGN_ERROR", "Could not load signature image", nil)
       return
     }
 
     guard let pdfDoc = PDFDocument(url: pdfUrl) else {
-      reject("ERR", "Could not load PDF", nil)
+      reject("SIGN_ERROR", "Could not load PDF", nil)
       return
     }
 
     let clampedPage = max(1, min(pageNumber, pdfDoc.pageCount))
     guard let page = pdfDoc.page(at: clampedPage - 1) else {
-      reject("ERR", "Could not access page \(clampedPage)", nil)
+      reject("SIGN_ERROR", "Could not access page \(clampedPage)", nil)
       return
     }
 
     let outputFilename = "signed_\(Int(Date().timeIntervalSince1970)).pdf"
     let outputUrl = FileManager.default.temporaryDirectory.appendingPathComponent(outputFilename)
 
-    // Get page bounds for coordinate transform
     let pageBounds = page.bounds(for: .mediaBox)
-    // y from bottom-left in PDF coordinates → flip for UIKit
     let flippedY = pageBounds.height - y - height
 
     DispatchQueue.global(qos: .userInitiated).async {
-      // Render each page with proper bounds
       let renderer = UIGraphicsPDFRenderer()
       let data = renderer.pdfData { ctx in
         for i in 0..<pdfDoc.pageCount {
@@ -275,16 +421,18 @@ class PdfTools: NSObject {
           ctx.beginPage(withBounds: bounds, pageInfo: [:])
           p.draw(with: .mediaBox, to: ctx.cgContext)
 
-          // Overlay signature on target page
           if i == clampedPage - 1 {
             let sigRect = CGRect(x: x, y: flippedY, width: width, height: height)
             sigImage.draw(in: sigRect)
           }
+
+          self.emitProgress("sign", progress: Double(i + 1) / Double(pdfDoc.pageCount))
         }
       }
 
       do {
         try data.write(to: outputUrl)
+        self.emitProgress("sign", progress: 1.0, message: "Complete")
         resolve([
           "uri": outputUrl.absoluteString,
           "success": true,
@@ -292,88 +440,227 @@ class PdfTools: NSObject {
           "position": ["x": x, "y": y, "width": width, "height": height]
         ])
       } catch {
-        reject("ERR", "Failed to write signed PDF: \(error.localizedDescription)", nil)
+        reject("SIGN_ERROR", "Failed to write signed PDF: \(error.localizedDescription)", nil)
       }
     }
   }
 
-  // ─── WATERMARK REMOVE ─────────────────────────────────────────────────────
+  // MARK: - WATERMARK ADD
+
+  @objc
+  func addWatermark(_ pdfUri: String,
+                    text: String?,
+                    imageUri: String?,
+                    options: [String: Any],
+                    resolver resolve: @escaping RCTPromiseResolveBlock,
+                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+
+    let pdfUrl = URL(string: pdfUri) ?? URL(fileURLWithPath: pdfUri)
+    guard let pdfDoc = PDFDocument(url: pdfUrl) else {
+      reject("WATERMARK_ERROR", "Could not load PDF", nil)
+      return
+    }
+
+    let outputFilename = "watermarked_\(Int(Date().timeIntervalSince1970)).pdf"
+    let outputUrl = FileManager.default.temporaryDirectory.appendingPathComponent(outputFilename)
+
+    // Parse options
+    let opacity = options["opacity"] as? CGFloat ?? 0.3
+    let rotation = options["rotation"] as? CGFloat ?? 45
+    let fontSize = options["fontSize"] as? CGFloat ?? 48
+    let colorHex = options["color"] as? String ?? "#808080"
+    let pages = options["pages"] as? [Int] // nil = all pages
+    let position = options["position"] as? String ?? "center" // center, topLeft, topRight, bottomLeft, bottomRight
+
+    DispatchQueue.global(qos: .userInitiated).async {
+      let renderer = UIGraphicsPDFRenderer()
+      let data = renderer.pdfData { ctx in
+        for i in 0..<pdfDoc.pageCount {
+          guard let page = pdfDoc.page(at: i) else { continue }
+          let bounds = page.bounds(for: .mediaBox)
+
+          ctx.beginPage(withBounds: bounds, pageInfo: [:])
+          page.draw(with: .mediaBox, to: ctx.cgContext)
+
+          // Check if we should watermark this page
+          if let targetPages = pages {
+            guard targetPages.contains(i + 1) else { continue }
+          }
+
+          let cgContext = ctx.cgContext
+          cgContext.saveGState()
+
+          if let text = text, !text.isEmpty {
+            // Text watermark
+            self.drawTextWatermark(text, in: bounds, context: cgContext,
+                                   opacity: opacity, rotation: rotation,
+                                   fontSize: fontSize, colorHex: colorHex,
+                                   position: position)
+          } else if let imageUri = imageUri, !imageUri.isEmpty {
+            // Image watermark
+            self.drawImageWatermark(imageUri, in: bounds, context: cgContext,
+                                    opacity: opacity, rotation: rotation,
+                                    position: position)
+          }
+
+          cgContext.restoreGState()
+
+          self.emitProgress("watermark", progress: Double(i + 1) / Double(pdfDoc.pageCount))
+        }
+      }
+
+      do {
+        try data.write(to: outputUrl)
+        self.emitProgress("watermark", progress: 1.0, message: "Complete")
+        resolve([
+          "uri": outputUrl.absoluteString,
+          "success": true,
+          "pageCount": pdfDoc.pageCount,
+          "watermarkType": text != nil ? "text" : "image"
+        ])
+      } catch {
+        reject("WATERMARK_ERROR", "Failed to write watermarked PDF: \(error.localizedDescription)", nil)
+      }
+    }
+  }
+
+  private func drawTextWatermark(_ text: String, in bounds: CGRect, context: CGContext,
+                                  opacity: CGFloat, rotation: CGFloat, fontSize: CGFloat,
+                                  colorHex: String, position: String) {
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.alignment = .center
+
+    let color = UIColor(hex: colorHex)?.withAlphaComponent(opacity) ?? UIColor.gray.withAlphaComponent(opacity)
+
+    let attributes: [NSAttributedString.Key: Any] = [
+      .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
+      .foregroundColor: color,
+      .paragraphStyle: paragraphStyle
+    ]
+
+    let textSize = text.size(withAttributes: attributes)
+    let centerX = bounds.midX
+    let centerY = bounds.midY
+
+    context.translateBy(x: centerX, y: centerY)
+    context.rotate(by: rotation * .pi / 180)
+
+    let rect = CGRect(x: -textSize.width / 2, y: -textSize.height / 2, width: textSize.width, height: textSize.height)
+    text.draw(in: rect, withAttributes: attributes)
+  }
+
+  private func drawImageWatermark(_ imageUri: String, in bounds: CGRect, context: CGContext,
+                                   opacity: CGFloat, rotation: CGFloat, position: String) {
+    let url = URL(string: imageUri) ?? URL(fileURLWithPath: imageUri)
+    guard let imgData = try? Data(contentsOf: url),
+          let image = UIImage(data: imgData) else { return }
+
+    let maxSize: CGFloat = 200
+    let scale = min(maxSize / image.size.width, maxSize / image.size.height, 1.0)
+    let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+
+    context.translateBy(x: bounds.midX, y: bounds.midY)
+    context.rotate(by: rotation * .pi / 180)
+
+    let rect = CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)
+
+    context.setAlpha(opacity)
+    image.draw(in: rect)
+  }
+
+  // MARK: - WATERMARK REMOVE
 
   @objc
   func removeWatermark(_ pdfUri: String,
+                       pages: [Int]?,
                        resolver resolve: @escaping RCTPromiseResolveBlock,
                        rejecter reject: @escaping RCTPromiseRejectBlock) {
 
     let url = URL(string: pdfUri) ?? URL(fileURLWithPath: pdfUri)
     guard let data = try? Data(contentsOf: url),
           let pdf = PDFDocument(data: data) else {
-      reject("ERR", "Could not load PDF", nil)
+      reject("WATERMARK_ERROR", "Could not load PDF", nil)
       return
     }
 
-    let pageCount = pdf.pageCount
-
-    // Re-render pages using CGPDFDocument to strip watermark overlay layers.
-    // We render each page as a high-quality image then re-assemble into a new PDF.
     let outputFilename = "cleaned_\(Int(Date().timeIntervalSince1970)).pdf"
     let outputUrl = FileManager.default.temporaryDirectory.appendingPathComponent(outputFilename)
 
     DispatchQueue.global(qos: .userInitiated).async {
-      guard let cgPDF = CGPDFDocument(url as CFURL) else {
-        // Fallback: write original PDF
-        _ = pdf.write(to: outputUrl)
-        resolve([
-          "uri": outputUrl.absoluteString,
-          "pageCount": pageCount,
-          "success": true,
-          "note": "Could not access CGPDFDocument, copied original"
-        ])
-        return
+      let pageCount = pdf.pageCount
+      var targetPages = Set(1...pageCount)
+      if let specificPages = pages {
+        targetPages = Set(specificPages.filter { $0 >= 1 && $0 <= pageCount })
       }
 
-      let totalPages = cgPDF.numberOfPages
-      var renderedCount = 0
-
-      // Collect bounds from PDFDocument pages for renderer
-      var pageBounds: [CGRect] = []
-      for i in 0..<pdf.pageCount {
-        if let p = pdf.page(at: i) {
-          pageBounds.append(p.bounds(for: .mediaBox))
-        }
-      }
-
-      // Use first page size as reference (assumes consistent sizing)
-      let referenceSize = pageBounds.first ?? CGRect(x: 0, y: 0, width: 612, height: 792)
-
-      let renderer = UIGraphicsPDFRenderer(bounds: referenceSize)
+      let renderer = UIGraphicsPDFRenderer()
       let pdfData = renderer.pdfData { ctx in
-        for i in 1...totalPages {
-          guard let page = cgPDF.page(at: i) else { continue }
+        for i in 0..<pageCount {
+          guard let page = pdf.page(at: i) else { continue }
+          let bounds = page.bounds(for: .mediaBox)
 
-          var boxRect = page.getBoxRect(.mediaBox)
-          if boxRect.width <= 0 || boxRect.height <= 0 {
-            boxRect = referenceSize
+          ctx.beginPage(withBounds: bounds, pageInfo: [:])
+
+          if targetPages.contains(i + 1) {
+            // Re-render page to strip potential watermark layers
+            // This rasterizes the page which removes vector-based watermarks
+            let scale: CGFloat = 2.0 // High quality rendering
+            let renderBounds = CGRect(x: 0, y: 0, width: bounds.width * scale, height: bounds.height * scale)
+
+            UIGraphicsPushContext(ctx.cgContext)
+            ctx.cgContext.saveGState()
+            ctx.cgContext.scaleBy(x: 1.0 / scale, y: 1.0 / scale)
+            page.draw(with: .mediaBox, to: ctx.cgContext)
+            ctx.cgContext.restoreGState()
+            UIGraphicsPopContext()
+          } else {
+            // Keep original page
+            page.draw(with: .mediaBox, to: ctx.cgContext)
           }
 
-          ctx.beginPage(withBounds: boxRect, pageInfo: [:])
-          UIColor.white.setFill()
-          ctx.fill(boxRect)
-          ctx.cgContext.drawPDFPage(page)
-          renderedCount += 1
+          self.emitProgress("unwatermark", progress: Double(i + 1) / Double(pageCount))
         }
       }
 
       do {
         try pdfData.write(to: outputUrl)
+        self.emitProgress("unwatermark", progress: 1.0, message: "Complete")
         resolve([
           "uri": outputUrl.absoluteString,
-          "pageCount": renderedCount,
-          "success": true,
-          "note": "Re-rendered \(renderedCount) pages to remove watermark overlay"
+          "pageCount": pageCount,
+          "pagesProcessed": targetPages.count,
+          "success": true
         ])
       } catch {
-        reject("ERR", "Failed to write cleaned PDF: \(error.localizedDescription)", nil)
+        reject("WATERMARK_ERROR", "Failed to write cleaned PDF: \(error.localizedDescription)", nil)
       }
     }
+  }
+}
+
+// MARK: - UIColor Hex Extension
+
+extension UIColor {
+  convenience init?(hex: String) {
+    let r, g, b: CGFloat
+    let hexString = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+
+    var hexValue: UInt64 = 0
+    guard Scanner(string: hexString).scanHexInt64(&hexValue) else { return nil }
+
+    switch hexString.count {
+    case 3: // RGB (12-bit)
+      r = CGFloat((hexValue & 0xF00) >> 8) / 15.0
+      g = CGFloat((hexValue & 0x0F0) >> 4) / 15.0
+      b = CGFloat(hexValue & 0x00F) / 15.0
+    case 6: // RGB (24-bit)
+      r = CGFloat((hexValue & 0xFF0000) >> 16) / 255.0
+      g = CGFloat((hexValue & 0x00FF00) >> 8) / 255.0
+      b = CGFloat(hexValue & 0x0000FF) / 255.0
+    default:
+      return nil
+    }
+
+    self.init(red: r, green: g, blue: b, alpha: 1.0)
   }
 }

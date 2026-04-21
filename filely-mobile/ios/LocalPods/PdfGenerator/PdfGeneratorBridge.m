@@ -4,6 +4,7 @@
 
 RCT_EXTERN_METHOD(generatePdf:(NSArray *)imageUris
                   filename:(NSString *)filename
+                  options:(NSDictionary *)options
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 

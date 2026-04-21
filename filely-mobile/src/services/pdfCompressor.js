@@ -50,11 +50,11 @@ export async function analyzeCompression(pdfUri) {
 
 export async function compressPdf(pdfUri, options = {}) {
   try {
-    const { quality = 'medium' } = options;
+    const { quality = 'medium', targetSizeKB = 0 } = options;
     const originalSizeKB = await getFileSizeKB(pdfUri);
 
     if (Platform.OS === 'ios' && NativePdfTools) {
-      const result = await NativePdfTools.compressPdf(pdfUri, quality);
+      const result = await NativePdfTools.compressPdf(pdfUri, quality, targetSizeKB);
       if (result.success && result.uri) {
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(result.uri, {

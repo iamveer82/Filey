@@ -134,15 +134,24 @@ export async function pickFromGallery() {
  * Detect document edges using Apple Vision framework (iOS native).
  * Falls back to edge-detection stub on Android/web.
  */
-export async function detectDocumentEdges(imageUri) {
+export async function detectDocumentEdges(imageUri, options = {}) {
   try {
     if (Platform.OS === 'ios' && NativeEdgeDetection) {
-      const result = await NativeEdgeDetection.detectEdges(imageUri);
+      const opts = {
+        preprocess: options.preprocess ?? true,
+        contrastBoost: options.contrastBoost ?? true,
+        denoise: options.denoise ?? false,
+        minAspectRatio: options.minAspectRatio ?? 0.2,
+        maxAspectRatio: options.maxAspectRatio ?? 1.5,
+        minConfidence: options.minConfidence ?? 0.5,
+      };
+      const result = await NativeEdgeDetection.detectEdges(imageUri, opts);
       console.log('[Scanner] Native edge detection:', result);
       return {
         corners: result.corners,
         confidence: result.confidence,
         detected: result.detected,
+        boundingBox: result.boundingBox,
       };
     }
   } catch (error) {
@@ -166,10 +175,14 @@ export async function detectDocumentEdges(imageUri) {
  * Apply perspective correction using native CIPerspectiveCorrection (iOS).
  * Falls back to pass-through on other platforms.
  */
-export async function applyPerspectiveCorrection(imageUri, corners) {
+export async function applyPerspectiveCorrection(imageUri, corners, options = {}) {
   try {
     if (Platform.OS === 'ios' && NativeEdgeDetection) {
-      const result = await NativeEdgeDetection.applyPerspectiveCorrection(imageUri, corners);
+      const opts = {
+        enhance: options.enhance ?? true,
+        grayscale: options.grayscale ?? false,
+      };
+      const result = await NativeEdgeDetection.applyPerspectiveCorrection(imageUri, corners, opts);
       console.log('[Scanner] Native perspective correction applied');
       return result.uri;
     }
@@ -260,12 +273,21 @@ export async function generatePdfFromImages(imageUris, options = {}) {
     const { filename = `Scan-${Date.now()}.pdf` } = options;
 
     if (Platform.OS === 'ios' && NativePdfGenerator) {
-      const result = await NativePdfGenerator.generatePdf(imageUris, filename);
+      const opts = {
+        pageSize: options.pageSize ?? 'a4', // a4, letter, original
+        orientation: options.orientation ?? 'auto', // auto, portrait, landscape
+        quality: options.quality ?? 'high', // low, medium, high
+        autoCrop: options.autoCrop ?? false,
+        enhanceContrast: options.enhanceContrast ?? true,
+        grayscale: options.grayscale ?? false,
+      };
+      const result = await NativePdfGenerator.generatePdf(imageUris, filename, opts);
       console.log('[Scanner] Native PDF generated:', result.pageCount, 'pages');
       return {
         success: true,
         outputUri: result.uri,
         pageCount: result.pageCount,
+        fileSizeKB: result.fileSizeKB,
         message: `Generated PDF with ${result.pageCount} page(s)`,
       };
     }
