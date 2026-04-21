@@ -9,6 +9,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { registerRootComponent } from 'expo';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,9 +44,11 @@ import AIMessagingHub from './src/screens/AIMessagingHub';
 import TeamScreen from './src/screens/TeamScreen';
 import ComplianceVault from './src/screens/ComplianceVault';
 import ServicesScreen from './src/screens/ServicesScreen';
+import ScannerScreen from './src/screens/ScannerScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
+const ClipStack = createNativeStackNavigator();
 // const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Themes ────────────────────────────────────────────────────────────────────
@@ -460,7 +463,21 @@ function AppContent() {
             {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
           </Tab.Screen>
           <Tab.Screen name="Clip">
-            {(props) => <ServicesScreen {...props} darkMode={darkMode} />}
+            {(props) => (
+              <ClipStack.Navigator screenOptions={{ headerShown: false }}>
+                <ClipStack.Screen name="ClipHome">
+                  {(screenProps) => <ServicesScreen {...screenProps} darkMode={darkMode} />}
+                </ClipStack.Screen>
+                <ClipStack.Screen
+                  name="Scanner"
+                  component={ScannerScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+              </ClipStack.Navigator>
+            )}
           </Tab.Screen>
           <Tab.Screen name="Team">
             {(props) => <TeamScreen {...props} darkMode={darkMode} />}
