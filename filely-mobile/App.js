@@ -476,6 +476,14 @@ function AppContent() {
                     animation: 'slide_from_bottom',
                   }}
                 />
+                <ClipStack.Screen
+                  name="TransactionReview"
+                  component={TransactionReviewScreen}
+                  options={{
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
               </ClipStack.Navigator>
             )}
           </Tab.Screen>

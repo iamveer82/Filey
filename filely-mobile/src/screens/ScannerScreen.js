@@ -11,10 +11,14 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Platform, StatusBar, Pressable, Text, Alert, Image, Dimensions } from 'react-native';
 import { Camera } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import ScannerOverlay from '../components/ScannerOverlay';
+import WoodenFrameOverlay from '../components/WoodenFrameOverlay';
 import { detectDocumentEdges, autoCropDocument, applyPerspectiveCorrection, enhanceDocumentImage, generatePdfFromImages } from '../services/documentScanner';
+import { recognizeText } from '../services/visionOcr';
+import { parseReceipt } from '../services/gemmaInference';
 import { addFile } from '../services/recentFiles';
 
 const BRAND = '#2A63E2';
@@ -48,6 +52,17 @@ export default function ScannerScreen({ navigation, route }) {
       }
     })();
   }, []);
+
+  // Reset state when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Clear any stuck states when returning to scanner
+      setIsDetecting(false);
+      setProcessing(false);
+      setLastPhoto(null);
+      setDetectedCorners(null);
+    }, [])
+  );
 
   // Handle edge detection callback from overlay
   const handleDetect = useCallback(async (detection) => {
@@ -87,6 +102,18 @@ export default function ScannerScreen({ navigation, route }) {
         autoContrast: true,
       });
 
+      // ─── NEW: AI Pipeline Integration ──────────────────────
+      let extractedData = null;
+      try {
+        const ocrResult = await recognizeText(enhancedUri);
+        if (ocrResult.text) {
+          extractedData = await parseReceipt(ocrResult.text);
+        }
+      } catch (ocrErr) {
+        console.error('[ScannerScreen] AI Pipeline failed:', ocrErr);
+      }
+      // ──────────────────────────────────────────────────────
+
       // Add to captured pages
       const newImage = {
         uri: enhancedUri,
@@ -94,14 +121,33 @@ export default function ScannerScreen({ navigation, route }) {
         height: photo.height,
         corners: corners,
         cropped: cropResult.success,
+        extractedData, // Pass AI data to the image object
       };
 
       setCapturedImages(prev => [...prev, newImage]);
 
+      const merchantInfo = extractedData?.merchant
+        ? `Found: ${extractedData.merchant} (${extractedData.amount || 0} ${extractedData.currency || 'AED'})`
+        : null;
+
       Alert.alert(
-        'Document Scanned',
-        cropResult.success ? 'Auto-cropped and enhanced!' : 'Document captured.',
+        extractedData ? 'Scan Complete' : 'Scan Complete - Manual Entry',
+        merchantInfo || (cropResult.success ? 'Document captured! AI extraction failed - you can enter details manually.' : 'Document captured.'),
         [
+          {
+            text: 'Review & Save',
+            onPress: () => {
+              // Navigate then clear state after delay
+              navigation.navigate('TransactionReview', { transaction: extractedData, imageUri: enhancedUri });
+              setTimeout(() => {
+                setCapturedImages([]);
+                setIsDetecting(false);
+                setLastPhoto(null);
+                setDetectedCorners(null);
+                setProcessing(false);
+              }, 300);
+            },
+          },
           {
             text: 'Add Another',
             onPress: () => {
@@ -110,11 +156,8 @@ export default function ScannerScreen({ navigation, route }) {
               setDetectedCorners(null);
             },
           },
-          {
-            text: 'Save PDF',
-            onPress: () => handleSavePdf(newImage),
-          },
-        ]
+        ],
+        { cancelable: false }
       );
     } catch (error) {
       console.error('[ScannerScreen] Process error:', error);
@@ -229,53 +272,56 @@ export default function ScannerScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar barStyle="light-content" backgroundColor="#2A1F1A" />
 
-      {/* Camera preview */}
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        type={Camera.Constants.Type.back}
-        flashMode={flashOn ? Camera.Constants.FlashMode.torch : Camera.Constants.FlashMode.off}
-        ratio="4:3"
-      >
-        {/* Scanner overlay with blue boundary */}
-        <ScannerOverlay
-          cameraRef={cameraRef}
-          onDetect={handleDetect}
-          onCornersChange={handleCornersChange}
-          corners={detectedCorners}
-          isDetecting={isDetecting || processing}
-        />
+      {/* Wooden Frame Scanner UI */}
+      <WoodenFrameOverlay>
+        {/* Camera preview inside wooden frame */}
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          type={Camera.Constants.Type.back}
+          flashMode={flashOn ? Camera.Constants.FlashMode.torch : Camera.Constants.FlashMode.off}
+          ratio="4:3"
+        >
+          {/* Scanner overlay with blue boundary */}
+          <ScannerOverlay
+            cameraRef={cameraRef}
+            onDetect={handleDetect}
+            onCornersChange={handleCornersChange}
+            corners={detectedCorners}
+            isDetecting={isDetecting || processing}
+          />
 
-        {/* Top toolbar */}
-        <View style={styles.topToolbar}>
-          <Pressable onPress={() => navigation?.goBack?.()} style={styles.toolbarButton}>
-            <Ionicons name="close" size={28} color="#FFFFFF" />
-          </Pressable>
+          {/* Top toolbar - wood styled */}
+          <View style={styles.topToolbarWood}>
+            <Pressable onPress={() => navigation?.goBack?.()} style={styles.toolbarButtonWood}>
+              <Ionicons name="close" size={26} color="#F5DEB3" />
+            </Pressable>
 
-          <View style={styles.toolbarCenter}>
-            <Text style={styles.toolbarTitle}>Scan Document</Text>
+            <View style={styles.toolbarCenter}>
+              <Text style={styles.toolbarTitleWood}>Scan Document</Text>
+            </View>
+
+            <Pressable onPress={toggleSettings} style={styles.toolbarButtonWood}>
+              <Ionicons name="settings-outline" size={22} color="#F5DEB3" />
+            </Pressable>
           </View>
 
-          <Pressable onPress={toggleSettings} style={styles.toolbarButton}>
-            <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
-        {/* Bottom info */}
-        <View style={styles.bottomInfo}>
-          <Text style={styles.bottomInfoText}>
-            {processing ? 'Processing...' : 'Position document within the blue frame'}
-          </Text>
-          {capturedImages.length > 0 && (
-            <View style={styles.pageCount}>
-              <Ionicons name="documents" size={16} color="#FFFFFF" />
-              <Text style={styles.pageCountText}>{capturedImages.length}</Text>
-            </View>
-          )}
-        </View>
-      </Camera>
+          {/* Bottom info - wood styled */}
+          <View style={styles.bottomInfoWood}>
+            <Text style={styles.bottomInfoTextWood}>
+              {processing ? 'Processing...' : 'Position document within frame'}
+            </Text>
+            {capturedImages.length > 0 && (
+              <View style={styles.pageCountWood}>
+                <Ionicons name="documents" size={16} color="#F5DEB3" />
+                <Text style={styles.pageCountTextWood}>{capturedImages.length}</Text>
+              </View>
+            )}
+          </View>
+        </Camera>
+      </WoodenFrameOverlay>
 
       {/* Bottom controls: mode selector + shutter + gallery */}
       <View style={styles.bottomControls}>
@@ -412,26 +458,92 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Bottom controls: mode selector + capture row
+  // Wood-themed controls
+  topToolbarWood: {
+    position: 'absolute',
+    top: 40,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  toolbarButtonWood: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(92, 64, 51, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D4A574',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  toolbarTitleWood: {
+    color: '#F5DEB3',
+    fontSize: 17,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  bottomInfoWood: {
+    position: 'absolute',
+    bottom: 180,
+    left: 40,
+    right: 40,
+    alignItems: 'center',
+  },
+  bottomInfoTextWood: {
+    color: '#F5DEB3',
+    fontSize: 14,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  pageCountWood: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(92, 64, 51, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#D4A574',
+  },
+  pageCountTextWood: {
+    color: '#F5DEB3',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Bottom controls: mode selector + capture row - wood themed
   bottomControls: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(20, 15, 10, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#2A1F1A',
+    borderTopWidth: 3,
+    borderTopColor: '#5C4033',
     paddingBottom: Platform.OS === 'ios' ? 28 : 18,
   },
 
-  // Mode selector tabs
+  // Mode selector tabs - wood themed
   modeSelector: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(139, 105, 85, 0.3)',
   },
   modeTab: {
     flex: 1,
@@ -441,18 +553,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     gap: 4,
+    borderRadius: 8,
   },
   modeTabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: BRAND,
+    backgroundColor: 'rgba(92, 64, 51, 0.5)',
+    borderWidth: 1,
+    borderColor: '#D4A574',
   },
   modeTabText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(245, 222, 179, 0.6)',
     fontSize: 12,
     fontWeight: '500',
   },
   modeTabTextActive: {
-    color: '#FFFFFF',
+    color: '#F5DEB3',
     fontWeight: '600',
   },
 
@@ -468,49 +582,56 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(92, 64, 51, 0.8)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D4A574',
   },
   placeholderButton: {
     width: 50,
     height: 50,
   },
 
-  // Capture button (from ScannerOverlay - moved here)
+  // Wood-styled capture button
   captureButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#FFFFFF',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#D4A574',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: BRAND,
+    borderColor: '#5C4033',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
   captureButtonInner: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: BRAND,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#8B6914',
+    borderWidth: 2,
+    borderColor: '#5C4033',
   },
 
-  // Preview strip
+  // Preview strip - wood themed
   previewStrip: {
     position: 'absolute',
-    bottom: 180,
-    left: 0,
-    right: 0,
+    bottom: 200,
+    left: 40,
+    right: 40,
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(42, 31, 26, 0.9)',
     paddingHorizontal: 12,
     paddingVertical: 12,
     gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#5C4033',
   },
   previewThumb: {
     width: 50,
