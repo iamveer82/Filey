@@ -1,58 +1,60 @@
 /**
  * Scanner Overlay Component
- * Blue boundary box with white corner dots for document scanning.
- * Shows live camera preview with auto-detect and manual crop adjustment.
+ * Blue L-shaped corner markers for document scanning.
+ * Shows live camera preview with auto-detect and manual corner adjustment.
  */
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Pressable, Platform, Dimensions } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  Platform,
+  Dimensions,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const BORDER_COLOR = '#2A63E2';
-const DOT_COLOR = '#FFFFFF';
-const BRACKET_SIZE = 28;
-const DOT_SIZE = 14;
+const BRAND = '#2A63E2';
+const CORNER_SIZE = 28;
+const HANDLE_SIZE = 16;
+const STROKE_WIDTH = 3;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
- * Corner dot with drag gesture support.
+ * Corner Handle - White circle with blue border
  */
-function CornerDot({ position, onDrag, index }) {
+function CornerHandle({ position, index, onDrag }) {
   const [dragging, setDragging] = useState(false);
-
-  const handleMove = useCallback((dx, dy) => {
-    onDrag(index, dx, dy);
-  }, [index, onDrag]);
 
   return (
     <View
       style={[
-        styles.cornerDot,
-        { left: position.x - DOT_SIZE / 2, top: position.y - DOT_SIZE / 2 },
-        dragging && styles.cornerDotActive,
+        styles.cornerHandle,
+        {
+          left: position.x - HANDLE_SIZE / 2,
+          top: position.y - HANDLE_SIZE / 2,
+        },
+        dragging && styles.cornerHandleActive,
       ]}
+      pointerEvents="auto"
     />
   );
 }
 
 /**
- * Scanner overlay with blue boundary and corner dots.
- * @param {object} props
- * @param {React.ComponentRef} props.cameraRef - Ref to camera
- * @param {function} props.onDetect - Callback for edge detection
- * @param {boolean} props.isDetecting - Whether auto-detect is in progress
- * @param {Array<{x,y}>} props.corners - Normalized corner coordinates (0-1)
- * @param {function} props.onCornersChange - Callback when user drags corners
+ * Scanner overlay with blue L-shaped corner markers
  */
 export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corners, onCornersChange }) {
   const [localCorners, setLocalCorners] = useState([
-    { x: 0.1, y: 0.1 },
-    { x: 0.9, y: 0.1 },
-    { x: 0.9, y: 0.9 },
-    { x: 0.1, y: 0.9 },
+    { x: 0.1, y: 0.15 },   // top-left
+    { x: 0.9, y: 0.15 },   // top-right
+    { x: 0.9, y: 0.75 },   // bottom-right
+    { x: 0.1, y: 0.75 },   // bottom-left
   ]);
   const [hasDetected, setHasDetected] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+  const scanLineAnim = useState(new Animated.Value(0))[0];
 
   // Sync with parent corners
   useEffect(() => {
@@ -67,17 +69,39 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
     const timer = setTimeout(() => {
       setHasDetected(true);
       const detected = [
-        { x: 0.08, y: 0.12 },
-        { x: 0.92, y: 0.12 },
-        { x: 0.92, y: 0.85 },
-        { x: 0.08, y: 0.85 },
+        { x: 0.1, y: 0.15 },
+        { x: 0.9, y: 0.15 },
+        { x: 0.9, y: 0.75 },
+        { x: 0.1, y: 0.75 },
       ];
       setLocalCorners(detected);
       onDetect?.({ corners: detected });
-    }, 1000);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Scanning animation
+  useEffect(() => {
+    if (isDetecting) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanLineAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scanLineAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      scanLineAnim.setValue(0);
+    }
+  }, [isDetecting]);
 
   // Handle container layout
   const handleLayout = useCallback((event) => {
@@ -85,13 +109,13 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
     setContainerSize({ width, height });
   }, []);
 
-  // Handle corner drag - update normalized position
+  // Handle corner drag
   const handleCornerDrag = useCallback((index, dx, dy) => {
     setLocalCorners(prev => {
       const newCorners = [...prev];
       const corner = newCorners[index];
       const newX = Math.max(0, Math.min(1, corner.x + dx / containerSize.width));
-      const newY = Math.max(0, Math.min(1, corner.y + dy / containerSize.height));
+      const newY = Math.max(0, Math.min(1, corner.y + containerSize.height));
       newCorners[index] = { x: newX, y: newY };
       onCornersChange?.(newCorners);
       return newCorners;
@@ -104,7 +128,9 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
     y: corner.y * containerSize.height,
   });
 
-  // Get boundary style from corners
+  const cornerPixels = localCorners.map(getCornerPixel);
+
+  // Calculate quadrilateral boundary
   const getBoundaryStyle = () => {
     const xs = localCorners.map(c => c.x * containerSize.width);
     const ys = localCorners.map(c => c.y * containerSize.height);
@@ -116,197 +142,187 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
     };
   };
 
-  const boundaryStyle = getBoundaryStyle();
-  const cornerPixels = localCorners.map(getCornerPixel);
+  const boundary = getBoundaryStyle();
 
   return (
     <View style={styles.container} onLayout={handleLayout}>
-      {/* Blue boundary with corner dots */}
-      <View style={[styles.boundaryWrapper, boundaryStyle]}>
-        {/* Blue border lines */}
-        <View style={[styles.borderLine, styles.topBorder]} />
-        <View style={[styles.borderLine, styles.bottomBorder]} />
-        <View style={[styles.borderLine, styles.leftBorder]} />
-        <View style={[styles.borderLine, styles.rightBorder]} />
+      {/* Corner markers container */}
+      {hasDetected && (
+        <View style={[styles.markerContainer, boundary]}>
+          {/* Top-left L marker */}
+          <View style={[styles.lMarker, styles.lMarkerTopLeft]}>
+            <View style={styles.lMarkerHorizontal} />
+            <View style={styles.lMarkerVertical} />
+          </View>
 
-        {/* Corner brackets (L-shaped) */}
-        <View style={[styles.bracket, styles.topLeftBracket]} />
-        <View style={[styles.bracket, styles.topRightBracket]} />
-        <View style={[styles.bracket, styles.bottomLeftBracket]} />
-        <View style={[styles.bracket, styles.bottomRightBracket]} />
+          {/* Top-right L marker */}
+          <View style={[styles.lMarker, styles.lMarkerTopRight]}>
+            <View style={styles.lMarkerHorizontal} />
+            <View style={styles.lMarkerVertical} />
+          </View>
 
-        {/* Corner dots */}
-        {cornerPixels.map((pos, i) => (
-          <CornerDot
-            key={i}
-            index={i}
-            position={pos}
-            onDrag={handleCornerDrag}
-          />
-        ))}
-      </View>
+          {/* Bottom-left L marker */}
+          <View style={[styles.lMarker, styles.lMarkerBottomLeft]}>
+            <View style={styles.lMarkerHorizontal} />
+            <View style={styles.lMarkerVertical} />
+          </View>
 
-      {/* Status badge */}
+          {/* Bottom-right L marker */}
+          <View style={[styles.lMarker, styles.lMarkerBottomRight]}>
+            <View style={styles.lMarkerHorizontal} />
+            <View style={styles.lMarkerVertical} />
+          </View>
+
+          {/* Corner handles */}
+          {cornerPixels.map((pos, i) => (
+            <CornerHandle
+              key={i}
+              index={i}
+              position={pos}
+              onDrag={handleCornerDrag}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Scanning line animation */}
+      {isDetecting && hasDetected && (
+        <Animated.View
+          style={[
+            styles.scanLine,
+            {
+              transform: [{
+                translateY: scanLineAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [boundary.top, boundary.top + boundary.height],
+                }),
+              }],
+              width: boundary.width,
+              left: boundary.left,
+            },
+          ]}
+        />
+      )}
+
+      {/* Instructions */}
       {!hasDetected && (
-        <View style={styles.statusBadge}>
-          <Ionicons name="scan-outline" size={16} color="#FFFFFF" />
+        <View style={styles.instructions}>
+          <Text style={styles.instructionsText}>Position document within frame</Text>
         </View>
       )}
-
-      {/* Detecting animation */}
-      {isDetecting && (
-        <View style={styles.detectingOverlay}>
-          <View style={styles.scanLine} />
-        </View>
-      )}
-
-      {/* Help icon */}
-      <Pressable style={styles.helpButton}>
-        <Ionicons name="information-circle-outline" size={24} color="#FFFFFF" />
-      </Pressable>
     </View>
   );
 }
 
+// Import Text for instructions
+import { Text } from 'react-native';
+
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
-  // Dynamic boundary wrapper
-  boundaryWrapper: {
+  // Marker container
+  markerContainer: {
     position: 'absolute',
     backgroundColor: 'transparent',
   },
 
-  // Blue border lines
-  borderLine: {
+  // L-shaped corner markers
+  lMarker: {
     position: 'absolute',
-    backgroundColor: BORDER_COLOR,
+    width: CORNER_SIZE,
+    height: CORNER_SIZE,
   },
-  topBorder: {
-    top: 0,
-    left: BRACKET_SIZE,
-    right: BRACKET_SIZE,
-    height: 2,
-  },
-  bottomBorder: {
-    bottom: 0,
-    left: BRACKET_SIZE,
-    right: BRACKET_SIZE,
-    height: 2,
-  },
-  leftBorder: {
-    top: BRACKET_SIZE,
-    bottom: BRACKET_SIZE,
-    left: 0,
-    width: 2,
-  },
-  rightBorder: {
-    top: BRACKET_SIZE,
-    bottom: BRACKET_SIZE,
-    right: 0,
-    width: 2,
-  },
-
-  // Corner brackets (L-shaped)
-  bracket: {
+  lMarkerHorizontal: {
     position: 'absolute',
-    width: BRACKET_SIZE,
-    height: BRACKET_SIZE,
-    borderColor: DOT_COLOR,
-  },
-  topLeftBracket: {
-    top: -2,
-    left: -2,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 6,
-  },
-  topRightBracket: {
-    top: -2,
-    right: -2,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 6,
-  },
-  bottomLeftBracket: {
-    bottom: -2,
-    left: -2,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 6,
-  },
-  bottomRightBracket: {
-    bottom: -2,
-    right: -2,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 6,
-  },
-
-  // White corner dots
-  cornerDot: {
-    position: 'absolute',
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    backgroundColor: DOT_COLOR,
-    borderWidth: 2.5,
-    borderColor: BORDER_COLOR,
-    shadowColor: BORDER_COLOR,
+    height: STROKE_WIDTH,
+    width: CORNER_SIZE,
+    backgroundColor: BRAND,
+    borderRadius: 2,
+    shadowColor: BRAND,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
-  cornerDotActive: {
-    backgroundColor: BORDER_COLOR,
-    borderColor: DOT_COLOR,
-    transform: [{ scale: 1.3 }],
+  lMarkerVertical: {
+    position: 'absolute',
+    width: STROKE_WIDTH,
+    height: CORNER_SIZE,
+    backgroundColor: BRAND,
+    borderRadius: 2,
+    shadowColor: BRAND,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+  },
+  lMarkerTopLeft: {
+    top: -STROKE_WIDTH,
+    left: -STROKE_WIDTH,
+  },
+  lMarkerTopRight: {
+    top: -STROKE_WIDTH,
+    right: -STROKE_WIDTH,
+    alignItems: 'flex-end',
+  },
+  lMarkerBottomLeft: {
+    bottom: -STROKE_WIDTH,
+    left: -STROKE_WIDTH,
+    justifyContent: 'flex-end',
+  },
+  lMarkerBottomRight: {
+    bottom: -STROKE_WIDTH,
+    right: -STROKE_WIDTH,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
   },
 
-  // Detecting animation
-  detectingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-start',
-    overflow: 'hidden',
+  // Corner handles (white circles with blue border)
+  cornerHandle: {
+    position: 'absolute',
+    width: HANDLE_SIZE,
+    height: HANDLE_SIZE,
+    borderRadius: HANDLE_SIZE / 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2.5,
+    borderColor: BRAND,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
+  cornerHandleActive: {
+    backgroundColor: BRAND,
+    borderColor: '#FFFFFF',
+    transform: [{ scale: 1.2 }],
+  },
+
+  // Scan line
   scanLine: {
-    height: 3,
-    backgroundColor: 'rgba(42, 99, 226, 0.7)',
-    shadowColor: BORDER_COLOR,
+    position: 'absolute',
+    height: 2,
+    backgroundColor: 'rgba(42, 99, 226, 0.8)',
+    shadowColor: BRAND,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 12,
+    shadowRadius: 10,
   },
 
-  // Status badge
-  statusBadge: {
+  // Instructions
+  instructions: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(42, 99, 226, 0.9)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flexDirection: 'row',
+    top: Platform.OS === 'ios' ? 100 : 80,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    gap: 6,
   },
-
-  // Help button
-  helpButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  instructionsText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
