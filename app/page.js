@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell,
 } from 'recharts';
@@ -12,9 +13,9 @@ import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK, SLATE } from '@/components/dashboard/theme';
 
 const STATS = [
-  { id: 'balance', icon: Wallet,       label: 'Total Balance',    value: 'AED 365,500', delta: '+12%', up: true,  sub: '+AED 42,300 from last month' },
-  { id: 'vat',     icon: ShieldCheck,  label: 'VAT Reclaimable',  value: 'AED 2,340',   delta: '+8%',  up: true,  sub: 'Filed Q1 PEPPOL • due May 28' },
-  { id: 'bills',   icon: Bell,         label: 'Bills Due',        value: '4',           delta: '-3',   up: false, sub: '−3 from last week' },
+  { id: 'balance', href: '/transactions', icon: Wallet,       label: 'Total Balance',    value: 'AED 365,500', delta: '+12%', up: true,  sub: '+AED 42,300 from last month' },
+  { id: 'vat',     href: '/reports',      icon: ShieldCheck,  label: 'VAT Reclaimable',  value: 'AED 2,340',   delta: '+8%',  up: true,  sub: 'Filed Q1 PEPPOL • due May 28' },
+  { id: 'bills',   href: '/bills',        icon: Bell,         label: 'Bills Due',        value: '4',           delta: '-3',   up: false, sub: '−3 from last week' },
 ];
 
 const CATEGORY = [
@@ -48,7 +49,7 @@ export default function HomePage() {
         {STATS.map((s, i) => {
           const I = s.icon;
           return (
-            <motion.div key={s.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.08 }} className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:shadow-md">
+            <motion.div key={s.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.08 }} className="card-hover rounded-2xl border border-slate-200 bg-white p-5">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: BRAND_SOFT }}>
@@ -65,9 +66,9 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-                <button className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                <Link href={s.href} aria-label={`Open ${s.label}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
                   <ArrowRight className="h-4 w-4" />
-                </button>
+                </Link>
               </div>
               <p className="mt-3 text-xs text-slate-500">{s.sub}</p>
             </motion.div>
@@ -146,8 +147,8 @@ export default function HomePage() {
       <div className="grid gap-6 md:grid-cols-3">
         {/* Tx */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.4 }} className="rounded-2xl border border-slate-200 bg-white p-6 md:col-span-2">
-          <SectionHead icon={Receipt} title="Recent Transactions" />
-          <div className="mt-4 overflow-hidden">
+          <SectionHead icon={Receipt} title="Recent Transactions" href="/transactions" />
+          <div className="mt-4 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -191,10 +192,14 @@ export default function HomePage() {
               </tbody>
             </table>
           </div>
+          <Link href="/transactions" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: BRAND }}>
+            View all transactions <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </motion.div>
 
         {/* AI promo */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.45 }} className="relative overflow-hidden rounded-2xl p-6 text-white" style={{ background: `linear-gradient(135deg, ${BRAND} 0%, ${BRAND_DARK} 100%)` }}>
+        <Link href="/chat" className="block" aria-label="Open Chat AI">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.45 }} className="relative h-full overflow-hidden rounded-2xl p-6 text-white transition hover:shadow-xl" style={{ background: `linear-gradient(135deg, ${BRAND} 0%, ${BRAND_DARK} 100%)` }}>
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 60, repeat: Infinity, ease: 'linear' }} className="absolute -right-12 -bottom-12 h-60 w-60 opacity-40">
             <svg viewBox="0 0 200 200" className="h-full w-full">
               <defs>
@@ -223,18 +228,19 @@ export default function HomePage() {
             <div className="mt-6 text-xs font-medium text-white/70">AI Insights</div>
             <h3 className="mt-1 text-2xl font-bold leading-tight">Try Filey AI Copilot</h3>
             <p className="mt-2 text-xs text-white/70">Ask "log 500 AED to Zain" or "show VAT due Q1" — agent handles it.</p>
-            <button className="mt-6 inline-flex items-center gap-2 rounded-full bg-white py-2 pl-3 pr-4 text-sm font-semibold shadow-lg transition hover:scale-105" style={{ color: BRAND }}>
+            <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-white py-2 pl-3 pr-4 text-sm font-semibold shadow-lg transition hover:scale-105" style={{ color: BRAND }}>
               <Sparkles className="h-4 w-4" />
               Get an insight
-            </button>
+            </span>
           </div>
         </motion.div>
+        </Link>
       </div>
     </Shell>
   );
 }
 
-function SectionHead({ icon: I, title }) {
+function SectionHead({ icon: I, title, href }) {
   return (
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-2">
@@ -243,7 +249,11 @@ function SectionHead({ icon: I, title }) {
         </div>
         <h3 className="text-sm font-semibold" style={{ color: INK }}>{title}</h3>
       </div>
-      <button><MoreHorizontal className="h-5 w-5 text-slate-400" /></button>
+      {href ? (
+        <Link href={href} aria-label={`Open ${title}`}><MoreHorizontal className="h-5 w-5 text-slate-400 hover:text-slate-700" /></Link>
+      ) : (
+        <button aria-label="More"><MoreHorizontal className="h-5 w-5 text-slate-400" /></button>
+      )}
     </div>
   );
 }

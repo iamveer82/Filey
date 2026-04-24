@@ -30,8 +30,8 @@ export default function Topbar({ title, subtitle, wave = false, action }) {
   return (
     <div ref={rootRef} className="flex flex-wrap items-start justify-between gap-4 pb-6">
       <div className="min-w-0 flex-1">
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl" style={{ color: INK }}>
-          <span className="truncate">{title}</span>
+        <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl md:text-3xl" style={{ color: INK }}>
+          <span>{title}</span>
           {wave && (
             <motion.span
               animate={{ rotate: [0, 18, -8, 18, 0] }}
@@ -47,13 +47,18 @@ export default function Topbar({ title, subtitle, wave = false, action }) {
 
       <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
         {action || (
-          <button className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+          <button
+            onClick={() => router.push('/reports')}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+          >
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export report</span>
           </button>
         )}
 
-        <IconBtn label="Mail"><Mail className="h-4 w-4 text-slate-600 dark:text-slate-300" /></IconBtn>
+        <div className="hidden sm:block">
+          <IconBtn label="Mail"><Mail className="h-4 w-4 text-slate-600 dark:text-slate-300" /></IconBtn>
+        </div>
 
         <div className="relative">
           <IconBtn label="Notifications" dot active={openMenu === 'notifs'} onClick={() => setOpenMenu(openMenu === 'notifs' ? null : 'notifs')}>

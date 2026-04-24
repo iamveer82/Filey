@@ -40,7 +40,7 @@ export default function Shell({ title, subtitle, wave, action, children }) {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 overflow-hidden p-4 sm:p-6 md:p-8">
+      <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">
         <div className="mx-auto max-w-[1400px]">
           <div className="rounded-[24px] border border-slate-200/60 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/60 sm:p-6 md:rounded-[32px] md:p-8">
             {/* Mobile hamburger */}
