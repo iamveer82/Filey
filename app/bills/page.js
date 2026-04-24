@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Bell, BellOff, Trash2, X, CalendarDays, Wifi, Zap, Droplet,
-  Music, Tv, Phone, CreditCard, ShoppingCart, Home as HomeIcon, Car,
+  Music, Tv, Phone, CreditCard, ShoppingCart, Home as HomeIcon, Car, Sparkles,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
-import { BRAND, BRAND_SOFT, INK } from '@/components/dashboard/theme';
+import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_BILLS, formatAED } from '@/lib/webStore';
 
 const ICONS = {
@@ -61,9 +62,17 @@ export default function BillsPage() {
       title="Bills"
       subtitle={`${totals.count} bills · ${formatAED(totals.sum)} pending`}
       action={
-        <button onClick={() => setDrawer(true)} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:scale-105" style={{ background: BRAND }}>
-          <Plus className="h-4 w-4" /> Add bill
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={{ pathname: '/chat', query: { q: 'Given my upcoming bills and 30-day cashflow, which should I pay first, which can wait, and are any unusually high?' } }}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <Sparkles className="h-4 w-4" style={{ color: BRAND }} /> Ask AI
+          </Link>
+          <button onClick={() => setDrawer(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:scale-[1.02]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Plus className="h-4 w-4" /> Add bill
+          </button>
+        </div>
       }
     >
       {/* Summary */}
@@ -73,6 +82,30 @@ export default function BillsPage() {
         <StatCard icon={Bell} label="Reminders on" value={totals.reminders} color="#8B5CF6" />
         <StatCard icon={BellOff} label="Overdue" value={totals.overdue} color="#EF4444" />
       </div>
+
+      {/* Empty state */}
+      {sorted.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="mx-auto max-w-xl rounded-3xl border border-dashed border-slate-300 bg-white py-16 text-center dark:border-slate-700 dark:bg-slate-900"
+        >
+          <motion.div
+            initial={{ scale: 0.8, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', damping: 12, delay: 0.1 }}
+            className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl shadow-lg"
+            style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+          >
+            <CalendarDays className="h-10 w-10 text-white" />
+          </motion.div>
+          <h3 className="mt-5 text-xl font-bold" style={{ color: INK }}>No bills tracked yet</h3>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+            Add your recurring expenses — DEWA, Etisalat, Netflix — and Filey reminds you before each due date.
+          </p>
+          <button onClick={() => setDrawer(true)} className="mt-6 inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:scale-[1.02]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Plus className="h-4 w-4" /> Add first bill
+          </button>
+        </motion.div>
+      )}
 
       {/* Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

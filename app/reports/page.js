@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Receipt, Download,
-  Calendar, FileText, PieChart as PieIcon,
+  Calendar, FileText, PieChart as PieIcon, Sparkles,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer,
@@ -89,9 +90,17 @@ export default function ReportsPage() {
       title="Reports"
       subtitle={`${filtered.length} transactions · VAT net ${formatAED(stats.vatNet)}`}
       action={
-        <button onClick={exportPDFReport} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:scale-105" style={{ background: BRAND }}>
-          <Download className="h-4 w-4" /> Export PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={{ pathname: '/chat', query: { q: `Explain my ${range === 'all' ? 'full' : range} financial report — key trends, whether my VAT net is healthy, and 3 concrete actions I should take before the next FTA filing deadline.` } }}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <Sparkles className="h-4 w-4" style={{ color: BRAND }} /> Explain with AI
+          </Link>
+          <button onClick={exportPDFReport} className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:scale-[1.02]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Download className="h-4 w-4" /> Export PDF
+          </button>
+        </div>
       }
     >
       {/* Range filter */}

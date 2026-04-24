@@ -10,6 +10,7 @@ import {
 import Shell from '@/components/dashboard/Shell';
 import InsightsCard from '@/components/dashboard/InsightsCard';
 import PrivacyBanner from '@/components/dashboard/PrivacyBanner';
+import OnboardingCards from '@/components/dashboard/OnboardingCards';
 import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
 
 // Lazy-load recharts (~120KB) — dashboard paints first without it
@@ -40,6 +41,9 @@ const TX_ROWS = [
 export default function HomePage() {
   return (
     <Shell title="Good Morning, Veer" subtitle="Here's your financial overview for today" wave>
+      {/* First-run onboarding (self-hides once tx seeded + AI configured, or dismissed) */}
+      <OnboardingCards />
+
       {/* Privacy trust banner — dismissible */}
       <PrivacyBanner variant="banner" />
 

@@ -1,24 +1,45 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus, Search, Filter, Download, Receipt, ArrowDownLeft, ArrowUpRight,
-  Trash2, X, TrendingUp, TrendingDown, Wallet, Sparkles,
+  Plus, Search, Filter, Download, Upload, Receipt, ArrowDownLeft, ArrowUpRight,
+  Trash2, X, TrendingUp, TrendingDown, Wallet, Sparkles, Camera, FileUp,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
-import { BRAND, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
+import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_TX, CATEGORIES, formatAED, formatWhen } from '@/lib/webStore';
+import CsvImportDrawer from '@/components/dashboard/CsvImportDrawer';
 
 const TYPES = ['all', 'income', 'expense'];
 
 export default function TransactionsPage() {
-  const { list, add, remove } = useLocalList('filey.web.tx', SEED_TX);
+  return (
+    <Suspense fallback={<Shell title="Transactions" subtitle="Loading…"><div className="h-96 animate-pulse rounded-2xl bg-slate-100" /></Shell>}>
+      <TransactionsInner />
+    </Suspense>
+  );
+}
+
+function TransactionsInner() {
+  const searchParams = useSearchParams();
+  const router       = useRouter();
+  const { list, add, remove, setAll } = useLocalList('filey.web.tx', SEED_TX);
   const [q, setQ]       = useState('');
   const [type, setType] = useState('all');
   const [cat, setCat]   = useState('all');
   const [drawer, setDrawer] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
+
+  // Auto-open CSV import when landing with ?import=1
+  useEffect(() => {
+    if (searchParams.get('import') === '1') {
+      setCsvOpen(true);
+      router.replace('/transactions');
+    }
+  }, [searchParams, router]);
 
   const filtered = useMemo(() => {
     return list.filter((t) => {
@@ -53,11 +74,15 @@ export default function TransactionsPage() {
       subtitle={`${list.length} records · ${formatAED(totals.bal)} net`}
       action={
         <div className="flex items-center gap-2">
-          <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-slate-50">
+          <button onClick={() => setCsvOpen(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <Upload className="h-4 w-4" />
+            Import CSV
+          </button>
+          <button onClick={exportCsv} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
             <Download className="h-4 w-4" />
             Export CSV
           </button>
-          <button onClick={() => setDrawer(true)} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:scale-105" style={{ background: BRAND }}>
+          <button onClick={() => setDrawer(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:scale-[1.02]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
             <Plus className="h-4 w-4" /> Add transaction
           </button>
         </div>
@@ -111,8 +136,19 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400">No transactions match filters.</td></tr>
+            {filtered.length === 0 && list.length === 0 && (
+              <tr><td colSpan={7}>
+                <EmptyState onAdd={() => setDrawer(true)} onImport={() => setCsvOpen(true)} />
+              </td></tr>
+            )}
+            {filtered.length === 0 && list.length > 0 && (
+              <tr><td colSpan={7} className="px-6 py-16 text-center">
+                <div className="mx-auto max-w-sm space-y-3">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800"><Search className="h-5 w-5" /></div>
+                  <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">No transactions match the current filters.</div>
+                  <button onClick={() => { setQ(''); setType('all'); setCat('all'); }} className="cursor-pointer text-xs font-semibold" style={{ color: BRAND }}>Clear filters</button>
+                </div>
+              </td></tr>
             )}
             <AnimatePresence initial={false}>
               {filtered.map((t, i) => (
@@ -166,7 +202,62 @@ export default function TransactionsPage() {
       <AnimatePresence>
         {drawer && <AddTxDrawer onClose={() => setDrawer(false)} onAdd={(x) => { add(x); setDrawer(false); }} />}
       </AnimatePresence>
+
+      <CsvImportDrawer
+        open={csvOpen}
+        onClose={() => setCsvOpen(false)}
+        onImport={(rows) => setAll([...rows, ...list])}
+      />
     </Shell>
+  );
+}
+
+function EmptyState({ onAdd, onImport }) {
+  return (
+    <div className="px-6 py-16">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="mx-auto max-w-xl text-center"
+      >
+        <motion.div
+          initial={{ scale: 0.8, rotate: -10 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', damping: 12, delay: 0.1 }}
+          className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl shadow-lg"
+          style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+        >
+          <Receipt className="h-10 w-10 text-white" />
+        </motion.div>
+        <h3 className="mt-5 text-xl font-bold" style={{ color: INK }}>No transactions yet</h3>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+          Capture one receipt, drop a CSV from your bank, or add a transaction manually.
+          All three keep your data on this device.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/scan"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:scale-[1.02]"
+            style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+          >
+            <Camera className="h-4 w-4" /> Scan a receipt
+          </Link>
+          <button
+            onClick={onImport}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <FileUp className="h-4 w-4" /> Import CSV
+          </button>
+          <button
+            onClick={onAdd}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <Plus className="h-4 w-4" /> Add manually
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
