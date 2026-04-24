@@ -1,4 +1,5 @@
 import './globals.css';
+import Providers from '@/components/dashboard/Providers';
 
 export const metadata = {
   title: 'Filey - UAE Finance Tracker',
@@ -44,7 +45,7 @@ export default function RootLayout({ children }) {
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body className="antialiased overscroll-none">
-        {children}
+        <Providers>{children}</Providers>
         <script
           dangerouslySetInnerHTML={{
             __html: `
