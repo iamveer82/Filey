@@ -8,7 +8,7 @@ import {
   Download, Mail, Bell, ChevronDown, LogOut, User, Settings, HelpCircle,
   Check, AlertCircle, Info,
 } from 'lucide-react';
-import { BRAND, INK } from './theme';
+import { BRAND, BRAND_DARK, INK } from './theme';
 
 const NOTIFS = [
   { id: 1, icon: AlertCircle, tint: '#FEF3C7', color: '#D97706', title: 'VAT filing due in 4 days', sub: 'Q1 2026 · AED 2,510 payable' },
@@ -49,7 +49,8 @@ export default function Topbar({ title, subtitle, wave = false, action }) {
         {action || (
           <button
             onClick={() => router.push('/reports')}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+            style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
           >
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export report</span>

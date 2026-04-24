@@ -9,7 +9,7 @@ import {
   CreditCard, Bot, FolderKanban, Users, BarChart3, Settings as SettingsIcon,
   Moon, Sun,
 } from 'lucide-react';
-import { BRAND, INK } from './theme';
+import { BRAND, BRAND_DARK, INK } from './theme';
 
 const MAIN = [
   { href: '/',              label: 'Dashboard',    icon: LayoutDashboard },
@@ -100,9 +100,10 @@ function NavLink({ item, active }) {
       href={item.href}
       className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${
         active
-          ? 'bg-slate-900 text-white shadow-sm dark:bg-blue-600'
+          ? 'text-white shadow-sm'
           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
       }`}
+      style={active ? { background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` } : undefined}
     >
       {active && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-x-2 -translate-y-1/2 rounded-full" style={{ background: BRAND }} />}
       <span className="flex items-center gap-3">

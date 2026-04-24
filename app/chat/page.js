@@ -106,7 +106,8 @@ export default function ChatPage() {
               <button
                 key={t.id}
                 onClick={() => setActiveId(t.id)}
-                className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition ${activeId === t.id ? 'bg-slate-900 text-white' : 'hover:bg-slate-50'}`}
+                className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition ${activeId === t.id ? 'text-white' : 'hover:bg-slate-50'}`}
+                style={activeId === t.id ? { background: 'linear-gradient(135deg, ' + BRAND + ', ' + BRAND_DARK + ')' } : undefined}
               >
                 <MessageSquare className={`mt-0.5 h-4 w-4 ${activeId === t.id ? 'text-white' : 'text-slate-400'}`} />
                 <div className="min-w-0 flex-1">
@@ -138,7 +139,7 @@ export default function ChatPage() {
           <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-6">
             {messages.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: 'linear-gradient(135deg, ' + BRAND + ', ' + BRAND_DARK + ')' }}>
                   <Sparkles className="h-8 w-8 text-white" />
                 </div>
                 <div>
@@ -163,7 +164,7 @@ export default function ChatPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
                 >
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${m.role === 'user' ? 'bg-slate-900' : ''}`} style={m.role !== 'user' ? { background: BRAND_SOFT } : undefined}>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: m.role === 'user' ? BRAND : BRAND_SOFT }}>
                     {m.role === 'user' ? <UserIcon className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4" style={{ color: BRAND }} />}
                   </div>
                   <div className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm ${m.role === 'user' ? 'text-white' : 'bg-slate-50 text-slate-800'}`} style={m.role === 'user' ? { background: BRAND } : undefined}>
