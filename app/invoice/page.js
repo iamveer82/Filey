@@ -8,8 +8,10 @@ import {
   CalendarDays, Hash, Sparkles, Receipt,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
+import { UpgradeCallout, UpgradeModal } from '@/components/dashboard/PlanGate';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_TX, formatAED } from '@/lib/webStore';
+import { usePlan } from '@/lib/plan';
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -26,6 +28,8 @@ const NEW_LINE = () => ({ id: Date.now().toString(36) + Math.random().toString(3
 export default function InvoicePage() {
   const { list: invoices, add: addInvoice } = useLocalList('filey.web.invoices', []);
   const { list: tx, add: addTx } = useLocalList('filey.web.tx', SEED_TX);
+  const { plan, isPro, canUse, remaining, track } = usePlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const [profile, setProfile] = useState({ name: 'Filey Technologies', email: 'hello@filey.ae', trn: '100123456789003' });
   useEffect(() => {
@@ -69,6 +73,10 @@ export default function InvoicePage() {
 
   const downloadPdf = async () => {
     if (!canSave) { toast.error('Add a client + at least one line item'); return; }
+    if (!canUse('invoicesPerMonth')) {
+      setUpgradeOpen(true);
+      return;
+    }
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([595, 842]); // A4
@@ -163,6 +171,12 @@ export default function InvoicePage() {
       dueDate: form.dueDate,
       status: 'sent',
     });
+
+    // Count against free-plan monthly cap
+    track('invoicesPerMonth');
+
+    // Roll to next invoice number for subsequent downloads
+    setForm((f) => ({ ...f, number: nextNumber([...invoices, { number: f.number }]) }));
   };
 
   const recordAsIncome = () => {
@@ -203,6 +217,18 @@ export default function InvoicePage() {
         </div>
       }
     >
+      {/* Plan usage banner */}
+      {!isPro && (
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-slate-600 dark:text-slate-400">
+            Free plan: <strong className="text-slate-900 dark:text-white">{Math.max(0, remaining('invoicesPerMonth'))}</strong> of <strong className="text-slate-900 dark:text-white">{plan.limits.invoicesPerMonth}</strong> invoices left this month.
+          </span>
+          <button onClick={() => setUpgradeOpen(true)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Sparkles className="h-3 w-3" /> Unlimited with Pro
+          </button>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
         {/* Editor */}
         <div className="space-y-5">
@@ -370,6 +396,8 @@ export default function InvoicePage() {
           )}
         </aside>
       </div>
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} feature="invoicesPerMonth" />
     </Shell>
   );
 }

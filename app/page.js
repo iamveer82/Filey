@@ -8,6 +8,7 @@ import {
   MoreHorizontal, Sparkles, Wallet, ShieldCheck,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
+import FirstVisitGate from '@/components/dashboard/FirstVisitGate';
 import InsightsCard from '@/components/dashboard/InsightsCard';
 import PrivacyBanner from '@/components/dashboard/PrivacyBanner';
 import OnboardingCards from '@/components/dashboard/OnboardingCards';
@@ -40,6 +41,7 @@ const TX_ROWS = [
 
 export default function HomePage() {
   return (
+    <FirstVisitGate>
     <Shell title="Good Morning, Veer" subtitle="Here's your financial overview for today" wave>
       {/* First-run onboarding (self-hides once tx seeded + AI configured, or dismissed) */}
       <OnboardingCards />
@@ -226,6 +228,7 @@ export default function HomePage() {
         </Link>
       </div>
     </Shell>
+    </FirstVisitGate>
   );
 }
 

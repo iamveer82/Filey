@@ -7,9 +7,10 @@ import { useEffect, useState } from 'react';
 import {
   Search, LayoutDashboard, Receipt, ScanLine, Paperclip, Bell,
   CreditCard, Bot, FolderKanban, Users, BarChart3, Settings as SettingsIcon,
-  Moon, Sun, FileText,
+  Moon, Sun, FileText, Crown, Sparkles,
 } from 'lucide-react';
 import { BRAND, BRAND_DARK, INK } from './theme';
+import { usePlan } from '@/lib/plan';
 
 const MAIN = [
   { href: '/',              label: 'Dashboard',    icon: LayoutDashboard },
@@ -32,6 +33,7 @@ export default function Sidebar() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dark = mounted && theme === 'dark';
+  const { plan, isPro } = usePlan();
   return (
     <aside className="sticky top-0 flex h-screen w-[260px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6 dark:border-slate-800 dark:bg-slate-900">
       <Link href="/" className="mb-6 flex items-center gap-2.5 px-2">
@@ -39,6 +41,11 @@ export default function Sidebar() {
           <Paperclip className="h-5 w-5 text-white" style={{ transform: 'scaleX(-1)' }} />
         </div>
         <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white" style={{ color: INK }}>Filey</span>
+        {isPro && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" title={`${plan.name} plan`}>
+            <Crown className="h-3 w-3" /> {plan.name}
+          </span>
+        )}
       </Link>
 
       <div className="relative mb-6">
@@ -64,6 +71,22 @@ export default function Sidebar() {
       </nav>
 
       <div className="mt-auto">
+        {!isPro && (
+          <Link
+            href="/pricing"
+            className="mb-4 block overflow-hidden rounded-2xl p-4 text-white shadow-lg transition hover:scale-[1.02]"
+            style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+          >
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Upgrade to Pro</span>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-white/80">Unlimited invoices, bank sync &amp; premium AI.</p>
+            <div className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white/15 px-2 py-1 text-[10px] font-bold backdrop-blur">
+              <Sparkles className="h-3 w-3" /> 14-day free trial
+            </div>
+          </Link>
+        )}
         <SectionLabel>Others</SectionLabel>
         <nav aria-label="Others" className="flex flex-col gap-1">
           <NavLink item={{ href: '/settings', label: 'Settings', icon: SettingsIcon }} active={isActive(pathname, '/settings')} />
