@@ -7,17 +7,17 @@ import { useEffect, useState } from 'react';
 import {
   Search, LayoutDashboard, Receipt, ScanLine, Paperclip, Bell,
   CreditCard, Bot, FolderKanban, Users, BarChart3, Settings as SettingsIcon,
-  Moon, Sun,
+  Moon, Sun, FileText,
 } from 'lucide-react';
 import { BRAND, BRAND_DARK, INK } from './theme';
 
 const MAIN = [
   { href: '/',              label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/transactions',  label: 'Transactions', icon: Receipt, badge: '12' },
+  { href: '/transactions',  label: 'Transactions', icon: Receipt },
   { href: '/scan',          label: 'Scan',         icon: ScanLine },
-  { href: '/clip',          label: 'Clip Tools',   icon: Paperclip },
+  { href: '/invoice',       label: 'Invoice',      icon: FileText },
   { href: '/bills',         label: 'Bills',        icon: CreditCard },
-  { href: '/chat',          label: 'Chat AI',      icon: Bot, badge: 'NEW' },
+  { href: '/chat',          label: 'Chat AI',      icon: Bot, badge: 'AI' },
 ];
 
 const MGMT = [
@@ -46,6 +46,7 @@ export default function Sidebar() {
         <input
           placeholder="Search"
           readOnly
+          aria-label="Open command palette (Cmd+K)"
           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
           className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-14 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:bg-slate-800"
         />
@@ -53,22 +54,24 @@ export default function Sidebar() {
       </div>
 
       <SectionLabel>Main menu</SectionLabel>
-      <nav className="mb-6 flex flex-col gap-1">
+      <nav aria-label="Main menu" className="mb-6 flex flex-col gap-1">
         {MAIN.map((it) => <NavLink key={it.href} item={it} active={isActive(pathname, it.href)} />)}
       </nav>
 
       <SectionLabel>Management</SectionLabel>
-      <nav className="mb-6 flex flex-col gap-1">
+      <nav aria-label="Management" className="mb-6 flex flex-col gap-1">
         {MGMT.map((it) => <NavLink key={it.href} item={it} active={isActive(pathname, it.href)} />)}
       </nav>
 
       <div className="mt-auto">
         <SectionLabel>Others</SectionLabel>
-        <nav className="flex flex-col gap-1">
+        <nav aria-label="Others" className="flex flex-col gap-1">
           <NavLink item={{ href: '/settings', label: 'Settings', icon: SettingsIcon }} active={isActive(pathname, '/settings')} />
           <button
             onClick={() => setTheme(dark ? 'light' : 'dark')}
-            className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-pressed={dark}
+            className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <span className="flex items-center gap-3">
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -98,6 +101,7 @@ function NavLink({ item, active }) {
   return (
     <Link
       href={item.href}
+      aria-current={active ? 'page' : undefined}
       className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${
         active
           ? 'text-white shadow-sm'

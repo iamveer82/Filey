@@ -8,8 +8,9 @@ import {
   Music, Tv, Phone, CreditCard, ShoppingCart, Home as HomeIcon, Car, Sparkles,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
+import RecurringSuggestions from '@/components/dashboard/RecurringSuggestions';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
-import { useLocalList, SEED_BILLS, formatAED } from '@/lib/webStore';
+import { useLocalList, SEED_BILLS, SEED_TX, formatAED } from '@/lib/webStore';
 
 const ICONS = {
   electric: { icon: Zap,          tint: '#FEF3C7', color: '#D97706' },
@@ -47,6 +48,7 @@ function daysUntil(iso) {
 
 export default function BillsPage() {
   const { list, add, remove, update } = useLocalList('filey.web.bills', SEED_BILLS);
+  const { list: tx } = useLocalList('filey.web.tx', SEED_TX);
   const [drawer, setDrawer] = useState(false);
 
   const sorted = useMemo(() => [...list].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)), [list]);
@@ -82,6 +84,9 @@ export default function BillsPage() {
         <StatCard icon={Bell} label="Reminders on" value={totals.reminders} color="#8B5CF6" />
         <StatCard icon={BellOff} label="Overdue" value={totals.overdue} color="#EF4444" />
       </div>
+
+      {/* Recurring detection */}
+      <RecurringSuggestions tx={tx} bills={list} onAdd={(x) => add(x)} />
 
       {/* Empty state */}
       {sorted.length === 0 && (
@@ -135,7 +140,7 @@ export default function BillsPage() {
                       <div className="text-xs text-slate-500">Due {new Date(b.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
                     </div>
                   </div>
-                  <button onClick={() => remove(b.id)} className="opacity-0 transition group-hover:opacity-100"><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-500" /></button>
+                  <button onClick={() => remove(b.id)} aria-label={`Remove ${b.name}`} className="cursor-pointer opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-500" /></button>
                 </div>
                 <div className="mt-5 flex items-end justify-between">
                   <div className="text-3xl font-bold" style={{ color: INK }}>{formatAED(b.amount)}</div>
@@ -149,7 +154,7 @@ export default function BillsPage() {
                 </div>
                 <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
                   <span className="text-xs font-semibold text-slate-500">Reminder</span>
-                  <button onClick={() => update(b.id, { reminder: !b.reminder })} className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${b.reminder ? '' : 'bg-slate-200'}`} style={b.reminder ? { background: BRAND } : undefined}>
+                  <button onClick={() => update(b.id, { reminder: !b.reminder })} role="switch" aria-checked={!!b.reminder} aria-label={`Reminder for ${b.name}`} className={`inline-flex h-6 w-11 cursor-pointer items-center rounded-full p-0.5 transition ${b.reminder ? '' : 'bg-slate-200'}`} style={b.reminder ? { background: BRAND } : undefined}>
                     <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${b.reminder ? 'translate-x-5' : ''}`} />
                   </button>
                 </div>
@@ -196,11 +201,14 @@ function AddBillDrawer({ onClose, onAdd }) {
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto bg-white p-8 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-bill-title"
+        className="fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto bg-white p-8 shadow-2xl dark:bg-slate-900"
       >
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold" style={{ color: INK }}>Add bill</h2>
-          <button onClick={onClose}><X className="h-5 w-5 text-slate-500" /></button>
+          <h2 id="add-bill-title" className="text-xl font-bold" style={{ color: INK }}>Add bill</h2>
+          <button onClick={onClose} aria-label="Close add-bill drawer" className="cursor-pointer rounded-lg p-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5 text-slate-500" /></button>
         </div>
         <div className="space-y-4">
           <Field label="Bill name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="e.g. DEWA, Netflix, Etisalat" /></Field>
@@ -208,7 +216,7 @@ function AddBillDrawer({ onClose, onAdd }) {
           <Field label="Due date"><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={inputCls} /></Field>
           <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
             <span className="text-sm font-semibold text-slate-700">Remind me before due date</span>
-            <button onClick={() => setForm({ ...form, reminder: !form.reminder })} className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${form.reminder ? '' : 'bg-slate-200'}`} style={form.reminder ? { background: BRAND } : undefined}>
+            <button onClick={() => setForm({ ...form, reminder: !form.reminder })} role="switch" aria-checked={!!form.reminder} aria-label="Toggle reminder" className={`inline-flex h-6 w-11 cursor-pointer items-center rounded-full p-0.5 transition ${form.reminder ? '' : 'bg-slate-200'}`} style={form.reminder ? { background: BRAND } : undefined}>
               <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${form.reminder ? 'translate-x-5' : ''}`} />
             </button>
           </label>
