@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Filter, Download, Receipt, ArrowDownLeft, ArrowUpRight,
-  Trash2, X, TrendingUp, TrendingDown, Wallet,
+  Trash2, X, TrendingUp, TrendingDown, Wallet, Sparkles,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
@@ -143,7 +144,16 @@ export default function TransactionsPage() {
                     {t.type === 'income' ? '+' : '−'}{formatAED(t.amount)}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => remove(t.id)} className="text-slate-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={{ pathname: '/chat', query: { q: `Analyse this transaction: ${t.name}${t.merchant ? ' (' + t.merchant + ')' : ''}, ${t.type} ${formatAED(t.amount)}, category ${t.category}, on ${new Date(t.ts).toLocaleDateString('en-GB')}. Is the VAT treatment correct? Is it an anomaly vs my usual spending? Suggest a better category if needed.` } }}
+                        title="Ask AI about this transaction"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </Link>
+                      <button onClick={() => remove(t.id)} title="Delete" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                    </div>
                   </td>
                 </motion.tr>
               ))}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
-import { useLocalList, SEED_THREADS, SEED_MESSAGES, formatWhen } from '@/lib/webStore';
+import { useLocalList, SEED_THREADS, SEED_MESSAGES, formatWhen, buildFinanceContext } from '@/lib/webStore';
 
 const SUGGESTIONS = [
   { label: 'Log 500 AED paid to Zain today',           icon: '💸' },
@@ -26,6 +27,16 @@ function loadAI() {
 }
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<Shell title="Chat AI" subtitle="Loading…"><div className="h-[560px] animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" /></Shell>}>
+      <ChatInner />
+    </Suspense>
+  );
+}
+
+function ChatInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { list: threads, add: addThread, remove: removeThread, update: updateThread } = useLocalList('filey.web.threads', SEED_THREADS);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -40,6 +51,24 @@ export default function ChatPage() {
 
   useEffect(() => { setAi(loadAI()); }, []);
   useEffect(() => { if (!activeId && threads.length) setActiveId(threads[0].id); }, [threads, activeId]);
+
+  // Prefill from ?q= — open new thread with the prompt queued in the composer
+  const prefillRef = useRef(false);
+  useEffect(() => {
+    if (prefillRef.current) return;
+    const q = searchParams.get('q');
+    if (!q) return;
+    prefillRef.current = true;
+    // Start a fresh thread so the incoming question is isolated from history
+    const id = `t_${Date.now().toString(36)}`;
+    addThread({ id, title: q.slice(0, 48), updatedAt: Date.now() });
+    setActiveId(id);
+    setMessages([]);
+    setDraft(q);
+    // Strip ?q from URL so refresh doesn't re-trigger
+    router.replace('/chat');
+    setTimeout(() => textareaRef.current?.focus(), 80);
+  }, [searchParams, addThread, router]);
 
   // Per-thread message load
   useEffect(() => {
@@ -111,6 +140,7 @@ export default function ChatPage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           provider: cfg.provider, apiKey: cfg.apiKey, model: cfg.model, baseUrl: cfg.baseUrl,
+          system: buildFinanceContext(),
           messages: baseline.map(m => ({ role: m.role, content: m.content })),
         }),
         signal: ctrl.signal,

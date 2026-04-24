@@ -58,7 +58,7 @@ async function* streamAnthropic({ apiKey, model, messages, system }) {
     body: JSON.stringify({
       model: model || 'claude-sonnet-4-20250514',
       max_tokens: 2048,
-      system: system || SYSTEM_DEFAULT,
+      system: (SYSTEM_DEFAULT + (system ? '\n\n' + system : '')),
       messages: messages.filter(m => m.role !== 'system'),
       stream: true,
     }),
@@ -81,7 +81,7 @@ async function* streamOpenAI({ apiKey, model, messages, system, baseUrl }) {
     },
     body: JSON.stringify({
       model: model || 'gpt-4o-mini',
-      messages: [{ role: 'system', content: system || SYSTEM_DEFAULT }, ...messages.filter(m => m.role !== 'system')],
+      messages: [{ role: 'system', content: (SYSTEM_DEFAULT + (system ? '\n\n' + system : '')) }, ...messages.filter(m => m.role !== 'system')],
       stream: true,
     }),
   });
@@ -102,7 +102,7 @@ async function* streamGoogle({ apiKey, model, messages, system }) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system || SYSTEM_DEFAULT }] },
+      systemInstruction: { parts: [{ text: (SYSTEM_DEFAULT + (system ? '\n\n' + system : '')) }] },
       contents,
     }),
   });

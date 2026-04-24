@@ -8,23 +8,45 @@ import {
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_SOFT, INK } from '@/components/dashboard/theme';
-import { useLocalList, SEED_TX, formatAED } from '@/lib/webStore';
+import Link from 'next/link';
+import { useLocalList, SEED_TX, formatAED, CATEGORIES } from '@/lib/webStore';
 
 const Webcam = dynamic(() => import('react-webcam'), { ssr: false });
 
+// Category inference from merchant/keywords — runs fully local.
+function inferCategory(text) {
+  const t = (text || '').toLowerCase();
+  const rules = [
+    [/(talabat|lunch|cafe|coffee|restaurant|dining|zomato|deliveroo|mcdonald|kfc|starbucks|costa|pizza)/, 'Food'],
+    [/(dewa|etisalat|du|wifi|electric|water|internet|zain|vodafone)/,                                     'Utilities'],
+    [/(careem|uber|taxi|metro|rta|fuel|petrol|shell|adnoc|enoc|flight|emirates|flydubai)/,               'Travel'],
+    [/(amazon|officesupplies|staples|ikea|office)/,                                                      'Supplies'],
+    [/(adobe|figma|github|slack|notion|atlassian|google workspace|microsoft 365|dropbox|aws|vercel)/,    'Software'],
+    [/(rent|landlord|ejari)/,                                                                            'Rent'],
+    [/(facebook|google ads|linkedin ads|tiktok ads|instagram ads|marketing)/,                            'Marketing'],
+    [/(invoice|client|consulting|freelance|project payment)/,                                            'Freelance'],
+  ];
+  for (const [re, cat] of rules) if (re.test(t)) return cat;
+  return 'Other';
+}
+
 function parseReceipt(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  let total = 0, merchant = '';
   const amounts = [];
+  let explicitTotal = 0, explicitVat = 0;
   for (const l of lines) {
-    const m = l.match(/(?:total|amount|grand\s*total|aed|dhs|dh)[\s:]*([0-9]+[.,][0-9]{2})/i)
-           || l.match(/^([0-9]+[.,][0-9]{2})$/);
+    const totalMatch = l.match(/(?:grand\s*total|total|amount\s*due|net\s*total)[\s:]*(?:aed|dhs?|dh)?[\s:]*([0-9]+[.,][0-9]{2})/i);
+    if (totalMatch) { const v = parseFloat(totalMatch[1].replace(',', '.')); if (v > explicitTotal) explicitTotal = v; continue; }
+    const vatMatch = l.match(/(?:vat|tax)\s*(?:\(5%\)|5%)?[\s:]*(?:aed|dhs?|dh)?[\s:]*([0-9]+[.,][0-9]{2})/i);
+    if (vatMatch) { explicitVat = parseFloat(vatMatch[1].replace(',', '.')); continue; }
+    const m = l.match(/^([0-9]+[.,][0-9]{2})$/) || l.match(/(?:aed|dhs?|dh)\s*([0-9]+[.,][0-9]{2})/i);
     if (m) amounts.push(parseFloat(m[1].replace(',', '.')));
   }
-  total = amounts.length ? Math.max(...amounts) : 0;
-  merchant = lines[0]?.slice(0, 40) || 'Receipt';
-  const vat = +(total * 0.05).toFixed(2);
-  return { merchant, total, vat, raw: text };
+  const total = explicitTotal || (amounts.length ? Math.max(...amounts) : 0);
+  const merchant = (lines[0] || 'Receipt').replace(/[^\w\s&'.-]/g, '').slice(0, 40) || 'Receipt';
+  const vat = explicitVat || +(total * 0.05 / 1.05).toFixed(2); // VAT portion of VAT-inclusive total
+  const category = inferCategory(lines.join(' '));
+  return { merchant, total, vat, category, raw: text };
 }
 
 export default function ScanPage() {
@@ -62,19 +84,41 @@ export default function ScanPage() {
     setRunning(false);
   };
 
-  const saveTx = () => {
-    if (!ocr || !ocr.total) return;
-    add({
+  const [draft, setDraft] = useState(null); // editable form populated from ocr
+
+  const runOcrThenDraft = async () => {
+    await runOcr();
+  };
+
+  // Sync ocr → draft when new OCR result arrives
+  if (ocr && !draft) {
+    setDraft({
       name: ocr.merchant,
-      merchant: 'Scanned receipt',
       amount: ocr.total,
       vat: ocr.vat,
       type: 'expense',
-      category: 'Food',
+      category: ocr.category || 'Other',
+      date: new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  const saveTx = () => {
+    if (!draft || !draft.amount) return;
+    const d = new Date(draft.date || Date.now()).getTime() || Date.now();
+    add({
+      name: draft.name || 'Receipt',
+      merchant: 'Scanned receipt',
+      amount: +draft.amount,
+      vat: +draft.vat || 0,
+      type: draft.type,
+      category: draft.category,
       status: 'Cleared',
+      ts: d,
     });
     setSaved(true);
   };
+
+  const resetAll = () => { setImg(null); setOcr(null); setDraft(null); setSaved(false); };
 
   return (
     <Shell title="Scan" subtitle="Capture receipts w/ browser camera. OCR runs locally via tesseract.js.">
@@ -149,32 +193,71 @@ export default function ScanPage() {
             <h3 className="text-sm font-semibold" style={{ color: INK }}>Parsed data</h3>
           </div>
 
-          {!ocr && (
+          {!draft && !saved && (
             <div className="flex h-[300px] flex-col items-center justify-center gap-3 text-slate-400">
               <ScanLine className="h-10 w-10" />
-              <span className="text-sm">Capture or upload a receipt to see OCR results</span>
+              <span className="text-sm">Capture or upload a receipt to see extracted data</span>
             </div>
           )}
 
-          {ocr && (
+          {draft && !saved && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-              <Row label="Merchant"  value={ocr.merchant} />
-              <Row label="Total"     value={formatAED(ocr.total)} big />
-              <Row label="VAT (5%)"  value={formatAED(ocr.vat)} />
-              <Row label="Category"  value="Food (auto)" />
-              <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
-                <summary className="cursor-pointer font-semibold text-slate-600">Raw OCR text</summary>
-                <pre className="mt-2 whitespace-pre-wrap text-slate-500">{ocr.raw}</pre>
-              </details>
-              {!saved ? (
-                <button onClick={saveTx} disabled={!ocr.total} className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105 disabled:opacity-50" style={{ background: BRAND }}>
-                  <Check className="h-4 w-4" /> Save as transaction
-                </button>
-              ) : (
-                <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-50 py-3 text-sm font-bold text-emerald-600">
-                  <Check className="h-4 w-4" /> Saved to transactions
-                </div>
+              <FormField label="Merchant / description">
+                <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={inputCls} />
+              </FormField>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Amount (AED)">
+                  <input type="number" step="0.01" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value, vat: +(+e.target.value * 0.05 / 1.05).toFixed(2) })} className={inputCls} />
+                </FormField>
+                <FormField label="VAT portion">
+                  <input type="number" step="0.01" value={draft.vat} onChange={(e) => setDraft({ ...draft, vat: e.target.value })} className={inputCls} />
+                </FormField>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Type">
+                  <select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} className={inputCls}>
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                  </select>
+                </FormField>
+                <FormField label="Category">
+                  <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className={inputCls}>
+                    {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </FormField>
+              </div>
+              <FormField label="Date">
+                <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} className={inputCls} />
+              </FormField>
+              {ocr?.raw && (
+                <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                  <summary className="cursor-pointer font-semibold text-slate-600">Raw OCR text</summary>
+                  <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-slate-500">{ocr.raw}</pre>
+                </details>
               )}
+              <button onClick={saveTx} disabled={!draft.amount} className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50" style={{ background: `linear-gradient(135deg, ${BRAND}, #1E4BB0)` }}>
+                <Check className="h-4 w-4" /> Save as transaction
+              </button>
+            </motion.div>
+          )}
+
+          {saved && (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex h-[300px] flex-col items-center justify-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+                <Check className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-emerald-700">Saved to your ledger</div>
+                <div className="mt-1 text-xs text-slate-500">{draft?.name} · {formatAED(draft?.amount)}</div>
+              </div>
+              <div className="flex gap-2">
+                <Link href="/transactions" className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ background: BRAND }}>
+                  View transactions
+                </Link>
+                <button onClick={resetAll} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  Scan another
+                </button>
+              </div>
             </motion.div>
           )}
         </div>
@@ -198,11 +281,12 @@ export default function ScanPage() {
   );
 }
 
-function Row({ label, value, big }) {
+const inputCls = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+function FormField({ label, children }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0">
-      <span className="text-xs font-semibold text-slate-500">{label}</span>
-      <span className={`${big ? 'text-2xl font-bold' : 'text-sm font-semibold'}`} style={{ color: INK }}>{value}</span>
-    </div>
+    <label className="block">
+      <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">{label}</span>
+      {children}
+    </label>
   );
 }

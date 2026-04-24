@@ -2,15 +2,21 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell,
-} from 'recharts';
+import dynamic from 'next/dynamic';
 import {
   Bell, Receipt, BarChart3, TrendingUp, TrendingDown, ArrowRight,
   MoreHorizontal, Sparkles, Wallet, ShieldCheck,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
-import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK, SLATE } from '@/components/dashboard/theme';
+import InsightsCard from '@/components/dashboard/InsightsCard';
+import PrivacyBanner from '@/components/dashboard/PrivacyBanner';
+import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
+
+// Lazy-load recharts (~120KB) — dashboard paints first without it
+const RevenueChart = dynamic(() => import('@/components/dashboard/RevenueChart'), {
+  ssr: false,
+  loading: () => <div className="h-[260px] w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />,
+});
 
 const STATS = [
   { id: 'balance', href: '/transactions', icon: Wallet,       label: 'Total Balance',    value: 'AED 365,500', delta: '+12%', up: true,  sub: '+AED 42,300 from last month' },
@@ -25,16 +31,6 @@ const CATEGORY = [
   { name: 'Misc',        pct: 10, color: '#F59E0B' },
 ];
 
-const REVENUE = [
-  { year: '2019', income: 120 },
-  { year: '2020', income: 180 },
-  { year: '2021', income: 220 },
-  { year: '2022', income: 260 },
-  { year: '2023', income: 310, highlight: true },
-  { year: '2024', income: 280 },
-  { year: '2025', income: 340 },
-];
-
 const TX_ROWS = [
   { name: 'Noor Creative Co.', meta: 'Invoice #INV-2401',   loc: 'Jumeirah, Dubai', type: 'Income',  status: 'Settled', amount: 'AED 12,500' },
   { name: 'Zain Wifi',         meta: 'Monthly subscription', loc: 'Bur Dubai',       type: 'Bill',    status: 'Paid',    amount: 'AED 310' },
@@ -44,6 +40,12 @@ const TX_ROWS = [
 export default function HomePage() {
   return (
     <Shell title="Good Morning, Veer" subtitle="Here's your financial overview for today" wave>
+      {/* Privacy trust banner — dismissible */}
+      <PrivacyBanner variant="banner" />
+
+      {/* AI Insights — computed from user's real ledger */}
+      <InsightsCard />
+
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         {STATS.map((s, i) => {
@@ -121,24 +123,7 @@ export default function HomePage() {
             <button><MoreHorizontal className="h-5 w-5 text-slate-400" /></button>
           </div>
           <div className="mt-6 h-[260px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={REVENUE} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: SLATE, fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: SLATE, fontSize: 11 }} />
-                <Tooltip
-                  cursor={{ fill: 'transparent' }}
-                  content={({ active, payload, label }) => !active || !payload?.length ? null : (
-                    <div className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-lg">
-                      {label} · AED {payload[0].value}k
-                    </div>
-                  )}
-                />
-                <ReferenceLine y={310} stroke={BRAND} strokeDasharray="4 4" strokeOpacity={0.5} />
-                <Bar dataKey="income" radius={[8, 8, 8, 8]} barSize={32}>
-                  {REVENUE.map((r, i) => <Cell key={i} fill={r.highlight ? BRAND : '#E2E8F0'} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <RevenueChart />
           </div>
         </motion.div>
       </div>
