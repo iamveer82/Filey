@@ -14,6 +14,18 @@ const STORAGE_KEYS = [
   'filey.web.approvals', 'filey.web.projects',
 ];
 
+const PROVIDER_DEFAULTS = {
+  anthropic:      { model: 'claude-sonnet-4-20250514', keyHint: 'sk-ant-…' },
+  openai:         { model: 'gpt-4o-mini',              keyHint: 'sk-…' },
+  google:         { model: 'gemini-2.0-flash',         keyHint: 'AIza…' },
+  groq:           { model: 'llama-3.3-70b-versatile',  keyHint: 'gsk_…' },
+  mistral:        { model: 'mistral-large-latest',     keyHint: '…' },
+  openrouter:     { model: 'anthropic/claude-sonnet-4',keyHint: 'sk-or-…' },
+  together:       { model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyHint: '…' },
+  ollama:         { model: 'llama3.2',                 keyHint: '(empty — local)' },
+  'openai-compat':{ model: '',                         keyHint: 'your-key' },
+};
+
 function validateTRN(trn) {
   const clean = (trn || '').replace(/\s/g, '');
   if (!clean) return { ok: false, msg: 'Enter TRN to validate' };
@@ -24,7 +36,9 @@ function validateTRN(trn) {
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState({ name: 'Veer Patel', email: 'iamveer82@gmail.com', company: 'Filey Technologies', trn: '100123456789003' });
-  const [ai, setAi] = useState({ provider: 'claude', apiKey: '', model: 'claude-sonnet-4' });
+  const [ai, setAi] = useState({ provider: 'anthropic', apiKey: '', model: 'claude-sonnet-4-20250514', baseUrl: '' });
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [prefs, setPrefs] = useState({ theme: 'light', notifications: true, currency: 'AED', locale: 'en-AE' });
   const [saved, setSaved] = useState(false);
   const trn = validateTRN(profile.trn);
@@ -148,31 +162,77 @@ export default function SettingsPage() {
         </Card>
 
         {/* AI Provider */}
-        <Card icon={Bot} title="AI Provider" className="lg:col-span-2">
+        <Card icon={Bot} title="AI Brain — connect any LLM" className="lg:col-span-2">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Provider">
-              <select value={ai.provider} onChange={(e) => setAi({ ...ai, provider: e.target.value })} className={inputCls}>
-                <option value="claude">Anthropic Claude</option>
-                <option value="openai">OpenAI GPT</option>
-                <option value="gemini">Google Gemini</option>
-                <option value="local">On-device (Gemma)</option>
+              <select value={ai.provider} onChange={(e) => setAi({ ...ai, provider: e.target.value, model: PROVIDER_DEFAULTS[e.target.value]?.model || '' })} className={inputCls}>
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="openai">OpenAI (GPT)</option>
+                <option value="google">Google (Gemini)</option>
+                <option value="groq">Groq</option>
+                <option value="mistral">Mistral</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="together">Together AI</option>
+                <option value="ollama">Ollama (local)</option>
+                <option value="openai-compat">Custom OpenAI-compatible</option>
               </select>
             </Field>
-            <Field label="Model">
-              <select value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} className={inputCls}>
-                <option value="claude-sonnet-4">Claude Sonnet 4</option>
-                <option value="claude-opus-4">Claude Opus 4</option>
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                <option value="gemma-3n">Gemma 3n (local)</option>
-              </select>
+            <Field label="Model ID">
+              <input value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} className={inputCls} placeholder={PROVIDER_DEFAULTS[ai.provider]?.model || 'model-name'} />
             </Field>
             <Field label="API key" className="md:col-span-2">
               <div className="relative">
                 <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input type="password" value={ai.apiKey} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} className={`${inputCls} pl-9`} placeholder="sk-ant-..." />
+                <input type="password" value={ai.apiKey} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} className={`${inputCls} pl-9`} placeholder={PROVIDER_DEFAULTS[ai.provider]?.keyHint || 'sk-...'} />
               </div>
             </Field>
+            {(ai.provider === 'openai-compat' || ai.provider === 'ollama') && (
+              <Field label="Base URL" className="md:col-span-2">
+                <input value={ai.baseUrl || ''} onChange={(e) => setAi({ ...ai, baseUrl: e.target.value })} className={inputCls} placeholder={ai.provider === 'ollama' ? 'http://localhost:11434' : 'https://your-endpoint.com'} />
+              </Field>
+            )}
+            <div className="md:col-span-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  setTesting(true); setTestResult(null);
+                  try {
+                    const res = await fetch('/api/chat', {
+                      method: 'POST',
+                      headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ provider: ai.provider, apiKey: ai.apiKey, model: ai.model, baseUrl: ai.baseUrl, messages: [{ role: 'user', content: 'Reply with exactly: OK' }] }),
+                    });
+                    if (!res.ok) { setTestResult({ ok: false, msg: await res.text() }); return; }
+                    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '', got = '';
+                    while (true) {
+                      const { done, value } = await reader.read(); if (done) break;
+                      buf += dec.decode(value, { stream: true });
+                      const lines = buf.split('\n'); buf = lines.pop() || '';
+                      for (const l of lines) {
+                        if (!l.startsWith('data:')) continue;
+                        const d = l.slice(5).trim(); if (!d || d === '[DONE]') continue;
+                        try { const j = JSON.parse(d); if (j.error) { setTestResult({ ok: false, msg: j.error }); return; } if (j.delta) got += j.delta; } catch {}
+                      }
+                    }
+                    setTestResult({ ok: true, msg: got.trim().slice(0, 80) || '(empty)' });
+                  } catch (e) { setTestResult({ ok: false, msg: String(e) }); }
+                  finally { setTesting(false); }
+                }}
+                disabled={!ai.apiKey || testing}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40"
+                style={{ background: BRAND }}
+              >
+                {testing ? 'Testing…' : 'Test connection'}
+              </button>
+              {testResult && (
+                <span className={`text-xs font-semibold ${testResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {testResult.ok ? `✓ ${testResult.msg}` : `✗ ${testResult.msg.slice(0, 120)}`}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">
+            Keys live in your browser (localStorage). Requests relay through Filey's edge function — keys never stored server-side.
           </div>
         </Card>
 

@@ -1,218 +1,343 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import Link from 'next/link';
 import {
-  Send, Bot, User as UserIcon, Plus, Sparkles, MessageSquare, ArrowRight,
-  Paperclip, Mic, Square, Copy, RotateCw,
+  Send, Sparkles, Plus, MessageSquare, Trash2, Copy, Check, Square,
+  PanelLeftClose, PanelLeftOpen, Settings as Cog, AlertTriangle, Bot,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_THREADS, SEED_MESSAGES, formatWhen } from '@/lib/webStore';
 
 const SUGGESTIONS = [
-  'Log 500 AED I paid to Zain today',
-  'What is my VAT reclaimable this quarter?',
-  'Show me my 3 largest expenses this month',
-  'Export my Q1 ledger as CSV',
+  { label: 'Log 500 AED paid to Zain today',           icon: '💸' },
+  { label: 'What is my VAT reclaimable this quarter?', icon: '📊' },
+  { label: 'Show 3 largest expenses this month',       icon: '🧾' },
+  { label: 'Export my Q1 ledger as CSV',               icon: '📤' },
 ];
 
-function mockReply(user) {
-  const u = user.toLowerCase();
-  if (/\b(paid|spent|logged|sent)\b.*\d/.test(u)) {
-    const amt = u.match(/(\d+(?:\.\d+)?)/)?.[1] || '0';
-    return `✓ Logged expense of AED ${amt}. VAT 5% = AED ${(+amt * 0.05).toFixed(2)}. Added to ledger.`;
-  }
-  if (/vat/.test(u)) {
-    return 'Current quarter VAT snapshot:\n• Reclaimable: AED 2,340\n• Owed on sales: AED 4,850\n• Net payable: **AED 2,510** due 28 May.';
-  }
-  if (/expense|spend|largest/.test(u)) {
-    return 'Top 3 expenses this month:\n1. Rent — AED 8,500\n2. Al Futtaim invoice payment — AED 5,200\n3. DEWA bill — AED 520.';
-  }
-  if (/export|csv/.test(u)) {
-    return 'Ledger export ready. Head to /transactions and click "Export CSV" to download.';
-  }
-  return 'Noted. I can log money movements, summarize VAT, explain UAE tax rules, and export data. What would you like next?';
+function loadAI() {
+  if (typeof window === 'undefined') return null;
+  try { return JSON.parse(localStorage.getItem('filey.web.ai') || 'null'); } catch { return null; }
 }
 
 export default function ChatPage() {
-  const { list: threads, add: addThread } = useLocalList('filey.web.threads', SEED_THREADS);
-  const [activeId, setActiveId] = useState(threads[0]?.id || 't1');
+  const { list: threads, add: addThread, remove: removeThread, update: updateThread } = useLocalList('filey.web.threads', SEED_THREADS);
+  const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [ai, setAi] = useState(null);
+  const [abortCtrl, setAbortCtrl] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
   const listRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  useEffect(() => { setActiveId(threads[0]?.id || 't1'); }, [threads.length]);
+  useEffect(() => { setAi(loadAI()); }, []);
+  useEffect(() => { if (!activeId && threads.length) setActiveId(threads[0].id); }, [threads, activeId]);
 
-  // Load messages per thread from localStorage
+  // Per-thread message load
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!activeId || typeof window === 'undefined') return;
     const key = `filey.web.msgs.${activeId}`;
     try {
       const raw = window.localStorage.getItem(key);
       if (raw) setMessages(JSON.parse(raw));
-      else {
-        const seed = SEED_MESSAGES[activeId] || [];
-        setMessages(seed);
-        window.localStorage.setItem(key, JSON.stringify(seed));
-      }
+      else { const seed = SEED_MESSAGES[activeId] || []; setMessages(seed); window.localStorage.setItem(key, JSON.stringify(seed)); }
     } catch { setMessages([]); }
   }, [activeId]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages.length]);
+  }, [messages.length, messages[messages.length - 1]?.content]);
 
-  const persist = (next) => {
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current; if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }, [draft]);
+
+  const persist = useCallback((next) => {
     setMessages(next);
-    try { window.localStorage.setItem(`filey.web.msgs.${activeId}`, JSON.stringify(next)); } catch {}
+    if (activeId) try { window.localStorage.setItem(`filey.web.msgs.${activeId}`, JSON.stringify(next)); } catch {}
+  }, [activeId]);
+
+  const newThread = () => {
+    const id = `t_${Date.now().toString(36)}`;
+    addThread({ id, title: 'New chat', updatedAt: Date.now() });
+    setActiveId(id); setMessages([]); setDraft('');
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
+  const deleteThread = (id) => {
+    removeThread(id);
+    try { localStorage.removeItem(`filey.web.msgs.${id}`); } catch {}
+    if (activeId === id) { setActiveId(null); setMessages([]); }
   };
 
   const send = async (text) => {
     const content = (text || draft).trim();
     if (!content || sending) return;
-    const userMsg  = { id: `m_${Date.now()}`, role: 'user', content, ts: Date.now() };
-    const typing   = { id: `m_${Date.now()}_t`, role: 'assistant', content: '…', ts: Date.now() + 1, typing: true };
-    const next = [...messages, userMsg, typing];
-    persist(next); setDraft(''); setSending(true);
-    setTimeout(() => {
-      const reply = { id: `m_${Date.now()}_r`, role: 'assistant', content: mockReply(content), ts: Date.now() };
-      persist([...messages, userMsg, reply]);
-      setSending(false);
-    }, 800 + Math.random() * 600);
+
+    const cfg = loadAI();
+    if (!cfg?.apiKey) {
+      const errMsg = { id: `m_${Date.now()}_err`, role: 'assistant', content: '⚠ No API key configured. Go to **[Settings → AI Brain](/settings)** to add one. Then try again.', ts: Date.now() };
+      persist([...messages, { id: `u_${Date.now()}`, role: 'user', content, ts: Date.now() }, errMsg]);
+      setDraft(''); return;
+    }
+
+    const userMsg = { id: `u_${Date.now()}`, role: 'user', content, ts: Date.now() };
+    const asstId  = `a_${Date.now()}`;
+    const asstMsg = { id: asstId, role: 'assistant', content: '', ts: Date.now() + 1, streaming: true };
+    const baseline = [...messages, userMsg];
+    persist([...baseline, asstMsg]);
+    setDraft(''); setSending(true);
+
+    // Auto-title from first message
+    if (activeId && messages.length === 0) {
+      updateThread(activeId, { title: content.slice(0, 48), updatedAt: Date.now() });
+    }
+
+    const ctrl = new AbortController(); setAbortCtrl(ctrl);
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: cfg.provider, apiKey: cfg.apiKey, model: cfg.model, baseUrl: cfg.baseUrl,
+          messages: baseline.map(m => ({ role: m.role, content: m.content })),
+        }),
+        signal: ctrl.signal,
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        persist([...baseline, { ...asstMsg, content: `⚠ ${txt || 'Request failed'}`, streaming: false, error: true }]);
+        setSending(false); return;
+      }
+
+      const reader = res.body.getReader(); const dec = new TextDecoder();
+      let buf = '', acc = '';
+      while (true) {
+        const { done, value } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const d = line.slice(5).trim(); if (!d || d === '[DONE]') continue;
+          try {
+            const j = JSON.parse(d);
+            if (j.error) { acc += `\n\n⚠ ${j.error}`; }
+            if (j.delta) acc += j.delta;
+            setMessages((prev) => prev.map(m => m.id === asstId ? { ...m, content: acc } : m));
+          } catch {}
+        }
+      }
+      const final = [...baseline, { ...asstMsg, content: acc || '(no response)', streaming: false }];
+      persist(final);
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        persist([...baseline, { ...asstMsg, content: `⚠ ${String(e)}`, streaming: false, error: true }]);
+      } else {
+        persist((prev => prev.map(m => m.id === asstId ? { ...m, streaming: false, content: m.content + '\n\n_(stopped)_' } : m))(messages));
+      }
+    } finally { setSending(false); setAbortCtrl(null); }
   };
 
-  const newThread = () => {
-    const id = `t_${Date.now().toString(36)}`;
-    const t = { id, title: 'New chat', updatedAt: Date.now() };
-    addThread(t);
-    setActiveId(id);
-    setMessages([]);
-  };
+  const stop = () => { abortCtrl?.abort(); };
+
+  const copy = (id, text) => { navigator.clipboard.writeText(text); setCopiedId(id); setTimeout(() => setCopiedId(null), 1500); };
 
   const activeThread = threads.find(t => t.id === activeId);
+  const hasKey = !!ai?.apiKey;
+  const providerLabel = ai?.provider ? ({ anthropic: 'Claude', openai: 'GPT', google: 'Gemini', groq: 'Groq', mistral: 'Mistral', openrouter: 'OpenRouter', together: 'Together', ollama: 'Ollama', 'openai-compat': 'Custom' }[ai.provider] || ai.provider) : 'Not configured';
 
   return (
-    <Shell title="Chat AI" subtitle="Tool-calling agent — log transactions, query VAT, export data">
-      <div className="grid gap-4 md:grid-cols-[280px_1fr]">
-        {/* Threads */}
-        <div className="flex flex-col gap-2">
-          <button onClick={newThread} className="inline-flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-sm transition hover:scale-105" style={{ background: BRAND }}>
-            <Plus className="h-4 w-4" /> New chat
-          </button>
-          <div className="rounded-2xl border border-slate-200 bg-white p-2">
-            {threads.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActiveId(t.id)}
-                className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition ${activeId === t.id ? 'text-white' : 'hover:bg-slate-50'}`}
-                style={activeId === t.id ? { background: 'linear-gradient(135deg, ' + BRAND + ', ' + BRAND_DARK + ')' } : undefined}
-              >
-                <MessageSquare className={`mt-0.5 h-4 w-4 ${activeId === t.id ? 'text-white' : 'text-slate-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <div className={`truncate text-sm font-semibold ${activeId === t.id ? '' : 'text-slate-900'}`}>{t.title}</div>
-                  <div className={`truncate text-[11px] ${activeId === t.id ? 'text-white/60' : 'text-slate-500'}`}>{formatWhen(t.updatedAt)}</div>
+    <Shell title="Chat AI" subtitle={hasKey ? `Connected to ${providerLabel} · ${ai.model || ''}` : 'No AI brain connected — set one in Settings'}>
+      <div className="flex h-[calc(100vh-240px)] min-h-[560px] overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        {/* Threads sidebar */}
+        <AnimatePresence initial={false}>
+          {sidebarOpen && (
+            <motion.aside
+              initial={{ width: 0, opacity: 0 }} animate={{ width: 260, opacity: 1 }} exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0 overflow-hidden border-r border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50"
+            >
+              <div className="flex h-full w-[260px] flex-col">
+                <div className="p-3">
+                  <button onClick={newThread} className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+                    <Plus className="h-4 w-4" /> New chat
+                  </button>
                 </div>
-              </button>
-            ))}
-          </div>
-        </div>
+                <div className="flex-1 overflow-y-auto px-2 pb-3">
+                  <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Recent</div>
+                  {threads.map((t) => (
+                    <div key={t.id} className={`group relative mb-1 rounded-xl transition ${activeId === t.id ? 'text-white' : 'text-slate-700 hover:bg-white dark:text-slate-200 dark:hover:bg-slate-800'}`} style={activeId === t.id ? { background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` } : undefined}>
+                      <button onClick={() => setActiveId(t.id)} className="flex w-full items-start gap-2 p-2.5 pr-9 text-left">
+                        <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold">{t.title}</div>
+                          <div className={`truncate text-[11px] ${activeId === t.id ? 'text-white/60' : 'text-slate-500'}`}>{formatWhen(t.updatedAt)}</div>
+                        </div>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete chat?')) deleteThread(t.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 opacity-0 transition hover:bg-black/20 group-hover:opacity-100">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 p-3 dark:border-slate-800">
+                  <Link href="/settings" className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800">
+                    <Cog className="h-3.5 w-3.5" /> AI settings
+                  </Link>
+                </div>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
-        {/* Conversation */}
-        <div className="flex h-[calc(100vh-280px)] min-h-[500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {/* Main conversation */}
+        <div className="relative flex min-w-0 flex-1 flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: BRAND_SOFT }}>
-                <Bot className="h-5 w-5" style={{ color: BRAND }} />
-              </div>
-              <div>
-                <div className="font-bold" style={{ color: INK }}>{activeThread?.title || 'Filey AI'}</div>
-                <div className="text-xs text-slate-500">Claude Sonnet 4 · Tool-calling enabled</div>
-              </div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setSidebarOpen(v => !v)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}>
+                {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+              </button>
+              <div className="font-bold" style={{ color: INK }}>{activeThread?.title || 'Filey AI'}</div>
             </div>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600">● Online</span>
+            <div className="flex items-center gap-2">
+              {hasKey ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {providerLabel}
+                </span>
+              ) : (
+                <Link href="/settings" className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100">
+                  <AlertTriangle className="h-3 w-3" /> Connect LLM
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Messages */}
-          <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-6">
-            {messages.length === 0 && (
-              <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: 'linear-gradient(135deg, ' + BRAND + ', ' + BRAND_DARK + ')' }}>
-                  <Sparkles className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold" style={{ color: INK }}>How can I help?</h3>
-                  <p className="mt-1 text-sm text-slate-500">Ask anything about your finances. Try:</p>
-                </div>
-                <div className="grid w-full max-w-md gap-2">
-                  {SUGGESTIONS.map((s) => (
-                    <button key={s} onClick={() => send(s)} className="inline-flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left text-sm font-medium text-slate-700 transition hover:bg-white hover:shadow-sm">
-                      {s}
-                      <ArrowRight className="h-4 w-4 text-slate-400" />
-                    </button>
-                  ))}
-                </div>
+          <div ref={listRef} className="flex-1 overflow-y-auto">
+            {messages.length === 0 ? (
+              <EmptyWelcome onPick={send} />
+            ) : (
+              <div className="mx-auto max-w-3xl px-4 py-8">
+                {messages.map((m, i) => (
+                  <MessageRow key={m.id} msg={m} onCopy={() => copy(m.id, m.content)} copied={copiedId === m.id} />
+                ))}
               </div>
             )}
-            <AnimatePresence initial={false}>
-              {messages.map((m) => (
-                <motion.div
-                  key={m.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: m.role === 'user' ? BRAND : BRAND_SOFT }}>
-                    {m.role === 'user' ? <UserIcon className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4" style={{ color: BRAND }} />}
-                  </div>
-                  <div className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm ${m.role === 'user' ? 'text-white' : 'bg-slate-50 text-slate-800'}`} style={m.role === 'user' ? { background: BRAND } : undefined}>
-                    {m.typing ? (
-                      <span className="flex gap-1">
-                        {[0, 1, 2].map((i) => (
-                          <motion.span
-                            key={i}
-                            animate={{ y: [0, -4, 0] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                            className="inline-block h-1.5 w-1.5 rounded-full bg-slate-400"
-                          />
-                        ))}
-                      </span>
-                    ) : (
-                      <div className="whitespace-pre-wrap">{m.content}</div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
           </div>
 
           {/* Composer */}
-          <div className="border-t border-slate-100 p-4">
-            <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
-              <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600"><Paperclip className="h-4 w-4" /></button>
-              <textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder="Ask anything… Shift+Enter for newline"
-                rows={1}
-                className="max-h-32 flex-1 resize-none bg-transparent p-2 text-sm outline-none"
-              />
-              <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600"><Mic className="h-4 w-4" /></button>
-              <button
-                onClick={() => send()}
-                disabled={!draft.trim() || sending}
-                className="inline-flex items-center justify-center rounded-xl p-2.5 text-white shadow-sm transition hover:scale-105 disabled:opacity-50"
-                style={{ background: BRAND }}
-              >
-                {sending ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-              </button>
+          <div className="border-t border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="mx-auto max-w-3xl">
+              <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:border-slate-700 dark:bg-slate-800">
+                <textarea
+                  ref={textareaRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  placeholder={hasKey ? 'Message Filey AI…  (Shift+Enter for newline)' : 'Set an API key in Settings to start chatting'}
+                  rows={1}
+                  className="block w-full resize-none rounded-2xl bg-transparent px-4 py-3.5 pr-14 text-sm outline-none placeholder-slate-400 dark:text-slate-100"
+                  style={{ minHeight: 52 }}
+                />
+                {sending ? (
+                  <button onClick={stop} aria-label="Stop" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90" style={{ background: '#1E293B' }}>
+                    <Square className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button onClick={() => send()} disabled={!draft.trim()} aria-label="Send" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+                    <Send className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 text-center text-[11px] text-slate-400">
+                Filey AI can make mistakes. Verify critical financial figures.
+              </div>
             </div>
           </div>
         </div>
       </div>
     </Shell>
+  );
+}
+
+function EmptyWelcome({ onPick }) {
+  return (
+    <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center gap-6 px-4 py-12 text-center">
+      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }} className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+        <Sparkles className="h-7 w-7 text-white" />
+      </motion.div>
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight" style={{ color: INK }}>How can I help today?</h2>
+        <p className="mt-2 text-sm text-slate-500">Your UAE finance copilot. Ask about VAT, log transactions, or query your ledger.</p>
+      </div>
+      <div className="grid w-full gap-2 sm:grid-cols-2">
+        {SUGGESTIONS.map((s) => (
+          <button key={s.label} onClick={() => onPick(s.label)} className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <span className="text-xl">{s.icon}</span>
+            <span className="flex-1">{s.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MessageRow({ msg, onCopy, copied }) {
+  const isUser = msg.role === 'user';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      className={`mb-6 flex gap-4 ${isUser ? 'justify-end' : ''}`}
+    >
+      {!isUser && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+          <Sparkles className="h-4 w-4 text-white" />
+        </div>
+      )}
+      <div className={`group min-w-0 ${isUser ? 'max-w-[85%]' : 'flex-1'}`}>
+        <div className={`${isUser ? 'rounded-2xl rounded-tr-md bg-slate-100 px-4 py-3 text-sm text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'text-[15px] leading-relaxed text-slate-800 dark:text-slate-100'}`}>
+          {isUser ? (
+            <div className="whitespace-pre-wrap">{msg.content}</div>
+          ) : msg.streaming && !msg.content ? (
+            <TypingDots />
+          ) : (
+            <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-a:text-blue-600">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+        {!isUser && !msg.streaming && msg.content && (
+          <div className="mt-2 flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function TypingDots() {
+  return (
+    <span className="inline-flex gap-1 py-1">
+      {[0, 1, 2].map(i => (
+        <motion.span key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }} className="inline-block h-1.5 w-1.5 rounded-full bg-slate-400" />
+      ))}
+    </span>
   );
 }
