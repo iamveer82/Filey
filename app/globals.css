@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html.dark {
+    color-scheme: dark;
+  }
   :root {
     --background: 0 0% 98%;
     --foreground: 222 47% 11%;
@@ -35,6 +38,9 @@
   * {
     @apply border-border;
     -webkit-tap-highlight-color: transparent;
+  }
+  html.dark body {
+    @apply bg-[#0B1220] text-slate-100;
   }
   body {
     @apply bg-[#F7F8FA] text-[#0F172A] antialiased;
@@ -138,3 +144,70 @@ button, nav, .no-select {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Focus rings — accessibility */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #2A63E2;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.12);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dark mode blanket overrides — apply once, cover all pages. */
+html.dark .bg-white { background-color: #0F172A !important; }
+html.dark .bg-slate-50 { background-color: #111827 !important; }
+html.dark .bg-slate-50\/50 { background-color: rgba(17,24,39,0.5) !important; }
+html.dark .bg-slate-100 { background-color: #1E293B !important; }
+html.dark .bg-slate-900 { background-color: #1E40AF !important; }
+html.dark .bg-slate-900\/60 { background-color: rgba(15,23,42,0.6) !important; }
+
+html.dark .text-slate-900 { color: #F1F5F9 !important; }
+html.dark .text-slate-800 { color: #E2E8F0 !important; }
+html.dark .text-slate-700 { color: #CBD5E1 !important; }
+html.dark .text-slate-600 { color: #94A3B8 !important; }
+html.dark .text-slate-500 { color: #94A3B8 !important; }
+html.dark .text-slate-400 { color: #64748B !important; }
+
+html.dark .border-slate-200 { border-color: #1E293B !important; }
+html.dark .border-slate-100 { border-color: #1E293B !important; }
+html.dark .border-slate-300 { border-color: #334155 !important; }
+html.dark .border-slate-200\/60 { border-color: rgba(30,41,59,0.6) !important; }
+
+html.dark .bg-\[\#F3F5F9\] { background-color: #0B1220 !important; }
+html.dark .bg-\[\#F7F8FA\] { background-color: #0B1220 !important; }
+
+/* Keep tinted status bg readable */
+html.dark .bg-emerald-50 { background-color: rgba(16,185,129,0.12) !important; }
+html.dark .bg-red-50     { background-color: rgba(239,68,68,0.12)  !important; }
+html.dark .bg-amber-50   { background-color: rgba(245,158,11,0.12) !important; }
+html.dark .bg-blue-50    { background-color: rgba(42,99,226,0.15)  !important; }
+
+/* Dark scrollbar */
+html.dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.dark ::-webkit-scrollbar-track { background: #0B1220; }
+html.dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 8px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* Light scrollbar polish */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-track { background: transparent; }
