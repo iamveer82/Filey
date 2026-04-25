@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   User, Shield, Bot, Palette, Download, Upload, Trash2, Check, AlertCircle,
-  Key, Globe, Bell, Moon, Sun, Save,
+  Key, Globe, Bell, Moon, Sun, Save, Crown, CreditCard, Sparkles, Zap, ArrowRight,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
-import { BRAND, BRAND_SOFT, INK } from '@/components/dashboard/theme';
+import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
+import { usePlan, PLANS } from '@/lib/plan';
+import { toast } from 'sonner';
 
 const STORAGE_KEYS = [
   'filey.web.tx', 'filey.web.bills', 'filey.web.threads', 'filey.web.team',
@@ -107,6 +111,9 @@ export default function SettingsPage() {
       }
     >
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* Plan & Billing */}
+        <PlanBillingCard />
+
         {/* Profile */}
         <Card icon={User} title="Profile" className="lg:col-span-2">
           <div className="grid gap-4 md:grid-cols-2">
@@ -268,6 +275,151 @@ export default function SettingsPage() {
         </Card>
       </div>
     </Shell>
+  );
+}
+
+function PlanBillingCard() {
+  const { plan, isPro, isAgency, usage, setPlan } = usePlan();
+  const router = useRouter();
+
+  const trialEndsAt = plan.trialEndsAt ? new Date(plan.trialEndsAt) : null;
+  const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt - Date.now()) / 86400000)) : 0;
+  const inTrial = isPro && trialEndsAt && trialDaysLeft > 0;
+  const billing = plan.billing || (isPro ? 'monthly' : null);
+  const since = plan.since ? new Date(plan.since) : null;
+
+  const FEATURES = [
+    { key: 'invoicesPerMonth', label: 'Invoices' },
+    { key: 'scansPerMonth',    label: 'Receipt scans' },
+    { key: 'csvImportsPerMonth', label: 'CSV imports' },
+  ];
+
+  const cancel = () => {
+    if (!confirm('Downgrade to Free? Pro features lock at the end of the current cycle.')) return;
+    setPlan('free');
+    toast.success('Downgraded to Free');
+  };
+
+  const tierTone = isAgency
+    ? { bg: `linear-gradient(135deg, #8B5CF6, #6D28D9)`, text: 'AGENCY' }
+    : isPro
+      ? { bg: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})`, text: 'PRO' }
+      : { bg: 'linear-gradient(135deg, #64748B, #334155)', text: 'FREE' };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:col-span-3">
+      <div className="mb-5 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: BRAND_SOFT }}>
+          <CreditCard className="h-4 w-4" style={{ color: BRAND }} />
+        </div>
+        <h3 className="text-sm font-semibold" style={{ color: INK }}>Plan & Billing</h3>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+        {/* Current plan */}
+        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: tierTone.bg }}>
+                <Crown className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold" style={{ color: INK }}>{plan.name}</span>
+                  <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: tierTone.bg }}>
+                    {tierTone.text}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {isPro
+                    ? `AED ${plan.price}/${billing === 'yearly' ? 'year' : 'month'}`
+                    : 'Forever free · core features included'}
+                </div>
+              </div>
+            </div>
+            {!isPro && (
+              <Link href="/pricing" className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+                <Sparkles className="h-3.5 w-3.5" /> Upgrade
+              </Link>
+            )}
+          </div>
+
+          {inTrial && (
+            <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <strong>Free trial</strong> · {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left ({trialEndsAt.toLocaleDateString('en-GB')}). Cancel anytime before trial ends.
+            </div>
+          )}
+
+          {since && (
+            <div className="mt-3 text-[11px] text-slate-500">
+              Member since {since.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/pricing" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+              Compare plans <ArrowRight className="h-3 w-3" />
+            </Link>
+            {isPro && (
+              <>
+                <button onClick={() => router.push(`/upgrade?plan=${isAgency ? 'agency' : 'pro'}`)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                  Update payment method
+                </button>
+                <button onClick={cancel} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100">
+                  Cancel subscription
+                </button>
+              </>
+            )}
+            {!isAgency && (
+              <Link href="/upgrade?plan=agency" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                <Zap className="h-3 w-3" /> Need team seats? Try Agency
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Usage this month */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">This month's usage</span>
+            <span className="text-[10px] text-slate-400">resets on the 1st</span>
+          </div>
+          <div className="space-y-3">
+            {FEATURES.map((f) => {
+              const limit = plan.limits[f.key];
+              const used = usage[`${f.key}:${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`] || 0;
+              const unlimited = limit === Infinity;
+              const pct = unlimited ? 0 : Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
+              const danger = !unlimited && pct >= 80;
+              return (
+                <div key={f.key}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-600">{f.label}</span>
+                    <span className="font-bold" style={{ color: danger ? '#DC2626' : INK }}>
+                      {used} / {unlimited ? <span style={{ color: BRAND }}>Unlimited</span> : limit}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: unlimited ? '100%' : `${pct}%`,
+                        background: unlimited ? `linear-gradient(90deg, ${BRAND}, #8B5CF6)` : danger ? '#DC2626' : BRAND,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!isPro && (
+            <div className="mt-4 rounded-xl bg-blue-50 p-3 text-[11px] text-blue-800">
+              Hit a cap? Pro removes all monthly limits + unlocks premium templates, bank sync & priority AI.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

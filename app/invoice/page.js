@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   FileText, Plus, Trash2, Download, Send, Check, User, Building2,
-  CalendarDays, Hash, Sparkles, Receipt,
+  CalendarDays, Hash, Sparkles, Receipt, Lock, Palette, Crown, Share2, Copy,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { UpgradeCallout, UpgradeModal } from '@/components/dashboard/PlanGate';
@@ -14,6 +14,48 @@ import { useLocalList, SEED_TX, formatAED } from '@/lib/webStore';
 import { usePlan } from '@/lib/plan';
 
 const EASE = [0.22, 1, 0.36, 1];
+
+// Premium template palettes — drives PDF + live preview
+const TEMPLATES = {
+  classic: {
+    id: 'classic',
+    name: 'Classic',
+    desc: 'Filey signature blue band',
+    locked: false,
+    // hex triplets (0-255) for pdf-lib + CSS
+    brand:  [0x2a, 0x63, 0xe2],
+    accent: [0x2a, 0x63, 0xe2],
+    band:   [0x2a, 0x63, 0xe2],
+    bandText: [0xff, 0xff, 0xff],
+    rowAlt: [0xf6, 0xf9, 0xff],
+    style: 'banded',
+  },
+  modern: {
+    id: 'modern',
+    name: 'Modern',
+    desc: 'Emerald accent, ink header',
+    locked: true,
+    brand:  [0x0f, 0x17, 0x2a],
+    accent: [0x10, 0xb9, 0x81],
+    band:   [0x0f, 0x17, 0x2a],
+    bandText: [0xff, 0xff, 0xff],
+    rowAlt: [0xf3, 0xfa, 0xf6],
+    style: 'banded',
+  },
+  minimal: {
+    id: 'minimal',
+    name: 'Minimal',
+    desc: 'Mono palette, no band — print-ready',
+    locked: true,
+    brand:  [0x0a, 0x0a, 0x0a],
+    accent: [0x0a, 0x0a, 0x0a],
+    band:   [0xff, 0xff, 0xff],
+    bandText: [0x0a, 0x0a, 0x0a],
+    rowAlt: [0xf5, 0xf5, 0xf5],
+    style: 'lined',
+  },
+};
+const cssRgb = (a) => `rgb(${a[0]}, ${a[1]}, ${a[2]})`;
 
 function nextNumber(invoices) {
   const yr = new Date().getFullYear();
@@ -30,6 +72,8 @@ export default function InvoicePage() {
   const { list: tx, add: addTx } = useLocalList('filey.web.tx', SEED_TX);
   const { plan, isPro, canUse, remaining, track } = usePlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState('invoicesPerMonth');
+  const openUpgrade = (feature) => { setUpgradeFeature(feature); setUpgradeOpen(true); };
 
   const [profile, setProfile] = useState({ name: 'Filey Technologies', email: 'hello@filey.ae', trn: '100123456789003' });
   useEffect(() => {
@@ -55,7 +99,17 @@ export default function InvoicePage() {
     lines: [NEW_LINE()],
     vatRate: 5,
     currency: 'AED',
+    template: 'classic',
   });
+
+  const tpl = TEMPLATES[form.template] || TEMPLATES.classic;
+
+  const pickTemplate = (id) => {
+    const t = TEMPLATES[id];
+    if (!t) return;
+    if (t.locked && !isPro) { openUpgrade('premiumTemplates'); return; }
+    setForm((f) => ({ ...f, template: id }));
+  };
 
   useEffect(() => { setForm((f) => ({ ...f, number: f.number || nextNumber(invoices) })); }, [invoices]);
 
@@ -74,7 +128,7 @@ export default function InvoicePage() {
   const downloadPdf = async () => {
     if (!canSave) { toast.error('Add a client + at least one line item'); return; }
     if (!canUse('invoicesPerMonth')) {
-      setUpgradeOpen(true);
+      openUpgrade('invoicesPerMonth');
       return;
     }
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
@@ -82,16 +136,29 @@ export default function InvoicePage() {
     const page = pdf.addPage([595, 842]); // A4
     const font  = await pdf.embedFont(StandardFonts.Helvetica);
     const bold  = await pdf.embedFont(StandardFonts.HelveticaBold);
-    const brand = rgb(0x2a/255, 0x63/255, 0xe2/255);
+    const T = TEMPLATES[form.template] || TEMPLATES.classic;
+    const toRgb = (a) => rgb(a[0]/255, a[1]/255, a[2]/255);
+    const brand    = toRgb(T.brand);
+    const accent   = toRgb(T.accent);
+    const bandCol  = toRgb(T.band);
+    const bandText = toRgb(T.bandText);
+    const rowAlt   = toRgb(T.rowAlt);
     const ink   = rgb(0x0f/255, 0x17/255, 0x2a/255);
     const slate = rgb(0x64/255, 0x74/255, 0x8B/255);
 
     const draw = (t, x, y, opts = {}) => page.drawText(String(t), { x, y, size: opts.size || 10, font: opts.bold ? bold : font, color: opts.color || ink });
 
-    // Header band
-    page.drawRectangle({ x: 0, y: 782, width: 595, height: 60, color: brand });
-    draw('INVOICE', 40, 808, { size: 24, bold: true, color: rgb(1, 1, 1) });
-    draw(form.number, 40, 790, { size: 11, color: rgb(1, 1, 1) });
+    // Header — banded vs lined
+    if (T.style === 'banded') {
+      page.drawRectangle({ x: 0, y: 782, width: 595, height: 60, color: bandCol });
+      draw('INVOICE', 40, 808, { size: 24, bold: true, color: bandText });
+      draw(form.number, 40, 790, { size: 11, color: bandText });
+    } else {
+      // Minimal: hairline rule + ink heading
+      draw('INVOICE', 40, 800, { size: 28, bold: true, color: ink });
+      draw(form.number, 40, 782, { size: 11, color: slate });
+      page.drawLine({ start: { x: 40, y: 770 }, end: { x: 555, y: 770 }, thickness: 1, color: ink });
+    }
 
     // Issuer
     draw('FROM', 40, 750, { size: 8, bold: true, color: slate });
@@ -115,7 +182,7 @@ export default function InvoicePage() {
 
     // Table header
     const tY = 620;
-    page.drawRectangle({ x: 40, y: tY - 6, width: 515, height: 22, color: rgb(0.97, 0.98, 1) });
+    page.drawRectangle({ x: 40, y: tY - 6, width: 515, height: 22, color: rowAlt });
     draw('Description', 48,  tY, { size: 9, bold: true, color: slate });
     draw('Qty',         340, tY, { size: 9, bold: true, color: slate });
     draw('Rate',        400, tY, { size: 9, bold: true, color: slate });
@@ -140,7 +207,7 @@ export default function InvoicePage() {
     draw(`${form.currency} ${totals.vat.toFixed(2)}`,  510, tBase - 18, { size: 10 });
     page.drawLine({ start: { x: 395, y: tBase - 28 }, end: { x: 555, y: tBase - 28 }, thickness: 1, color: ink });
     draw('TOTAL',                                 400, tBase - 44, { size: 11, bold: true });
-    draw(`${form.currency} ${totals.total.toFixed(2)}`, 510, tBase - 44, { size: 12, bold: true, color: brand });
+    draw(`${form.currency} ${totals.total.toFixed(2)}`, 510, tBase - 44, { size: 12, bold: true, color: accent });
 
     // Notes
     if (form.notes) {
@@ -150,7 +217,11 @@ export default function InvoicePage() {
     }
 
     // Footer
-    page.drawRectangle({ x: 0, y: 0, width: 595, height: 30, color: rgb(0.97, 0.98, 1) });
+    if (T.style === 'banded') {
+      page.drawRectangle({ x: 0, y: 0, width: 595, height: 30, color: rowAlt });
+    } else {
+      page.drawLine({ start: { x: 40, y: 30 }, end: { x: 555, y: 30 }, thickness: 0.5, color: slate });
+    }
     draw(`Generated by Filey · ${new Date().toLocaleDateString('en-GB')}`, 40, 12, { size: 8, color: slate });
 
     const bytes = await pdf.save();
@@ -179,6 +250,35 @@ export default function InvoicePage() {
     setForm((f) => ({ ...f, number: nextNumber([...invoices, { number: f.number }]) }));
   };
 
+  const shareLink = async () => {
+    if (!canSave) { toast.error('Fill the invoice first'); return; }
+    const payload = {
+      invoice: {
+        number: form.number,
+        clientName: form.clientName,
+        clientCompany: form.clientCompany,
+        clientEmail: form.clientEmail,
+        issueDate: form.issueDate,
+        dueDate: form.dueDate,
+        lines: form.lines.filter(l => l.desc || +l.rate > 0),
+        vatRate: form.vatRate,
+        currency: form.currency,
+        notes: form.notes,
+        status: 'sent',
+      },
+      profile: { company: profile.name, email: profile.email, trn: profile.trn },
+    };
+    const json = JSON.stringify(payload);
+    const b64 = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const url = `${location.origin}/i/${encodeURIComponent(form.number)}?d=${b64}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Public link copied — paste it anywhere');
+    } catch {
+      window.prompt('Copy this link:', url);
+    }
+  };
+
   const recordAsIncome = () => {
     if (!canSave) { toast.error('Fill the invoice first'); return; }
     addTx({
@@ -199,6 +299,13 @@ export default function InvoicePage() {
       subtitle="Create FTA-ready invoices with your TRN — downloads as PDF"
       action={
         <div className="flex items-center gap-2">
+          <button
+            onClick={shareLink}
+            disabled={!canSave}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            <Share2 className="h-4 w-4" /> Copy share link
+          </button>
           <button
             onClick={recordAsIncome}
             disabled={!canSave}
@@ -223,7 +330,7 @@ export default function InvoicePage() {
           <span className="text-slate-600 dark:text-slate-400">
             Free plan: <strong className="text-slate-900 dark:text-white">{Math.max(0, remaining('invoicesPerMonth'))}</strong> of <strong className="text-slate-900 dark:text-white">{plan.limits.invoicesPerMonth}</strong> invoices left this month.
           </span>
-          <button onClick={() => setUpgradeOpen(true)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+          <button onClick={() => openUpgrade('invoicesPerMonth')} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
             <Sparkles className="h-3 w-3" /> Unlimited with Pro
           </button>
         </div>
@@ -232,6 +339,51 @@ export default function InvoicePage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
         {/* Editor */}
         <div className="space-y-5">
+          {/* Template picker */}
+          <Card icon={Palette} title="Template">
+            <div className="grid grid-cols-3 gap-3">
+              {Object.values(TEMPLATES).map((t) => {
+                const active = form.template === t.id;
+                const locked = t.locked && !isPro;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => pickTemplate(t.id)}
+                    aria-pressed={active}
+                    aria-label={`Use ${t.name} template${locked ? ' (Pro)' : ''}`}
+                    className={`group relative cursor-pointer overflow-hidden rounded-xl border bg-white text-left transition hover:shadow-md dark:bg-slate-800 ${
+                      active ? 'border-2' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                    style={active ? { borderColor: cssRgb(t.accent) } : undefined}
+                  >
+                    <TemplateThumb tpl={t} />
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <div>
+                        <div className="text-xs font-bold" style={{ color: INK }}>{t.name}</div>
+                        <div className="text-[10px] text-slate-500">{t.desc}</div>
+                      </div>
+                      {locked ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                          <Lock className="h-2.5 w-2.5" /> Pro
+                        </span>
+                      ) : active ? (
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-white" style={{ background: cssRgb(t.accent) }}>
+                          <Check className="h-3 w-3" />
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {!isPro && (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Modern + Minimal templates unlock with Pro · custom logo + accent colors coming soon.
+              </p>
+            )}
+          </Card>
+
           {/* Meta */}
           <Card icon={Hash} title="Invoice details">
             <div className="grid gap-4 md:grid-cols-3">
@@ -322,10 +474,17 @@ export default function InvoicePage() {
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
             className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
-            <div className="px-5 py-4 text-white" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
-              <div className="text-xs uppercase tracking-wider opacity-80">Invoice</div>
-              <div className="text-lg font-bold">{form.number || 'INV-—'}</div>
-            </div>
+            {tpl.style === 'banded' ? (
+              <div className="px-5 py-4" style={{ background: cssRgb(tpl.band), color: cssRgb(tpl.bandText) }}>
+                <div className="text-xs uppercase tracking-wider opacity-80">Invoice · {tpl.name}</div>
+                <div className="text-lg font-bold">{form.number || 'INV-—'}</div>
+              </div>
+            ) : (
+              <div className="border-b-2 px-5 py-4" style={{ borderColor: cssRgb(tpl.brand) }}>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Invoice · {tpl.name}</div>
+                <div className="mt-1 text-xl font-bold tracking-tight" style={{ color: cssRgb(tpl.brand) }}>{form.number || 'INV-—'}</div>
+              </div>
+            )}
             <div className="space-y-4 p-5 text-sm">
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
@@ -370,7 +529,7 @@ export default function InvoicePage() {
                 <Row label={`VAT (${form.vatRate}%)`} value={`${form.currency} ${totals.vat.toFixed(2)}`} />
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-sm font-bold" style={{ color: INK }}>Total</span>
-                  <span className="text-base font-bold" style={{ color: BRAND }}>{form.currency} {totals.total.toFixed(2)}</span>
+                  <span className="text-base font-bold" style={{ color: cssRgb(tpl.accent) }}>{form.currency} {totals.total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -397,7 +556,7 @@ export default function InvoicePage() {
         </aside>
       </div>
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} feature="invoicesPerMonth" />
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} feature={upgradeFeature} />
     </Shell>
   );
 }
@@ -421,6 +580,32 @@ function Row({ label, value }) {
     <div className="flex items-center justify-between">
       <span className="text-slate-500">{label}</span>
       <span className="font-semibold" style={{ color: INK }}>{value}</span>
+    </div>
+  );
+}
+
+function TemplateThumb({ tpl }) {
+  const banded = tpl.style === 'banded';
+  return (
+    <div className="aspect-[1/1.18] w-full overflow-hidden bg-white p-2 dark:bg-slate-900">
+      {banded ? (
+        <div className="h-3 rounded-sm" style={{ background: cssRgb(tpl.band) }} />
+      ) : (
+        <div className="h-3 border-b" style={{ borderColor: cssRgb(tpl.brand) }} />
+      )}
+      <div className="mt-1.5 h-1.5 w-1/2 rounded-sm bg-slate-200 dark:bg-slate-700" />
+      <div className="mt-1 h-1 w-1/3 rounded-sm bg-slate-100 dark:bg-slate-800" />
+      <div className="mt-2 space-y-0.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-1">
+            <div className="h-1 flex-1 rounded-sm bg-slate-200 dark:bg-slate-700" />
+            <div className="h-1 w-3 rounded-sm" style={{ background: cssRgb(tpl.accent) }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-end">
+        <div className="h-1.5 w-8 rounded-sm" style={{ background: cssRgb(tpl.accent) }} />
+      </div>
     </div>
   );
 }

@@ -7,9 +7,11 @@ import {
   Camera, Upload, Loader2, Check, X, ScanLine, Sparkles, RotateCw,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
-import { BRAND, BRAND_SOFT, INK } from '@/components/dashboard/theme';
+import { UpgradeModal } from '@/components/dashboard/PlanGate';
+import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import Link from 'next/link';
 import { useLocalList, SEED_TX, formatAED, CATEGORIES } from '@/lib/webStore';
+import { usePlan } from '@/lib/plan';
 
 const Webcam = dynamic(() => import('react-webcam'), { ssr: false });
 
@@ -57,6 +59,8 @@ export default function ScanPage() {
   const [saved, setSaved] = useState(false);
   const webcamRef = useRef(null);
   const { add } = useLocalList('filey.web.tx', SEED_TX);
+  const { plan, isPro, canUse, remaining, track } = usePlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const capture = useCallback(() => {
     const src = webcamRef.current?.getScreenshot();
@@ -73,7 +77,9 @@ export default function ScanPage() {
 
   const runOcr = async () => {
     if (!img) return;
+    if (!canUse('scansPerMonth')) { setUpgradeOpen(true); return; }
     setRunning(true);
+    track('scansPerMonth');
     try {
       const Tesseract = (await import('tesseract.js')).default;
       const { data } = await Tesseract.recognize(img, 'eng', { logger: () => {} });
@@ -122,6 +128,16 @@ export default function ScanPage() {
 
   return (
     <Shell title="Scan" subtitle="Capture receipts w/ browser camera. OCR runs locally via tesseract.js.">
+      {!isPro && (
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-slate-600 dark:text-slate-400">
+            Free plan: <strong className="text-slate-900 dark:text-white">{Math.max(0, remaining('scansPerMonth'))}</strong> of <strong className="text-slate-900 dark:text-white">{plan.limits.scansPerMonth}</strong> scans left this month.
+          </span>
+          <button onClick={() => setUpgradeOpen(true)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Sparkles className="h-3 w-3" /> Unlimited with Pro
+          </button>
+        </div>
+      )}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Capture panel */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -277,6 +293,7 @@ export default function ScanPage() {
           </div>
         </div>
       </div>
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} feature="scansPerMonth" />
     </Shell>
   );
 }

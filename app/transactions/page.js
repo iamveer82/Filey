@@ -12,6 +12,8 @@ import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_TX, CATEGORIES, formatAED, formatWhen } from '@/lib/webStore';
 import CsvImportDrawer from '@/components/dashboard/CsvImportDrawer';
+import { UpgradeModal } from '@/components/dashboard/PlanGate';
+import { usePlan } from '@/lib/plan';
 
 const TYPES = ['all', 'income', 'expense'];
 
@@ -32,13 +34,21 @@ function TransactionsInner() {
   const [cat, setCat]   = useState('all');
   const [drawer, setDrawer] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { canUse, track } = usePlan();
+
+  const tryOpenCsv = () => {
+    if (!canUse('csvImportsPerMonth')) { setUpgradeOpen(true); return; }
+    setCsvOpen(true);
+  };
 
   // Auto-open CSV import when landing with ?import=1
   useEffect(() => {
     if (searchParams.get('import') === '1') {
-      setCsvOpen(true);
+      tryOpenCsv();
       router.replace('/transactions');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router]);
 
   const filtered = useMemo(() => {
@@ -74,7 +84,7 @@ function TransactionsInner() {
       subtitle={`${list.length} records · ${formatAED(totals.bal)} net`}
       action={
         <div className="flex items-center gap-2">
-          <button onClick={() => setCsvOpen(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+          <button onClick={tryOpenCsv} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
             <Upload className="h-4 w-4" />
             Import CSV
           </button>
@@ -138,7 +148,7 @@ function TransactionsInner() {
           <tbody>
             {filtered.length === 0 && list.length === 0 && (
               <tr><td colSpan={7}>
-                <EmptyState onAdd={() => setDrawer(true)} onImport={() => setCsvOpen(true)} />
+                <EmptyState onAdd={() => setDrawer(true)} onImport={tryOpenCsv} />
               </td></tr>
             )}
             {filtered.length === 0 && list.length > 0 && (
@@ -203,10 +213,12 @@ function TransactionsInner() {
         {drawer && <AddTxDrawer onClose={() => setDrawer(false)} onAdd={(x) => { add(x); setDrawer(false); }} />}
       </AnimatePresence>
 
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} feature="csvImportsPerMonth" />
+
       <CsvImportDrawer
         open={csvOpen}
         onClose={() => setCsvOpen(false)}
-        onImport={(rows) => setAll([...rows, ...list])}
+        onImport={(rows) => { track('csvImportsPerMonth'); setAll([...rows, ...list]); }}
       />
     </Shell>
   );

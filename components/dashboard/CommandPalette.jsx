@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   LayoutDashboard, Receipt, ScanLine, Paperclip, CreditCard, Bot,
   FolderKanban, Users, BarChart3, Settings, Plus, Download, Trash2,
-  FileText, Crown, DollarSign,
+  FileText, Crown, DollarSign, Banknote, BookOpen, Sparkles,
 } from 'lucide-react';
 import { BRAND } from './theme';
 
@@ -22,9 +22,12 @@ const NAV = [
   { href: '/projects', label: 'Projects', icon: FolderKanban, keywords: 'clients budget' },
   { href: '/team', label: 'Team', icon: Users, keywords: 'members approvals' },
   { href: '/reports', label: 'Reports', icon: BarChart3, keywords: 'vat analytics charts' },
+  { href: '/bank-sync', label: 'Bank sync', icon: Banknote, keywords: 'enbd mashreq adcb auto import' },
   { href: '/settings', label: 'Settings', icon: Settings, keywords: 'profile trn ai' },
   { href: '/pricing', label: 'Pricing & plans', icon: DollarSign, keywords: 'pro agency upgrade billing' },
   { href: '/upgrade?plan=pro', label: 'Upgrade to Pro', icon: Crown, keywords: 'pro premium trial' },
+  { href: '/onboarding', label: 'Run onboarding', icon: Sparkles, keywords: 'setup wizard' },
+  { href: '/blog', label: 'Filey Blog', icon: BookOpen, keywords: 'articles guides vat' },
 ];
 
 export default function CommandPalette() {

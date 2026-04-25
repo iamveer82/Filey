@@ -7,8 +7,10 @@ import {
   TrendingUp, Briefcase, Clock,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
-import { BRAND, BRAND_SOFT, INK } from '@/components/dashboard/theme';
+import { UpgradeModal, UpgradeCallout } from '@/components/dashboard/PlanGate';
+import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_PROJECTS, formatAED } from '@/lib/webStore';
+import { usePlan } from '@/lib/plan';
 
 const STATUS_COLORS = {
   active:    { tint: '#DBEAFE', text: '#2563EB', label: 'Active' },
@@ -27,6 +29,14 @@ export default function ProjectsPage() {
   const { list, add, remove, update } = useLocalList('filey.web.projects', SEED_PROJECTS);
   const [drawer, setDrawer] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { plan, isPro } = usePlan();
+
+  const tryNew = () => {
+    const limit = plan.limits?.projects ?? 0;
+    if (limit !== Infinity && list.length >= limit) { setUpgradeOpen(true); return; }
+    setDrawer(true);
+  };
 
   const filtered = useMemo(() => filter === 'all' ? list : list.filter(p => p.status === filter), [list, filter]);
 
@@ -42,7 +52,7 @@ export default function ProjectsPage() {
       title="Projects"
       subtitle={`${list.length} projects · ${formatAED(totals.spent)} of ${formatAED(totals.budget)} budget used`}
       action={
-        <button onClick={() => setDrawer(true)} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:scale-105" style={{ background: BRAND }}>
+        <button onClick={tryNew} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:scale-105" style={{ background: BRAND }}>
           <Plus className="h-4 w-4" /> New project
         </button>
       }
@@ -136,7 +146,7 @@ export default function ProjectsPage() {
           <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 py-16 text-center">
             <FolderKanban className="mx-auto h-10 w-10 text-slate-300" />
             <div className="mt-3 text-sm font-semibold text-slate-500">No projects in this filter</div>
-            <button onClick={() => setDrawer(true)} className="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: BRAND }}>
+            <button onClick={tryNew} className="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: BRAND }}>
               <Plus className="h-4 w-4" /> Create project
             </button>
           </div>
@@ -146,6 +156,7 @@ export default function ProjectsPage() {
       <AnimatePresence>
         {drawer && <NewProjectDrawer onClose={() => setDrawer(false)} onAdd={(x) => { add(x); setDrawer(false); }} />}
       </AnimatePresence>
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} feature="projects" />
     </Shell>
   );
 }

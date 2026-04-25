@@ -1,0 +1,345 @@
+'use client';
+
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import {
+  Paperclip, Download, Check, Building2, User, CalendarDays, Sparkles,
+  Shield, AlertTriangle,
+} from 'lucide-react';
+import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
+
+const EASE = [0.22, 1, 0.36, 1];
+
+function decodeInvoice(d) {
+  if (!d) return null;
+  try {
+    const b64 = d.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
+    return JSON.parse(decodeURIComponent(escape(atob(pad))));
+  } catch {
+    return null;
+  }
+}
+
+export default function PublicInvoicePageWrapper() {
+  return (
+    <Suspense fallback={<Frame><div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-400">Loading invoice…</div></Frame>}>
+      <PublicInvoicePage />
+    </Suspense>
+  );
+}
+
+function PublicInvoicePage() {
+  const { id } = useParams();
+  const search = useSearchParams();
+  const [invoice, setInvoice] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // 1. Try data param (viral share)
+    const encoded = search.get('d');
+    const decoded = decodeInvoice(encoded);
+    if (decoded?.invoice) {
+      setInvoice(decoded.invoice);
+      setProfile(decoded.profile || null);
+      return;
+    }
+    // 2. Fallback: issuer's local ledger
+    try {
+      const list = JSON.parse(localStorage.getItem('filey.web.invoices') || '[]');
+      const match = list.find((i) => i.id === id || i.number === id);
+      if (match) {
+        setInvoice(match);
+        const p = JSON.parse(localStorage.getItem('filey.web.profile') || 'null');
+        setProfile(p);
+        return;
+      }
+    } catch {}
+    setNotFound(true);
+  }, [id, search]);
+
+  const totals = useMemo(() => {
+    if (!invoice) return null;
+    const sub = (invoice.lines || []).reduce((s, l) => s + (+l.qty || 0) * (+l.rate || 0), 0);
+    const explicitTotal = typeof invoice.total === 'number' ? invoice.total : null;
+    const explicitVat = typeof invoice.vat === 'number' ? invoice.vat : null;
+    if (explicitTotal && !sub) {
+      const vat = explicitVat ?? 0;
+      return { sub: explicitTotal - vat, vat, total: explicitTotal };
+    }
+    const vat = sub * ((+invoice.vatRate || 0) / 100);
+    return { sub, vat, total: sub + vat };
+  }, [invoice]);
+
+  const downloadPdf = async () => {
+    if (!invoice) return;
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+      const pdf = await PDFDocument.create();
+      const page = pdf.addPage([595, 842]);
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+      const brand = rgb(0x2a / 255, 0x63 / 255, 0xe2 / 255);
+      const ink = rgb(0x0f / 255, 0x17 / 255, 0x2a / 255);
+      const slate = rgb(0x64 / 255, 0x74 / 255, 0x8b / 255);
+      const draw = (t, x, y, opts = {}) =>
+        page.drawText(String(t), {
+          x, y,
+          size: opts.size || 10,
+          font: opts.bold ? bold : font,
+          color: opts.color || ink,
+        });
+
+      page.drawRectangle({ x: 0, y: 782, width: 595, height: 60, color: brand });
+      draw('INVOICE', 40, 808, { size: 24, bold: true, color: rgb(1, 1, 1) });
+      draw(invoice.number || id, 40, 790, { size: 11, color: rgb(1, 1, 1) });
+
+      if (profile) {
+        draw('FROM', 40, 750, { size: 8, bold: true, color: slate });
+        draw(profile.company || profile.name || 'Filey user', 40, 735, { size: 11, bold: true });
+        if (profile.email) draw(profile.email, 40, 720, { size: 9, color: slate });
+        if (profile.trn) draw(`TRN ${profile.trn}`, 40, 707, { size: 9, color: slate });
+      }
+      draw('BILL TO', 310, 750, { size: 8, bold: true, color: slate });
+      draw(invoice.clientName || '—', 310, 735, { size: 11, bold: true });
+
+      if (invoice.issueDate) draw(`Issue: ${invoice.issueDate}`, 40, 665, { size: 9, color: slate });
+      if (invoice.dueDate) draw(`Due:   ${invoice.dueDate}`, 40, 652, { size: 9, color: slate });
+
+      if (totals) {
+        draw('Subtotal', 400, 500, { size: 10, color: slate });
+        draw(totals.sub.toFixed(2), 510, 500, { size: 10 });
+        draw('VAT', 400, 482, { size: 10, color: slate });
+        draw(totals.vat.toFixed(2), 510, 482, { size: 10 });
+        draw('TOTAL', 400, 460, { size: 11, bold: true });
+        draw(`AED ${totals.total.toFixed(2)}`, 510, 460, { size: 12, bold: true, color: brand });
+      }
+      page.drawRectangle({ x: 0, y: 0, width: 595, height: 30, color: rgb(0.97, 0.98, 1) });
+      draw(`Generated by Filey · ${new Date().toLocaleDateString('en-GB')}`, 40, 12, { size: 8, color: slate });
+
+      const bytes = await pdf.save();
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${invoice.number || id}.pdf`;
+      a.click();
+      toast.success('Invoice downloaded');
+    } catch (e) {
+      toast.error('Could not generate PDF');
+    }
+  };
+
+  if (notFound) {
+    return (
+      <Frame>
+        <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-xl">
+          <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
+          <h1 className="mt-4 text-2xl font-bold" style={{ color: INK }}>Invoice unavailable</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            This link has expired or the invoice has been deleted by the issuer.
+          </p>
+          <Link href="/" className="mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm" style={{ background: BRAND }}>
+            Back to Filey
+          </Link>
+        </div>
+      </Frame>
+    );
+  }
+
+  if (!invoice || !totals) {
+    return (
+      <Frame>
+        <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-400">
+          Loading invoice…
+        </div>
+      </Frame>
+    );
+  }
+
+  return (
+    <Frame>
+      <motion.article
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+      >
+        {/* Brand header */}
+        <header className="px-8 py-6 text-white" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] opacity-80">Invoice</div>
+              <div className="mt-1 text-3xl font-bold tracking-tight">{invoice.number || id}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs uppercase tracking-wider opacity-80">Total due</div>
+              <div className="text-2xl font-bold">AED {totals.total.toFixed(2)}</div>
+            </div>
+          </div>
+        </header>
+
+        {/* Body */}
+        <div className="grid gap-8 p-8 sm:grid-cols-2">
+          <Section icon={Building2} title="From">
+            <div className="font-bold" style={{ color: INK }}>{profile?.company || profile?.name || 'Filey user'}</div>
+            {profile?.email && <div className="text-slate-500">{profile.email}</div>}
+            {profile?.trn && <div className="text-slate-500">TRN {profile.trn}</div>}
+          </Section>
+          <Section icon={User} title="Bill to">
+            <div className="font-bold" style={{ color: INK }}>{invoice.clientName || '—'}</div>
+            {invoice.clientCompany && <div className="text-slate-500">{invoice.clientCompany}</div>}
+            {invoice.clientEmail && <div className="text-slate-500">{invoice.clientEmail}</div>}
+          </Section>
+        </div>
+
+        <div className="grid gap-3 border-t border-slate-100 bg-slate-50 px-8 py-5 text-sm sm:grid-cols-3">
+          <DateBlock label="Issue date" value={invoice.issueDate} />
+          <DateBlock label="Due date" value={invoice.dueDate} />
+          <DateBlock label="Status" value={invoice.status || 'sent'} />
+        </div>
+
+        {/* Line items */}
+        {Array.isArray(invoice.lines) && invoice.lines.length > 0 && (
+          <div className="border-t border-slate-100 px-8 py-6">
+            <table className="w-full text-sm">
+              <thead className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <tr className="border-b border-slate-200">
+                  <th className="py-2 text-left">Description</th>
+                  <th className="py-2 text-right">Qty</th>
+                  <th className="py-2 text-right">Rate</th>
+                  <th className="py-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.lines.map((l, i) => (
+                  <tr key={i} className="border-b border-slate-100">
+                    <td className="py-3" style={{ color: INK }}>{l.desc || '—'}</td>
+                    <td className="py-3 text-right text-slate-600">{l.qty}</td>
+                    <td className="py-3 text-right text-slate-600">{Number(l.rate || 0).toFixed(2)}</td>
+                    <td className="py-3 text-right font-semibold" style={{ color: INK }}>
+                      {((+l.qty || 0) * (+l.rate || 0)).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Totals */}
+        <div className="border-t border-slate-100 px-8 py-5">
+          <div className="ml-auto max-w-xs space-y-1 text-sm">
+            <Row label="Subtotal" value={`AED ${totals.sub.toFixed(2)}`} />
+            <Row label={`VAT${invoice.vatRate ? ` (${invoice.vatRate}%)` : ''}`} value={`AED ${totals.vat.toFixed(2)}`} />
+            <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
+              <span className="text-sm font-bold" style={{ color: INK }}>Total</span>
+              <span className="text-base font-bold" style={{ color: BRAND }}>AED {totals.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {invoice.notes && (
+          <div className="border-t border-slate-100 px-8 py-5">
+            <div className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Notes</div>
+            <p className="whitespace-pre-line text-sm text-slate-600">{invoice.notes}</p>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 bg-slate-50 px-8 py-5">
+          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+            <Check className="h-3.5 w-3.5" /> FTA-compliant · 5% VAT
+          </div>
+          <button
+            onClick={downloadPdf}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:scale-[1.02]"
+            style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+          >
+            <Download className="h-4 w-4" /> Download PDF
+          </button>
+        </div>
+      </motion.article>
+
+      {/* Filey CTA — viral surface */}
+      <motion.aside
+        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2, ease: EASE }}
+        className="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-lg"
+      >
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm" style={{ background: BRAND }}>
+              <Paperclip className="h-5 w-5 text-white" style={{ transform: 'scaleX(-1)' }} />
+            </div>
+            <div>
+              <div className="text-sm font-bold" style={{ color: INK }}>Powered by Filey</div>
+              <div className="text-xs text-slate-500">FTA-ready invoicing · UAE freelancer copilot · privacy-first</div>
+            </div>
+          </div>
+          <Link
+            href="/welcome?ref=invoice-share"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:scale-[1.02]"
+            style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+          >
+            <Sparkles className="h-4 w-4" /> Try Filey free
+          </Link>
+        </div>
+      </motion.aside>
+
+      <p className="mt-4 inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+        <Shield className="h-3 w-3" /> Invoice rendered locally in your browser — no Filey server stores this document.
+      </p>
+    </Frame>
+  );
+}
+
+function Frame({ children }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40 px-4 py-10 sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-3xl">
+        <Link href="/welcome" className="mb-6 inline-flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: BRAND }}>
+            <Paperclip className="h-3.5 w-3.5 text-white" style={{ transform: 'scaleX(-1)' }} />
+          </div>
+          <span className="text-sm font-bold tracking-tight" style={{ color: INK }}>Filey</span>
+        </Link>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Section({ icon: I, title, children }) {
+  return (
+    <div>
+      <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+        <I className="h-3 w-3" /> {title}
+      </div>
+      <div className="space-y-0.5 text-sm">{children}</div>
+    </div>
+  );
+}
+
+function DateBlock({ label, value }) {
+  return (
+    <div>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</div>
+      <div className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: INK }}>
+        <CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {value || '—'}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-semibold" style={{ color: INK }}>{value}</span>
+    </div>
+  );
+}

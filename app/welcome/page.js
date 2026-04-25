@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Paperclip, Sparkles, ScanLine, Receipt, Bot, Shield, Lock,
   Zap, Globe, Check, ArrowRight, Star, CreditCard, FileText,
-  TrendingUp, Users, Smartphone, Moon,
+  TrendingUp, Users, Smartphone, Moon, Menu, X,
 } from 'lucide-react';
 import { BRAND, BRAND_DARK, INK } from '@/components/dashboard/theme';
 
@@ -33,6 +33,7 @@ export default function WelcomePage() {
       <Features />
       <HowItWorks />
       <AiDemo />
+      <RoiCalculator />
       <PricingTeaser />
       <Testimonials />
       <FinalCta />
@@ -41,7 +42,25 @@ export default function WelcomePage() {
   );
 }
 
+const NAV_LINKS = [
+  { href: '#features', label: 'Features',  external: true },
+  { href: '/pricing',  label: 'Pricing' },
+  { href: '/blog',     label: 'Blog' },
+  { href: '#faq',      label: 'FAQ',       external: true },
+  { href: '/about',    label: 'About' },
+  { href: '/security', label: 'Security' },
+];
+
 function MarketingNav() {
+  const [open, setOpen] = useState(false);
+
+  // Lock scroll when drawer open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/80 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
       <nav aria-label="Primary" className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -52,10 +71,13 @@ function MarketingNav() {
           <span className="text-lg font-bold tracking-tight">Filey</span>
         </Link>
         <div className="hidden items-center gap-8 md:flex">
-          <a href="#features" className="text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">Features</a>
-          <Link href="/pricing" className="text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">Pricing</Link>
-          <a href="#faq" className="text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">FAQ</a>
-          <Link href="/privacy" className="text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">Privacy</Link>
+          {NAV_LINKS.map((l) =>
+            l.external ? (
+              <a key={l.href} href={l.href} className="text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">{l.label}</a>
+            ) : (
+              <Link key={l.href} href={l.href} className="text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">{l.label}</Link>
+            )
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Link href="/" className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:inline-flex">
@@ -63,13 +85,88 @@ function MarketingNav() {
           </Link>
           <Link
             href="/"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:scale-[1.03] hover:opacity-90"
+            className="hidden cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:scale-[1.03] hover:opacity-90 sm:inline-flex"
             style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
           >
             Get started <ArrowRight className="h-3.5 w-3.5" />
           </Link>
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
+            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 md:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+            />
+            <motion.aside
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed right-0 top-0 z-50 flex h-full w-[85%] max-w-sm flex-col bg-white p-6 shadow-2xl dark:bg-slate-950 md:hidden"
+            >
+              <div className="mb-8 flex items-center justify-between">
+                <Link href="/welcome" onClick={() => setOpen(false)} className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl shadow-sm" style={{ background: BRAND }}>
+                    <Paperclip className="h-4 w-4 text-white" style={{ transform: 'scaleX(-1)' }} />
+                  </div>
+                  <span className="text-lg font-bold tracking-tight">Filey</span>
+                </Link>
+                <button
+                  onClick={() => setOpen(false)}
+                  aria-label="Close menu"
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <nav className="flex flex-col gap-1">
+                {NAV_LINKS.map((l) => {
+                  const C = l.external ? 'a' : Link;
+                  return (
+                    <C
+                      key={l.href}
+                      href={l.href}
+                      onClick={() => setOpen(false)}
+                      className="rounded-xl px-3 py-3 text-base font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
+                    >
+                      {l.label}
+                    </C>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-auto space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800">
+                <Link
+                  href="/"
+                  onClick={() => setOpen(false)}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm"
+                  style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}
+                >
+                  Get started <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <Link
+                  href="/pricing"
+                  onClick={() => setOpen(false)}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  See pricing
+                </Link>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
@@ -325,6 +422,139 @@ function AiDemo() {
         </div>
       </div>
     </section>
+  );
+}
+
+function RoiCalculator() {
+  const [hoursPerWeek, setHoursPerWeek] = useState(6);
+  const [hourlyRate, setHourlyRate] = useState(150);
+  const [invoicesPerMonth, setInvoicesPerMonth] = useState(12);
+
+  // Assumptions (conservative)
+  const ADMIN_TIME_REDUCTION = 0.65;     // Filey saves ~65% of admin hours
+  const HOURS_PER_INVOICE = 0.5;         // 30 min per invoice manually
+  const INVOICE_TIME_REDUCTION = 0.85;   // Filey reduces to ~5 min
+
+  const adminHoursSaved = hoursPerWeek * 4 * ADMIN_TIME_REDUCTION;
+  const invoiceHoursSaved = invoicesPerMonth * HOURS_PER_INVOICE * INVOICE_TIME_REDUCTION;
+  const totalHoursSaved = adminHoursSaved + invoiceHoursSaved;
+  const monthlySavings = Math.round(totalHoursSaved * hourlyRate);
+  const yearlySavings = monthlySavings * 12;
+  const proCost = 29 * 12;
+  const roi = Math.round(((yearlySavings - proCost) / proCost) * 100);
+
+  return (
+    <section className="border-y border-slate-100 bg-slate-50 px-6 py-24 dark:border-slate-800 dark:bg-slate-900/40">
+      <div className="mx-auto max-w-5xl">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: EASE }}
+          className="text-center"
+        >
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+            <TrendingUp className="h-3 w-3" /> ROI Calculator
+          </span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">How much would Filey save you?</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-slate-600 dark:text-slate-400">
+            Most UAE freelancers we surveyed waste 6–10 hours a week on receipts, VAT bookkeeping and chasing invoices. Move those sliders.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
+          className="mt-10 grid gap-6 lg:grid-cols-[1.1fr_1fr]"
+        >
+          {/* Inputs */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <RoiSlider
+              label="Hours/week on admin (receipts, VAT, expense tracking)"
+              value={hoursPerWeek} setValue={setHoursPerWeek} min={1} max={20} step={0.5} suffix="h"
+            />
+            <RoiSlider
+              label="Your hourly rate"
+              value={hourlyRate} setValue={setHourlyRate} min={50} max={500} step={10} prefix="AED"
+            />
+            <RoiSlider
+              label="Invoices you send per month"
+              value={invoicesPerMonth} setValue={setInvoicesPerMonth} min={1} max={50} step={1}
+            />
+            <p className="mt-4 text-[11px] text-slate-500">
+              Estimates based on time-reduction studies for OCR + AI tools. Your mileage may vary; we'd rather under-promise.
+            </p>
+          </div>
+
+          {/* Result */}
+          <div className="relative overflow-hidden rounded-3xl p-8 text-white shadow-xl" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+            <div className="relative">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] opacity-80">You'd save</div>
+              <motion.div
+                key={monthlySavings}
+                initial={{ scale: 0.95, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3, ease: EASE }}
+                className="mt-2 text-5xl font-bold tracking-tight sm:text-6xl"
+              >
+                AED {monthlySavings.toLocaleString()}
+              </motion.div>
+              <div className="mt-1 text-sm opacity-80">per month</div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <RoiStat label="Per year" value={`AED ${yearlySavings.toLocaleString()}`} />
+                <RoiStat label="Hours back / mo" value={`${totalHoursSaved.toFixed(1)} h`} />
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-white/15 p-4 backdrop-blur">
+                <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">vs Pro plan</div>
+                <div className="mt-1 text-sm">
+                  <span className="font-bold">AED {proCost}/year</span> for unlimited Filey ·{' '}
+                  <span className="font-bold text-emerald-200">{roi}% ROI</span>
+                </div>
+              </div>
+
+              <Link
+                href="/pricing"
+                className="mt-6 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-900 shadow-lg transition hover:scale-[1.02]"
+              >
+                Start free trial <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function RoiSlider({ label, value, setValue, min, max, step, prefix, suffix }) {
+  return (
+    <div className="mb-6 last:mb-0">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</span>
+        <span className="rounded-lg px-2.5 py-1 text-sm font-bold text-white" style={{ background: BRAND }}>
+          {prefix && `${prefix} `}{value}{suffix && ` ${suffix}`}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step}
+        value={value}
+        onChange={(e) => setValue(+e.target.value)}
+        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600 dark:bg-slate-700"
+        aria-label={label}
+      />
+      <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+        <span>{prefix && `${prefix} `}{min}{suffix && ` ${suffix}`}</span>
+        <span>{prefix && `${prefix} `}{max}{suffix && ` ${suffix}`}</span>
+      </div>
+    </div>
+  );
+}
+
+function RoiStat({ label, value }) {
+  return (
+    <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
+      <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{label}</div>
+      <div className="mt-1 text-lg font-bold">{value}</div>
+    </div>
   );
 }
 
