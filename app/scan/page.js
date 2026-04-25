@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
-  Camera, Upload, Loader2, Check, X, ScanLine, Sparkles, RotateCw,
+  Camera, Upload, Loader2, Check, X, ScanLine, Sparkles, RotateCw, Layers, Wand2,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { UpgradeModal } from '@/components/dashboard/PlanGate';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import Link from 'next/link';
-import { useLocalList, SEED_TX, formatAED, CATEGORIES } from '@/lib/webStore';
+import { useLocalList, SEED_TX, formatAED } from '@/lib/webStore';
+import { useCategories } from '@/lib/categories';
 import { usePlan } from '@/lib/plan';
 
 const Webcam = dynamic(() => import('react-webcam'), { ssr: false });
@@ -59,8 +61,14 @@ export default function ScanPage() {
   const [saved, setSaved] = useState(false);
   const webcamRef = useRef(null);
   const { add } = useLocalList('filey.web.tx', SEED_TX);
+  const { all: CATEGORIES } = useCategories();
   const { plan, isPro, canUse, remaining, track } = usePlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [ai, setAi] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  useEffect(() => {
+    try { setAi(JSON.parse(localStorage.getItem('filey.web.ai') || 'null')); } catch {}
+  }, []);
 
   const capture = useCallback(() => {
     const src = webcamRef.current?.getScreenshot();
@@ -88,6 +96,48 @@ export default function ScanPage() {
       setOcr({ merchant: 'OCR failed', total: 0, vat: 0, raw: String(e.message || e) });
     }
     setRunning(false);
+  };
+
+  const runAiExtract = async () => {
+    if (!img) return;
+    if (!ai?.apiKey) { toast.error('Add an AI API key in Settings first'); return; }
+    if (!canUse('scansPerMonth')) { setUpgradeOpen(true); return; }
+    setAiBusy(true);
+    track('scansPerMonth');
+    try {
+      const res = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: ai.provider, apiKey: ai.apiKey, model: ai.model, baseUrl: ai.baseUrl,
+          imageDataUrl: img,
+        }),
+      });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || 'Extraction failed');
+      const d = j.data || {};
+      setOcr({
+        merchant: d.merchant || 'Receipt',
+        total: +d.total || 0,
+        vat: +d.vat || +(((+d.total) || 0) * 0.05 / 1.05).toFixed(2),
+        category: d.category || 'Other',
+        raw: j.raw,
+      });
+      setDraft({
+        name: d.merchant || 'Receipt',
+        amount: +d.total || 0,
+        vat: +d.vat || +(((+d.total) || 0) * 0.05 / 1.05).toFixed(2),
+        type: 'expense',
+        category: d.category || 'Other',
+        date: d.date || new Date().toISOString().slice(0, 10),
+        currency: d.currency || 'AED',
+        lineItems: Array.isArray(d.lineItems) ? d.lineItems : [],
+      });
+      toast.success(`AI extracted via ${ai.provider}`);
+    } catch (e) {
+      toast.error(String(e.message || e));
+    }
+    setAiBusy(false);
   };
 
   const [draft, setDraft] = useState(null); // editable form populated from ocr
@@ -127,7 +177,15 @@ export default function ScanPage() {
   const resetAll = () => { setImg(null); setOcr(null); setDraft(null); setSaved(false); };
 
   return (
-    <Shell title="Scan" subtitle="Capture receipts w/ browser camera. OCR runs locally via tesseract.js.">
+    <Shell
+      title="Scan"
+      subtitle="Capture receipts w/ browser camera. OCR runs locally via tesseract.js."
+      action={
+        <Link href="/bulk" className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+          <Layers className="h-4 w-4" /> Bulk import
+        </Link>
+      }
+    >
       {!isPro && (
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <span className="text-slate-600 dark:text-slate-400">
@@ -191,9 +249,18 @@ export default function ScanPage() {
                 <button onClick={() => { setImg(null); setOcr(null); setSaved(false); }} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
                   <RotateCw className="h-4 w-4" /> Retake
                 </button>
-                <button onClick={runOcr} disabled={running} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105 disabled:opacity-50" style={{ background: BRAND }}>
+                <button onClick={runOcr} disabled={running || aiBusy} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105 disabled:opacity-50" style={{ background: BRAND }}>
                   {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {running ? 'Reading…' : 'Extract data'}
+                  {running ? 'Reading…' : 'OCR'}
+                </button>
+                <button
+                  onClick={runAiExtract}
+                  disabled={running || aiBusy || !ai?.apiKey}
+                  title={ai?.apiKey ? `AI extract via ${ai.provider}` : 'Add API key in Settings → AI Provider to enable'}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 py-3 text-sm font-bold text-violet-700 shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-200"
+                >
+                  {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                  {aiBusy ? 'Calling AI…' : 'AI extract'}
                 </button>
               </>
             )}

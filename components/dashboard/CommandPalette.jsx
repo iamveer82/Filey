@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   LayoutDashboard, Receipt, ScanLine, Paperclip, CreditCard, Bot,
   FolderKanban, Users, BarChart3, Settings, Plus, Download, Trash2,
-  FileText, Crown, DollarSign, Banknote, BookOpen, Sparkles,
+  FileText, Crown, DollarSign, Banknote, BookOpen, Sparkles, Layers, Tag,
 } from 'lucide-react';
 import { BRAND } from './theme';
 
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home overview' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, keywords: 'tx payments' },
   { href: '/scan', label: 'Scan receipt', icon: ScanLine, keywords: 'ocr camera' },
+  { href: '/bulk', label: 'Bulk import receipts', icon: Layers, keywords: 'batch many ocr drag drop' },
   { href: '/invoice', label: 'New invoice', icon: FileText, keywords: 'invoice pdf client bill' },
   { href: '/clip', label: 'Clip Tools', icon: Paperclip, keywords: 'pdf merge split compress' },
   { href: '/bills', label: 'Bills', icon: CreditCard, keywords: 'dewa etisalat netflix' },
@@ -22,6 +23,7 @@ const NAV = [
   { href: '/projects', label: 'Projects', icon: FolderKanban, keywords: 'clients budget' },
   { href: '/team', label: 'Team', icon: Users, keywords: 'members approvals' },
   { href: '/reports', label: 'Reports', icon: BarChart3, keywords: 'vat analytics charts' },
+  { href: '/categories', label: 'Categories', icon: Tag, keywords: 'custom labels tags' },
   { href: '/bank-sync', label: 'Bank sync', icon: Banknote, keywords: 'enbd mashreq adcb auto import' },
   { href: '/settings', label: 'Settings', icon: Settings, keywords: 'profile trn ai' },
   { href: '/pricing', label: 'Pricing & plans', icon: DollarSign, keywords: 'pro agency upgrade billing' },

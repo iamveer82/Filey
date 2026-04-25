@@ -6,11 +6,13 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Filter, Download, Upload, Receipt, ArrowDownLeft, ArrowUpRight,
-  Trash2, X, TrendingUp, TrendingDown, Wallet, Sparkles, Camera, FileUp,
+  Trash2, X, TrendingUp, TrendingDown, Wallet, Sparkles, Camera, FileUp, FileSpreadsheet,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_TX, CATEGORIES, formatAED, formatWhen } from '@/lib/webStore';
+import { useCategories } from '@/lib/categories';
+import { exportXlsx } from '@/lib/xlsx';
 import CsvImportDrawer from '@/components/dashboard/CsvImportDrawer';
 import { UpgradeModal } from '@/components/dashboard/PlanGate';
 import { usePlan } from '@/lib/plan';
@@ -36,6 +38,7 @@ function TransactionsInner() {
   const [csvOpen, setCsvOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { canUse, track } = usePlan();
+  const { all: catList } = useCategories();
 
   const tryOpenCsv = () => {
     if (!canUse('csvImportsPerMonth')) { setUpgradeOpen(true); return; }
@@ -68,14 +71,44 @@ function TransactionsInner() {
   }, [list]);
 
   const exportCsv = () => {
-    const rows = [['Date','Name','Merchant','Type','Category','Amount','VAT','Status'],
-      ...list.map(t => [new Date(t.ts).toISOString(), t.name, t.merchant || '', t.type, t.category, t.amount, t.vat || 0, t.status || ''])];
+    // Collect every custom field key in use across the ledger
+    const cfKeys = Array.from(new Set(
+      list.flatMap(t => t.customFields ? Object.keys(t.customFields) : [])
+    )).sort();
+    const headers = ['Date','Name','Merchant','Type','Category','Amount','VAT','Status', ...cfKeys.map(k => `cf_${k}`)];
+    const rows = [headers,
+      ...list.map(t => [
+        new Date(t.ts).toISOString(), t.name, t.merchant || '', t.type, t.category, t.amount, t.vat || 0, t.status || '',
+        ...cfKeys.map(k => (t.customFields && t.customFields[k] != null) ? t.customFields[k] : ''),
+      ])];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `filey-transactions-${Date.now()}.csv`; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportXlsxFile = () => {
+    const cfKeys = Array.from(new Set(
+      list.flatMap(t => t.customFields ? Object.keys(t.customFields) : [])
+    )).sort();
+    const headers = ['Date','Name','Merchant','Type','Category','Amount','VAT','Status', ...cfKeys.map(k => `cf_${k}`)];
+    const rows = list.map(t => [
+      new Date(t.ts).toISOString(),
+      t.name,
+      t.merchant || '',
+      t.type,
+      t.category,
+      +t.amount || 0,
+      +t.vat || 0,
+      t.status || '',
+      ...cfKeys.map(k => (t.customFields && t.customFields[k] != null) ? t.customFields[k] : ''),
+    ]);
+    exportXlsx({
+      filename: `filey-transactions-${new Date().toISOString().slice(0,10)}.xls`,
+      sheets: [{ name: 'Transactions', headers, rows }],
+    });
   };
 
   return (
@@ -90,7 +123,11 @@ function TransactionsInner() {
           </button>
           <button onClick={exportCsv} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
             <Download className="h-4 w-4" />
-            Export CSV
+            CSV
+          </button>
+          <button onClick={exportXlsxFile} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+            <FileSpreadsheet className="h-4 w-4" />
+            Excel
           </button>
           <button onClick={() => setDrawer(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:scale-[1.02]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
             <Plus className="h-4 w-4" /> Add transaction
@@ -126,8 +163,11 @@ function TransactionsInner() {
           </div>
           <select value={cat} onChange={(e) => setCat(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
             <option value="all">All categories</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {catList.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          <Link href="/categories" className="text-xs font-semibold transition hover:underline" style={{ color: BRAND }}>
+            Manage
+          </Link>
         </div>
       </div>
 
@@ -180,6 +220,17 @@ function TransactionsInner() {
                       <div>
                         <div className="font-semibold" style={{ color: INK }}>{t.name}</div>
                         <div className="text-[11px] text-slate-500">{t.merchant || '—'}</div>
+                        {t.customFields && Object.keys(t.customFields).length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {Object.entries(t.customFields).slice(0, 3).map(([k, v]) => (
+                              <span key={k} className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                <span className="opacity-70">{k}</span>
+                                <span>·</span>
+                                <span>{String(v)}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -290,13 +341,23 @@ function StatMini({ icon: I, label, value, color }) {
 }
 
 function AddTxDrawer({ onClose, onAdd }) {
+  const { all: catList } = useCategories();
   const [form, setForm] = useState({
     name: '', merchant: '', amount: '', type: 'expense', category: 'Food', status: 'Cleared',
   });
+  const [customFields, setCustomFields] = useState([]); // [{ key, value }]
+  const addField = () => setCustomFields((f) => [...f, { key: '', value: '' }]);
+  const updField = (i, patch) => setCustomFields((f) => f.map((c, idx) => idx === i ? { ...c, ...patch } : c));
+  const rmField  = (i) => setCustomFields((f) => f.filter((_, idx) => idx !== i));
   const submit = () => {
     if (!form.name || !form.amount) return;
     const amt = +form.amount;
-    onAdd({ ...form, amount: amt, vat: +(amt * 0.05).toFixed(2) });
+    const cf = {};
+    for (const { key, value } of customFields) {
+      const k = (key || '').trim();
+      if (k) cf[k] = value;
+    }
+    onAdd({ ...form, amount: amt, vat: +(amt * 0.05).toFixed(2), customFields: cf });
   };
   return (
     <>
@@ -325,7 +386,7 @@ function AddTxDrawer({ onClose, onAdd }) {
           <div className="grid grid-cols-2 gap-4">
             <Field label="Category">
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls}>
-                {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                {catList.map((c) => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Status">
@@ -337,6 +398,45 @@ function AddTxDrawer({ onClose, onAdd }) {
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <div className="flex justify-between"><span>VAT (5%)</span><span className="font-semibold" style={{ color: INK }}>{formatAED((+form.amount || 0) * 0.05)}</span></div>
             <div className="flex justify-between"><span>Net</span><span className="font-semibold" style={{ color: INK }}>{formatAED((+form.amount || 0) * 0.95)}</span></div>
+          </div>
+
+          {/* Custom fields — TaxHacker-style key/value metadata */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-600">Custom fields</span>
+              <button type="button" onClick={addField} className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition hover:bg-blue-50" style={{ color: BRAND }}>
+                <Plus className="h-3 w-3" /> Add field
+              </button>
+            </div>
+            {customFields.length === 0 && (
+              <p className="text-[11px] text-slate-400">e.g. <code>project</code> · <code>invoice_ref</code> · <code>billable</code></p>
+            )}
+            <div className="space-y-2">
+              {customFields.map((cf, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_32px] gap-2">
+                  <input
+                    value={cf.key}
+                    onChange={(e) => updField(i, { key: e.target.value })}
+                    placeholder="Key"
+                    className={inputCls}
+                  />
+                  <input
+                    value={cf.value}
+                    onChange={(e) => updField(i, { value: e.target.value })}
+                    placeholder="Value"
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => rmField(i)}
+                    aria-label="Remove field"
+                    className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
           <button onClick={submit} className="w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105" style={{ background: BRAND }}>
             Add transaction

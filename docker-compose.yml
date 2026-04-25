@@ -1,0 +1,47 @@
+# Self-hosted Filey — single-node compose file.
+# Spin up:    docker compose up -d --build
+# Stop:       docker compose down
+# Logs:       docker compose logs -f filey
+#
+# Filey is offline-first: data lives in your browser's localStorage.
+# This container only serves the Next.js app + the BYOK LLM relay endpoints.
+# Nothing about your transactions, receipts, or invoices is persisted on the server.
+
+services:
+  filey:
+    build: .
+    image: filey:self-host
+    container_name: filey
+    restart: unless-stopped
+    ports:
+      - "${FILEY_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      # Optional: pin a default fallback model when users haven't set BYOK
+      # - FILEY_DEFAULT_PROVIDER=anthropic
+      # - FILEY_DEFAULT_MODEL=claude-sonnet-4-20250514
+    networks:
+      - filey-net
+
+  # Optional reverse proxy with TLS — uncomment and edit domain to enable.
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+  #   networks:
+  #     - filey-net
+
+networks:
+  filey-net:
+    driver: bridge
+
+# volumes:
+#   caddy-data:
+#   caddy-config:

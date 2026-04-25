@@ -9,6 +9,8 @@ export default function sitemap() {
     { path: '/',              priority: 0.8, freq: 'weekly' },
     { path: '/blog',          priority: 0.7, freq: 'weekly' },
     { path: '/about',         priority: 0.6, freq: 'monthly' },
+    { path: '/vs-taxhacker',  priority: 0.7, freq: 'monthly' },
+    { path: '/self-host',     priority: 0.6, freq: 'monthly' },
     { path: '/changelog',     priority: 0.5, freq: 'weekly' },
     { path: '/security',      priority: 0.5, freq: 'monthly' },
     { path: '/privacy',       priority: 0.5, freq: 'monthly' },

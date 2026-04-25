@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import {
   Search, LayoutDashboard, Receipt, ScanLine, Paperclip, Bell,
   CreditCard, Bot, FolderKanban, Users, BarChart3, Settings as SettingsIcon,
-  Moon, Sun, FileText, Crown, Sparkles,
+  Moon, Sun, FileText, Crown, Sparkles, Layers, Tag,
 } from 'lucide-react';
 import { BRAND, BRAND_DARK, INK } from './theme';
 import { usePlan } from '@/lib/plan';
@@ -16,6 +16,7 @@ const MAIN = [
   { href: '/',              label: 'Dashboard',    icon: LayoutDashboard },
   { href: '/transactions',  label: 'Transactions', icon: Receipt },
   { href: '/scan',          label: 'Scan',         icon: ScanLine },
+  { href: '/bulk',          label: 'Bulk import',  icon: Layers },
   { href: '/invoice',       label: 'Invoice',      icon: FileText },
   { href: '/bills',         label: 'Bills',        icon: CreditCard },
   { href: '/chat',          label: 'Chat AI',      icon: Bot, badge: 'AI' },
@@ -25,6 +26,7 @@ const MGMT = [
   { href: '/projects',      label: 'Projects',     icon: FolderKanban },
   { href: '/team',          label: 'Team',         icon: Users },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
+  { href: '/categories',    label: 'Categories',   icon: Tag },
 ];
 
 export default function Sidebar() {

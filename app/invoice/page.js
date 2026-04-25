@@ -57,6 +57,22 @@ const TEMPLATES = {
 };
 const cssRgb = (a) => `rgb(${a[0]}, ${a[1]}, ${a[2]})`;
 
+const CURRENCIES = {
+  AED: { symbol: 'AED', name: 'UAE Dirham',     rateToAed: 1,        decimals: 2 },
+  USD: { symbol: '$',   name: 'US Dollar',      rateToAed: 3.6725,   decimals: 2 },
+  EUR: { symbol: '€',   name: 'Euro',           rateToAed: 3.95,     decimals: 2 },
+  GBP: { symbol: '£',   name: 'British Pound',  rateToAed: 4.65,     decimals: 2 },
+  SAR: { symbol: 'SR',  name: 'Saudi Riyal',    rateToAed: 0.98,     decimals: 2 },
+  INR: { symbol: '₹',   name: 'Indian Rupee',   rateToAed: 0.044,    decimals: 2 },
+};
+const fmtCur = (cur, n) => {
+  const c = CURRENCIES[cur] || CURRENCIES.AED;
+  const v = (+n || 0).toFixed(c.decimals);
+  // Symbol style: AED/SR — postfix with space; $/€/£/₹ — prefix
+  if (cur === 'AED' || cur === 'SAR') return `${c.symbol} ${v}`;
+  return `${c.symbol}${v}`;
+};
+
 function nextNumber(invoices) {
   const yr = new Date().getFullYear();
   const max = invoices
@@ -99,6 +115,7 @@ export default function InvoicePage() {
     lines: [NEW_LINE()],
     vatRate: 5,
     currency: 'AED',
+    fxRate: 1,
     template: 'classic',
   });
 
@@ -202,12 +219,20 @@ export default function InvoicePage() {
     // Totals
     const tBase = Math.max(rowY - 20, 180);
     draw('Subtotal',                              400, tBase,      { size: 10, color: slate });
-    draw(`${form.currency} ${totals.sub.toFixed(2)}`,  510, tBase,      { size: 10 });
+    draw(`${fmtCur(form.currency, totals.sub)}`,  510, tBase,      { size: 10 });
     draw(`VAT (${form.vatRate}%)`,                400, tBase - 18, { size: 10, color: slate });
-    draw(`${form.currency} ${totals.vat.toFixed(2)}`,  510, tBase - 18, { size: 10 });
+    draw(`${fmtCur(form.currency, totals.vat)}`,  510, tBase - 18, { size: 10 });
     page.drawLine({ start: { x: 395, y: tBase - 28 }, end: { x: 555, y: tBase - 28 }, thickness: 1, color: ink });
     draw('TOTAL',                                 400, tBase - 44, { size: 11, bold: true });
-    draw(`${form.currency} ${totals.total.toFixed(2)}`, 510, tBase - 44, { size: 12, bold: true, color: accent });
+    draw(`${fmtCur(form.currency, totals.total)}`, 510, tBase - 44, { size: 12, bold: true, color: accent });
+
+    // FTA: foreign-currency invoices must show AED equivalent
+    if (form.currency !== 'AED' && +form.fxRate > 0) {
+      const aedTotal = totals.total * (+form.fxRate);
+      const aedVat   = totals.vat * (+form.fxRate);
+      draw(`AED equivalent (FX ${(+form.fxRate).toFixed(4)}):`, 40, tBase - 44, { size: 8, color: slate });
+      draw(`${fmtCur('AED', aedTotal)} total · ${fmtCur('AED', aedVat)} VAT`, 40, tBase - 56, { size: 9, bold: true });
+    }
 
     // Notes
     if (form.notes) {
@@ -263,6 +288,7 @@ export default function InvoicePage() {
         lines: form.lines.filter(l => l.desc || +l.rate > 0),
         vatRate: form.vatRate,
         currency: form.currency,
+        fxRate: form.fxRate,
         notes: form.notes,
         status: 'sent',
       },
@@ -391,6 +417,39 @@ export default function InvoicePage() {
               <Field label="Issue date"><input type="date" value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} className={inputCls} /></Field>
               <Field label="Due date"><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={inputCls} /></Field>
             </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <Field label="Currency">
+                <select
+                  value={form.currency}
+                  onChange={(e) => {
+                    const c = e.target.value;
+                    setForm({ ...form, currency: c, fxRate: CURRENCIES[c]?.rateToAed || 1 });
+                  }}
+                  className={inputCls}
+                >
+                  {Object.entries(CURRENCIES).map(([code, c]) => (
+                    <option key={code} value={code}>{code} — {c.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="VAT rate (%)">
+                <input type="number" min={0} max={100} step={0.1} value={form.vatRate}
+                  onChange={(e) => setForm({ ...form, vatRate: +e.target.value })}
+                  className={inputCls} />
+              </Field>
+              {form.currency !== 'AED' && (
+                <Field label={`FX rate (1 ${form.currency} = ? AED)`}>
+                  <input type="number" min={0} step="0.0001" value={form.fxRate}
+                    onChange={(e) => setForm({ ...form, fxRate: +e.target.value })}
+                    className={inputCls} />
+                </Field>
+              )}
+            </div>
+            {form.currency !== 'AED' && (
+              <p className="mt-2 text-[11px] text-slate-500">
+                FTA tip: tax invoices in foreign currency must show the AED equivalent. Filey adds it to the PDF automatically.
+              </p>
+            )}
           </Card>
 
           {/* From / To */}
@@ -525,16 +584,22 @@ export default function InvoicePage() {
               </div>
 
               <div className="space-y-1 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
-                <Row label="Subtotal" value={`${form.currency} ${totals.sub.toFixed(2)}`} />
-                <Row label={`VAT (${form.vatRate}%)`} value={`${form.currency} ${totals.vat.toFixed(2)}`} />
+                <Row label="Subtotal" value={`${fmtCur(form.currency, totals.sub)}`} />
+                <Row label={`VAT (${form.vatRate}%)`} value={`${fmtCur(form.currency, totals.vat)}`} />
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-sm font-bold" style={{ color: INK }}>Total</span>
-                  <span className="text-base font-bold" style={{ color: cssRgb(tpl.accent) }}>{form.currency} {totals.total.toFixed(2)}</span>
+                  <span className="text-base font-bold" style={{ color: cssRgb(tpl.accent) }}>{fmtCur(form.currency, totals.total)}</span>
                 </div>
+                {form.currency !== 'AED' && +form.fxRate > 0 && (
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500">
+                    <span>≈ AED equiv. (FX {(+form.fxRate).toFixed(4)})</span>
+                    <span className="font-semibold" style={{ color: INK }}>{fmtCur('AED', totals.total * (+form.fxRate))}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300">
-                <Check className="h-3 w-3" /> FTA-compliant: TRN, 5% VAT, issue + due dates
+                <Check className="h-3 w-3" /> FTA-compliant: TRN, {form.vatRate}% VAT, issue + due dates{form.currency !== 'AED' ? ' · AED equivalent on PDF' : ''}
               </div>
             </div>
           </motion.div>
