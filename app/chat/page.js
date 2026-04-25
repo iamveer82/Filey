@@ -9,10 +9,13 @@ import Link from 'next/link';
 import {
   Send, Sparkles, Plus, MessageSquare, Trash2, Copy, Check, Square,
   PanelLeftClose, PanelLeftOpen, Settings as Cog, AlertTriangle, Bot,
+  Paperclip, X, ImageIcon, FileText as FileIcon, FileType,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_THREADS, SEED_MESSAGES, formatWhen, buildFinanceContext } from '@/lib/webStore';
+import { readAttachment, attachmentSupport } from '@/lib/chatAttachments';
+import { toast } from 'sonner';
 
 const SUGGESTIONS = [
   { label: 'Log 500 AED paid to Zain today',           icon: '💸' },
@@ -41,13 +44,16 @@ function ChatInner() {
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [pendingAtts, setPendingAtts] = useState([]); // attachments staged on the composer
   const [sending, setSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [ai, setAi] = useState(null);
   const [abortCtrl, setAbortCtrl] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
   const listRef = useRef(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => { setAi(loadAI()); }, []);
   useEffect(() => { if (!activeId && threads.length) setActiveId(threads[0].id); }, [threads, activeId]);
@@ -110,9 +116,34 @@ function ChatInner() {
     if (activeId === id) { setActiveId(null); setMessages([]); }
   };
 
+  const addFiles = useCallback(async (files) => {
+    const cfg = loadAI();
+    const sup = attachmentSupport(cfg?.provider);
+    const ok = [];
+    for (const f of files) {
+      try {
+        const att = await readAttachment(f);
+        if (att.kind === 'image' && !sup.image) {
+          toast.error(`${cfg?.provider || 'This provider'} doesn't support image input. Try Claude, GPT-4o, or Gemini.`);
+          continue;
+        }
+        if (att.kind === 'document' && !sup.pdf) {
+          toast.error(`PDFs only work with Claude or Gemini. ${cfg?.provider} cannot read them — convert to text or screenshot first.`);
+          continue;
+        }
+        ok.push(att);
+      } catch (e) {
+        toast.error(e.message || String(e));
+      }
+    }
+    if (ok.length) setPendingAtts((prev) => [...prev, ...ok]);
+  }, []);
+
+  const removeAtt = (id) => setPendingAtts((prev) => prev.filter(a => a.id !== id));
+
   const send = async (text) => {
     const content = (text || draft).trim();
-    if (!content || sending) return;
+    if ((!content && pendingAtts.length === 0) || sending) return;
 
     const cfg = loadAI();
     if (!cfg?.apiKey) {
@@ -121,12 +152,12 @@ function ChatInner() {
       setDraft(''); return;
     }
 
-    const userMsg = { id: `u_${Date.now()}`, role: 'user', content, ts: Date.now() };
+    const userMsg = { id: `u_${Date.now()}`, role: 'user', content, attachments: pendingAtts, ts: Date.now() };
     const asstId  = `a_${Date.now()}`;
     const asstMsg = { id: asstId, role: 'assistant', content: '', ts: Date.now() + 1, streaming: true };
     const baseline = [...messages, userMsg];
     persist([...baseline, asstMsg]);
-    setDraft(''); setSending(true);
+    setDraft(''); setPendingAtts([]); setSending(true);
 
     // Auto-title from first message
     if (activeId && messages.length === 0) {
@@ -141,7 +172,7 @@ function ChatInner() {
         body: JSON.stringify({
           provider: cfg.provider, apiKey: cfg.apiKey, model: cfg.model, baseUrl: cfg.baseUrl,
           system: buildFinanceContext(),
-          messages: baseline.map(m => ({ role: m.role, content: m.content })),
+          messages: baseline.map(m => ({ role: m.role, content: m.content, attachments: m.attachments || [] })),
         }),
         signal: ctrl.signal,
       });
@@ -269,25 +300,68 @@ function ChatInner() {
           </div>
 
           {/* Composer */}
-          <div className="border-t border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div
+            className={`border-t border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 ${dragOver ? 'ring-2 ring-blue-300' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault(); setDragOver(false);
+              const files = Array.from(e.dataTransfer?.files || []);
+              if (files.length) addFiles(files);
+            }}
+          >
             <div className="mx-auto max-w-3xl">
+              {/* Pending attachments row */}
+              {pendingAtts.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {pendingAtts.map((a) => (
+                    <AttachmentChip key={a.id} att={a} onRemove={() => removeAtt(a.id)} />
+                  ))}
+                </div>
+              )}
               <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:border-slate-700 dark:bg-slate-800">
                 <textarea
                   ref={textareaRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                  placeholder={hasKey ? 'Message Filey AI…  (Shift+Enter for newline)' : 'Set an API key in Settings to start chatting'}
+                  onPaste={(e) => {
+                    const files = Array.from(e.clipboardData?.files || []);
+                    if (files.length) { e.preventDefault(); addFiles(files); }
+                  }}
+                  placeholder={hasKey ? (dragOver ? 'Drop files to attach…' : 'Message Filey AI…  (Shift+Enter for newline · paste or drop files)') : 'Set an API key in Settings to start chatting'}
                   rows={1}
-                  className="block w-full resize-none rounded-2xl bg-transparent px-4 py-3.5 pr-14 text-sm outline-none placeholder-slate-400 dark:text-slate-100"
+                  className="block w-full resize-none rounded-2xl bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none placeholder-slate-400 dark:text-slate-100"
                   style={{ minHeight: 52 }}
+                />
+                {/* Attach button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Attach files"
+                  title="Attach images, PDFs, or text files"
+                  className="absolute bottom-2.5 left-2.5 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,application/pdf,text/*,.csv,.json,.md,.log,.yml,.yaml,.xml,.html,.js,.ts,.py"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length) addFiles(files);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
                 />
                 {sending ? (
                   <button onClick={stop} aria-label="Stop" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90" style={{ background: '#1E293B' }}>
                     <Square className="h-4 w-4" />
                   </button>
                 ) : (
-                  <button onClick={() => send()} disabled={!draft.trim()} aria-label="Send" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+                  <button onClick={() => send()} disabled={!draft.trim() && pendingAtts.length === 0} aria-label="Send" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
                     <Send className="h-4 w-4" />
                   </button>
                 )}
@@ -325,8 +399,34 @@ function EmptyWelcome({ onPick }) {
   );
 }
 
+function AttachmentChip({ att, onRemove, compact }) {
+  const Icon = att.kind === 'image' ? ImageIcon : att.kind === 'document' ? FileType : FileIcon;
+  const sizeLabel = att.size > 1024 * 1024 ? `${(att.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(att.size / 1024))} KB`;
+  return (
+    <div className={`group inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 ${compact ? '' : 'pr-1.5'}`}>
+      {att.kind === 'image' && att.dataB64 ? (
+        <img src={`data:${att.mediaType};base64,${att.dataB64}`} alt={att.name} className="h-6 w-6 rounded object-cover" />
+      ) : (
+        <Icon className="h-4 w-4 text-slate-500" />
+      )}
+      <span className="max-w-[160px] truncate font-medium text-slate-700 dark:text-slate-200">{att.name}</span>
+      <span className="text-[10px] text-slate-400">{sizeLabel}</span>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          aria-label={`Remove ${att.name}`}
+          className="ml-0.5 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MessageRow({ msg, onCopy, copied }) {
   const isUser = msg.role === 'user';
+  const atts = msg.attachments || [];
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -338,9 +438,14 @@ function MessageRow({ msg, onCopy, copied }) {
         </div>
       )}
       <div className={`group min-w-0 ${isUser ? 'max-w-[85%]' : 'flex-1'}`}>
+        {isUser && atts.length > 0 && (
+          <div className="mb-2 flex flex-wrap justify-end gap-2">
+            {atts.map((a) => <AttachmentChip key={a.id} att={a} compact />)}
+          </div>
+        )}
         <div className={`${isUser ? 'rounded-2xl rounded-tr-md bg-slate-100 px-4 py-3 text-sm text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'text-[15px] leading-relaxed text-slate-800 dark:text-slate-100'}`}>
           {isUser ? (
-            <div className="whitespace-pre-wrap">{msg.content}</div>
+            msg.content ? <div className="whitespace-pre-wrap">{msg.content}</div> : <span className="italic text-slate-500">(attachment only)</span>
           ) : msg.streaming && !msg.content ? (
             <TypingDots />
           ) : (

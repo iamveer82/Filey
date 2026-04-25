@@ -47,6 +47,59 @@ async function* parseSSE(response) {
   }
 }
 
+// ─── Attachment helpers ────────────────────────────────────────────────────
+// Each attachment shape: { kind: 'image'|'document'|'text', mediaType, dataB64?, text?, name? }
+// Client extracts PDF/CSV/TXT to plain text before sending; images stay binary.
+
+function appendTextAttachments(content, atts = []) {
+  const txts = atts.filter(a => a.kind === 'text' && a.text);
+  if (!txts.length) return content;
+  const blob = txts.map(a => `\n\n[Attachment: ${a.name || 'file'}]\n${a.text}`).join('');
+  return (content || '') + blob;
+}
+
+function anthropicMessage(m) {
+  // Anthropic supports multi-block content: text + image (base64) + document (PDF base64).
+  const atts = m.attachments || [];
+  const blocks = [];
+  for (const a of atts) {
+    if (a.kind === 'image' && a.dataB64) {
+      blocks.push({ type: 'image', source: { type: 'base64', media_type: a.mediaType || 'image/png', data: a.dataB64 } });
+    } else if (a.kind === 'document' && a.dataB64) {
+      blocks.push({ type: 'document', source: { type: 'base64', media_type: a.mediaType || 'application/pdf', data: a.dataB64 } });
+    }
+  }
+  blocks.push({ type: 'text', text: appendTextAttachments(m.content, atts) });
+  return { role: m.role, content: blocks };
+}
+
+function openAIMessage(m) {
+  // OpenAI / OpenAI-compat: image_url blocks. PDFs unsupported in chat completions →
+  // any PDF/document the client could not text-extract is dropped (text already inlined).
+  const atts = m.attachments || [];
+  const imgs = atts.filter(a => a.kind === 'image' && a.dataB64);
+  if (imgs.length === 0) {
+    return { role: m.role, content: appendTextAttachments(m.content, atts) };
+  }
+  const blocks = [
+    { type: 'text', text: appendTextAttachments(m.content, atts) || '' },
+    ...imgs.map(a => ({ type: 'image_url', image_url: { url: `data:${a.mediaType || 'image/png'};base64,${a.dataB64}` } })),
+  ];
+  return { role: m.role, content: blocks };
+}
+
+function googleParts(m) {
+  const atts = m.attachments || [];
+  const parts = [];
+  parts.push({ text: appendTextAttachments(m.content, atts) || '' });
+  for (const a of atts) {
+    if ((a.kind === 'image' || a.kind === 'document') && a.dataB64) {
+      parts.push({ inlineData: { mimeType: a.mediaType || 'image/png', data: a.dataB64 } });
+    }
+  }
+  return parts;
+}
+
 async function* streamAnthropic({ apiKey, model, messages, system }) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -59,7 +112,7 @@ async function* streamAnthropic({ apiKey, model, messages, system }) {
       model: model || 'claude-sonnet-4-20250514',
       max_tokens: 2048,
       system: (SYSTEM_DEFAULT + (system ? '\n\n' + system : '')),
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages.filter(m => m.role !== 'system').map(anthropicMessage),
       stream: true,
     }),
   });
@@ -81,7 +134,7 @@ async function* streamOpenAI({ apiKey, model, messages, system, baseUrl }) {
     },
     body: JSON.stringify({
       model: model || 'gpt-4o-mini',
-      messages: [{ role: 'system', content: (SYSTEM_DEFAULT + (system ? '\n\n' + system : '')) }, ...messages.filter(m => m.role !== 'system')],
+      messages: [{ role: 'system', content: (SYSTEM_DEFAULT + (system ? '\n\n' + system : '')) }, ...messages.filter(m => m.role !== 'system').map(openAIMessage)],
       stream: true,
     }),
   });
@@ -97,7 +150,7 @@ async function* streamGoogle({ apiKey, model, messages, system }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${apiKey}`;
   const contents = messages
     .filter(x => x.role !== 'system')
-    .map(x => ({ role: x.role === 'assistant' ? 'model' : 'user', parts: [{ text: x.content }] }));
+    .map(x => ({ role: x.role === 'assistant' ? 'model' : 'user', parts: googleParts(x) }));
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
