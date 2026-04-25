@@ -135,11 +135,15 @@ export async function POST(req) {
       text = await callGoogle({ apiKey, model, parts });
     } else if (provider === 'openai') {
       text = await callOpenAI({ apiKey, model, parts });
-    } else if (provider === 'openai-compat' || provider === 'openrouter') {
-      const defaults = { openrouter: 'https://openrouter.ai/api' };
+    } else if (provider === 'openai-compat' || provider === 'openrouter' || provider === 'ollama-cloud') {
+      const defaults = {
+        openrouter: 'https://openrouter.ai/api',
+        // Ollama Cloud vision models (e.g. gpt-oss:120b-cloud, qwen3-vl:235b-cloud)
+        'ollama-cloud': 'https://ollama.com',
+      };
       text = await callOpenAI({ apiKey, model, parts, baseUrl: baseUrl || defaults[provider] });
     } else {
-      return Response.json({ error: `Provider ${provider} does not support vision extraction. Use Anthropic, OpenAI, Google, or OpenRouter.` }, { status: 400 });
+      return Response.json({ error: `Provider ${provider} does not support vision extraction. Use Anthropic, OpenAI, Google, OpenRouter, or Ollama Cloud.` }, { status: 400 });
     }
     const json = safeJson(text);
     if (!json) return Response.json({ error: 'Model did not return valid JSON', raw: text.slice(0, 500) }, { status: 502 });

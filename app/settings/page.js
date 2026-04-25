@@ -27,6 +27,7 @@ const PROVIDER_DEFAULTS = {
   openrouter:     { model: 'anthropic/claude-sonnet-4',keyHint: 'sk-or-…' },
   together:       { model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyHint: '…' },
   ollama:         { model: 'llama3.2',                 keyHint: '(empty — local)' },
+  'ollama-cloud': { model: 'gpt-oss:120b-cloud',       keyHint: 'ollama-…' },
   'openai-compat':{ model: '',                         keyHint: 'your-key' },
 };
 
@@ -181,6 +182,7 @@ export default function SettingsPage() {
                 <option value="openrouter">OpenRouter</option>
                 <option value="together">Together AI</option>
                 <option value="ollama">Ollama (local)</option>
+                <option value="ollama-cloud">Ollama Cloud (hosted)</option>
                 <option value="openai-compat">Custom OpenAI-compatible</option>
               </select>
             </Field>
@@ -193,9 +195,18 @@ export default function SettingsPage() {
                 <input type="password" value={ai.apiKey} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} className={`${inputCls} pl-9`} placeholder={PROVIDER_DEFAULTS[ai.provider]?.keyHint || 'sk-...'} />
               </div>
             </Field>
-            {(ai.provider === 'openai-compat' || ai.provider === 'ollama') && (
+            {(ai.provider === 'openai-compat' || ai.provider === 'ollama' || ai.provider === 'ollama-cloud') && (
               <Field label="Base URL" className="md:col-span-2">
-                <input value={ai.baseUrl || ''} onChange={(e) => setAi({ ...ai, baseUrl: e.target.value })} className={inputCls} placeholder={ai.provider === 'ollama' ? 'http://localhost:11434' : 'https://your-endpoint.com'} />
+                <input
+                  value={ai.baseUrl || ''}
+                  onChange={(e) => setAi({ ...ai, baseUrl: e.target.value })}
+                  className={inputCls}
+                  placeholder={
+                    ai.provider === 'ollama' ? 'http://localhost:11434' :
+                    ai.provider === 'ollama-cloud' ? 'https://ollama.com (default)' :
+                    'https://your-endpoint.com'
+                  }
+                />
               </Field>
             )}
             <div className="md:col-span-2 flex items-center gap-3">

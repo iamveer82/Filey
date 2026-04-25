@@ -287,7 +287,7 @@ function StepAi({ ai, setAi }) {
       <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: INK }}>
         Bring your own AI key.
       </h1>
-      <p className="mt-2 text-slate-500">Filey is BYOK — you control the model and the bill. Anthropic, OpenAI, Google, Groq, Ollama (local) and more.</p>
+      <p className="mt-2 text-slate-500">Filey is BYOK — you control the model and the bill. Anthropic, OpenAI, Google, Groq, Ollama (local + cloud) and more.</p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <Field label="Provider">
@@ -300,6 +300,7 @@ function StepAi({ ai, setAi }) {
             <option value="openrouter">OpenRouter</option>
             <option value="together">Together AI</option>
             <option value="ollama">Ollama (local)</option>
+            <option value="ollama-cloud">Ollama Cloud (hosted)</option>
           </select>
         </Field>
         <Field label="Model">

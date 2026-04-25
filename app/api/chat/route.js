@@ -129,13 +129,16 @@ export async function POST(req) {
   if (provider === 'anthropic' || provider === 'claude') gen = streamAnthropic({ apiKey, model, messages, system });
   else if (provider === 'google' || provider === 'gemini') gen = streamGoogle({ apiKey, model, messages, system });
   else if (provider === 'openai') gen = streamOpenAI({ apiKey, model, messages, system });
-  else if (provider === 'openai-compat' || provider === 'groq' || provider === 'mistral' || provider === 'openrouter' || provider === 'together' || provider === 'ollama') {
+  else if (provider === 'openai-compat' || provider === 'groq' || provider === 'mistral' || provider === 'openrouter' || provider === 'together' || provider === 'ollama' || provider === 'ollama-cloud') {
     const defaults = {
       groq: 'https://api.groq.com/openai',
       mistral: 'https://api.mistral.ai',
       openrouter: 'https://openrouter.ai/api',
       together: 'https://api.together.xyz',
       ollama: 'http://localhost:11434',
+      // Ollama Cloud — hosted models (gpt-oss:120b-cloud, qwen3-coder:480b-cloud, etc.)
+      // OpenAI-compatible chat completions with Bearer auth.
+      'ollama-cloud': 'https://ollama.com',
     };
     gen = streamOpenAI({ apiKey, model, messages, system, baseUrl: baseUrl || defaults[provider] });
   } else {
