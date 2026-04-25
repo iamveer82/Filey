@@ -7,6 +7,7 @@ import {
   Paperclip, Sparkles, ScanLine, Receipt, Bot, Shield, Lock,
   Zap, Globe, Check, ArrowRight, Star, CreditCard, FileText,
   TrendingUp, Users, Smartphone, Moon, Menu, X,
+  Layers, Wand2, Coins, Tag, FileSpreadsheet, Server, GitCompare,
 } from 'lucide-react';
 import { BRAND, BRAND_DARK, INK } from '@/components/dashboard/theme';
 
@@ -43,12 +44,12 @@ export default function WelcomePage() {
 }
 
 const NAV_LINKS = [
-  { href: '#features', label: 'Features',  external: true },
-  { href: '/pricing',  label: 'Pricing' },
-  { href: '/blog',     label: 'Blog' },
-  { href: '#faq',      label: 'FAQ',       external: true },
-  { href: '/about',    label: 'About' },
-  { href: '/security', label: 'Security' },
+  { href: '#features',     label: 'Features',     external: true },
+  { href: '/pricing',      label: 'Pricing' },
+  { href: '/vs-taxhacker', label: 'vs TaxHacker' },
+  { href: '/self-host',    label: 'Self-host' },
+  { href: '/blog',         label: 'Blog' },
+  { href: '/about',        label: 'About' },
 ];
 
 function MarketingNav() {
@@ -287,12 +288,18 @@ function SocialProof() {
 
 function Features() {
   const items = [
-    { icon: ScanLine,   title: 'OCR receipt scanner',      desc: 'Point camera → extract merchant, date, VAT, items. Works offline.' },
-    { icon: FileText,   title: 'FTA-compliant invoices',   desc: 'Issue PDF invoices in seconds. TRN auto-populated. 5% VAT calculated.' },
-    { icon: Receipt,    title: 'Smart ledger',             desc: 'Every transaction categorised. Recurring bills detected automatically.' },
-    { icon: Bot,        title: 'Ask AI anything',          desc: 'GPT-4, Claude, Gemini or local Ollama. Grounded on YOUR numbers.' },
-    { icon: TrendingUp, title: 'VAT & tax reports',        desc: 'One-click quarterly filing export. Profit, expenses, VAT net.' },
-    { icon: Lock,       title: 'Offline & private',        desc: 'Data lives on your device. No cloud unless you ask. BYO AI key.' },
+    { icon: ScanLine,        title: 'OCR receipt scanner',      desc: 'Point camera → extract merchant, date, VAT, items. Works offline.' },
+    { icon: Wand2,           title: 'AI vision extract',        desc: 'One tap → LLM reads merchant, total, VAT, line items as strict JSON.' },
+    { icon: Layers,          title: 'Bulk import',              desc: 'Drop 50 receipts at once. Queue OCR + AI in parallel. Edit + save all.' },
+    { icon: FileText,        title: 'FTA invoices, multi-FX',   desc: 'AED/USD/EUR/GBP/SAR/INR with FX rate. AED equivalent stamped on PDF.' },
+    { icon: Receipt,         title: 'Smart ledger + custom fields', desc: 'Every tx categorised. Recurring bills auto-detected. Add your own fields.' },
+    { icon: Tag,             title: 'Custom categories',        desc: 'Build your own taxonomy. Rename, delete, count — synced across tabs.' },
+    { icon: Bot,             title: 'Ask AI anything (BYOK)',   desc: 'GPT-4, Claude, Gemini, Groq, Mistral or local Ollama. Grounded on your numbers.' },
+    { icon: TrendingUp,      title: 'VAT & tax reports',        desc: 'One-click quarterly filing export. Profit, expenses, VAT net.' },
+    { icon: FileSpreadsheet, title: 'CSV + Excel export',       desc: 'Full ledger out as CSV or .xls — including every custom field column.' },
+    { icon: Server,          title: 'Self-host in 60 seconds',  desc: 'Docker compose up. Your VPS, your keys, your data. Zero database needed.' },
+    { icon: GitCompare,      title: 'Better than TaxHacker',    desc: 'Browser-native, UAE-aware, multi-LLM. See feature-by-feature comparison.' },
+    { icon: Lock,             title: 'Offline & private',        desc: 'Data lives on your device. No cloud unless you ask. BYO AI key.' },
   ];
   return (
     <section id="features" className="px-6 py-24">

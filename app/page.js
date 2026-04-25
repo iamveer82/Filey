@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import {
   Bell, Receipt, BarChart3, TrendingUp, TrendingDown, ArrowRight,
   MoreHorizontal, Sparkles, Wallet, ShieldCheck,
+  ScanLine, Layers, Wand2, Tag, FileSpreadsheet, Server, GitCompare, FileText,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import FirstVisitGate from '@/components/dashboard/FirstVisitGate';
@@ -51,6 +52,9 @@ export default function HomePage() {
 
       {/* AI Insights — computed from user's real ledger */}
       <InsightsCard />
+
+      {/* Quick actions — surface new tools (bulk, AI extract, categories, XLSX, self-host) */}
+      <QuickActions />
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -229,6 +233,84 @@ export default function HomePage() {
       </div>
     </Shell>
     </FirstVisitGate>
+  );
+}
+
+const QUICK_ACTIONS = [
+  { href: '/scan',          icon: ScanLine,        label: 'Scan receipt',     desc: 'OCR + AI extract',     tone: 'blue'    },
+  { href: '/bulk',          icon: Layers,          label: 'Bulk import',      desc: 'Drop many at once',    tone: 'violet'  },
+  { href: '/invoice',       icon: FileText,        label: 'New invoice',      desc: 'Multi-currency + FX',  tone: 'emerald' },
+  { href: '/categories',    icon: Tag,             label: 'Categories',       desc: 'Custom rules',         tone: 'amber'   },
+  { href: '/transactions',  icon: FileSpreadsheet, label: 'Export XLSX',      desc: 'CSV + Excel',          tone: 'sky'     },
+  { href: '/vs-taxhacker',  icon: GitCompare,      label: 'vs TaxHacker',     desc: 'Feature matrix',       tone: 'rose'    },
+  { href: '/self-host',     icon: Server,          label: 'Self-host',        desc: 'Docker in 60s',        tone: 'slate'   },
+  { href: '/chat',          icon: Wand2,           label: 'Ask Filey AI',     desc: 'BYOK copilot',         tone: 'indigo'  },
+];
+
+const TONE_BG = {
+  blue:    '#EBF1FF',
+  violet:  '#F3EEFF',
+  emerald: '#E6F8F0',
+  amber:   '#FFF4E0',
+  sky:     '#E0F2FE',
+  rose:    '#FFE4E9',
+  slate:   '#F1F5F9',
+  indigo:  '#E0E7FF',
+};
+const TONE_FG = {
+  blue:    BRAND,
+  violet:  '#7C3AED',
+  emerald: '#059669',
+  amber:   '#D97706',
+  sky:     '#0284C7',
+  rose:    '#E11D48',
+  slate:   '#475569',
+  indigo:  '#4F46E5',
+};
+
+function QuickActions() {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="rounded-2xl border border-slate-200 bg-white p-5"
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: BRAND_SOFT }}>
+            <Sparkles className="h-4 w-4" style={{ color: BRAND }} />
+          </div>
+          <h3 className="text-sm font-semibold" style={{ color: INK }}>Quick actions</h3>
+          <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">NEW</span>
+        </div>
+        <Link href="/welcome#features" className="text-xs font-semibold" style={{ color: BRAND }}>See all features →</Link>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+        {QUICK_ACTIONS.map((a) => {
+          const I = a.icon;
+          return (
+            <Link
+              key={a.href}
+              href={a.href}
+              aria-label={a.label}
+              className="group flex cursor-pointer flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-lg transition group-hover:scale-110"
+                style={{ background: TONE_BG[a.tone] }}
+              >
+                <I className="h-4.5 w-4.5" style={{ color: TONE_FG[a.tone], width: 18, height: 18 }} />
+              </div>
+              <div>
+                <div className="text-xs font-bold" style={{ color: INK }}>{a.label}</div>
+                <div className="text-[10px] text-slate-500">{a.desc}</div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </motion.section>
   );
 }
 
