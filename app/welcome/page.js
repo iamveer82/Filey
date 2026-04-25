@@ -567,7 +567,7 @@ function RoiStat({ label, value }) {
 
 function PricingTeaser() {
   const tiers = [
-    { name: 'Free', price: 'AED 0', desc: 'Forever free core.',           features: ['5 invoices/mo', '50 receipt scans/mo', 'BYO AI key', 'All reports'] },
+    { name: 'Free', price: 'AED 0', desc: 'Forever free core.',           features: ['5 invoices/mo', 'Unlimited OCR + AI scans (BYOK)', 'Unlimited AI chat (BYOK)', '10 LLM providers', 'All reports'] },
     { name: 'Pro',  price: 'AED 29', desc: 'For freelancers & solo SMBs.', features: ['Unlimited everything', 'Premium templates', 'Bank sync', 'GPT-4 / Claude Opus'], highlight: true },
     { name: 'Agency', price: 'AED 99', desc: '10 seats, multi-client.',     features: ['Everything in Pro', '10 team seats', 'White-label', 'Priority support'] },
   ];

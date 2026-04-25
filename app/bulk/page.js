@@ -267,11 +267,11 @@ export default function BulkImportPage() {
       {!isPro && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <span className="text-slate-600 dark:text-slate-400">
-            Free plan: <strong className="text-slate-900 dark:text-white">{Math.max(0, remaining('scansPerMonth'))}</strong> of <strong className="text-slate-900 dark:text-white">{plan.limits.scansPerMonth}</strong> scans left this month — bulk respects this budget.
+            <strong className="text-slate-900 dark:text-white">Unlimited bulk scans</strong> on free — OCR is local, AI extract uses your BYOK key. Filey never charges per scan.
           </span>
-          <button onClick={() => setUpgradeOpen(true)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
-            <Zap className="h-3 w-3" /> Unlimited with Pro
-          </button>
+          <Link href="/pricing" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Zap className="h-3 w-3" /> Pro: cloud sync + premium templates
+          </Link>
         </div>
       )}
 

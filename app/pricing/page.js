@@ -96,10 +96,11 @@ function Tiers({ billing }) {
       desc: 'Forever free core features.',
       features: [
         '5 invoices per month',
-        '50 OCR receipt scans per month',
+        'Unlimited OCR + AI receipt scans (BYOK)',
+        'Unlimited AI chat with your own API key',
+        '10 LLM providers (Anthropic, OpenAI, Google, Groq, Mistral, Together, OpenRouter, Ollama local + cloud, custom)',
         '2 CSV imports per month',
         '2 projects',
-        'BYO AI key (9 providers)',
         'All reports & VAT summary',
         'Offline-first, private',
       ],
@@ -203,7 +204,8 @@ function Tiers({ billing }) {
 function FeatureMatrix() {
   const rows = [
     { label: 'Invoices per month',       free: '5',       pro: 'Unlimited',    agency: 'Unlimited' },
-    { label: 'Receipt scans per month',  free: '50',      pro: 'Unlimited',    agency: 'Unlimited' },
+    { label: 'OCR + AI receipt scans',   free: 'Unlimited (BYOK)', pro: 'Unlimited', agency: 'Unlimited' },
+    { label: 'AI chat (BYOK key)',       free: 'Unlimited', pro: 'Unlimited',  agency: 'Unlimited' },
     { label: 'CSV bank imports',         free: '2 / mo',  pro: 'Unlimited',    agency: 'Unlimited' },
     { label: 'Projects',                 free: '2',       pro: 'Unlimited',    agency: 'Unlimited' },
     { label: 'Team seats',               free: '1',       pro: '1',            agency: '10' },

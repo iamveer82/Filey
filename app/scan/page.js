@@ -189,11 +189,11 @@ export default function ScanPage() {
       {!isPro && (
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">
           <span className="text-slate-600 dark:text-slate-400">
-            Free plan: <strong className="text-slate-900 dark:text-white">{Math.max(0, remaining('scansPerMonth'))}</strong> of <strong className="text-slate-900 dark:text-white">{plan.limits.scansPerMonth}</strong> scans left this month.
+            <strong className="text-slate-900 dark:text-white">Unlimited scans</strong> on free — OCR runs locally, AI extract is BYOK. You pay zero to Filey.
           </span>
-          <button onClick={() => setUpgradeOpen(true)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
-            <Sparkles className="h-3 w-3" /> Unlimited with Pro
-          </button>
+          <Link href="/pricing" className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.03]" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` }}>
+            <Sparkles className="h-3 w-3" /> Pro: cloud sync + premium templates
+          </Link>
         </div>
       )}
       <div className="grid gap-6 md:grid-cols-2">
