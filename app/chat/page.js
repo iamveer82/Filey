@@ -10,6 +10,7 @@ import {
   Send, Sparkles, Plus, MessageSquare, Trash2, Copy, Check, Square,
   PanelLeftClose, PanelLeftOpen, Settings as Cog, AlertTriangle, Bot,
   Paperclip, X, ImageIcon, FileText as FileIcon, FileType,
+  Camera, FileUp, Wand2, Receipt, Zap,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
@@ -53,9 +54,12 @@ function ChatInner() {
   const [copiedId, setCopiedId] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [slashIdx, setSlashIdx] = useState(0);
+  const [plusOpen, setPlusOpen] = useState(false);
   const listRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   // When user fires a new message mid-stream, the in-flight stream aborts
   // and the queued payload runs in the abort-handler tail.
   const queuedSendRef = useRef(null);
@@ -105,6 +109,20 @@ function ChatInner() {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }, [draft]);
+
+  // Close + menu on outside click + Escape
+  useEffect(() => {
+    if (!plusOpen) return;
+    const onDoc = (e) => {
+      const tgt = e.target;
+      if (tgt.closest && tgt.closest('[data-plus-menu]')) return;
+      setPlusOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setPlusOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [plusOpen]);
 
   const persist = useCallback((next) => {
     setMessages(next);
@@ -473,21 +491,93 @@ function ChatInner() {
                   className="block w-full resize-none rounded-2xl bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none placeholder-slate-400 dark:text-slate-100"
                   style={{ minHeight: 52 }}
                 />
-                {/* Attach button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label="Attach files"
-                  title="Attach images, PDFs, or text files"
-                  className="absolute bottom-2.5 left-2.5 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </button>
+                {/* Plus menu — upload, camera, quick prompts */}
+                <div data-plus-menu className="absolute bottom-2.5 left-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setPlusOpen((v) => !v)}
+                    aria-label="Open attachments + quick actions menu"
+                    aria-expanded={plusOpen}
+                    title="Attach, take a photo, or run a quick prompt"
+                    className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 ${plusOpen ? 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-white' : ''}`}
+                  >
+                    <Plus className={`h-5 w-5 transition-transform ${plusOpen ? 'rotate-45' : ''}`} />
+                  </button>
+
+                  {plusOpen && (
+                    <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                      <PlusMenuItem
+                        icon={ImageIcon}
+                        title="Upload photo"
+                        desc="Receipts, invoices, screenshots"
+                        onClick={() => { setPlusOpen(false); imageInputRef.current?.click(); }}
+                      />
+                      <PlusMenuItem
+                        icon={Camera}
+                        title="Take a photo"
+                        desc="Open camera (mobile / webcam)"
+                        onClick={() => { setPlusOpen(false); cameraInputRef.current?.click(); }}
+                      />
+                      <PlusMenuItem
+                        icon={FileUp}
+                        title="Upload file"
+                        desc="PDF, CSV, TXT, JSON, code"
+                        onClick={() => { setPlusOpen(false); fileInputRef.current?.click(); }}
+                      />
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                      <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Ask Filey AI</div>
+                      <PlusMenuItem
+                        icon={Receipt}
+                        title="Summarise this quarter"
+                        desc="Income, expenses, VAT net"
+                        onClick={() => { setPlusOpen(false); send('Summarise my finances this quarter — income, expenses, VAT net payable, and three concrete things I could improve.'); }}
+                      />
+                      <PlusMenuItem
+                        icon={Wand2}
+                        title="Categorise unsorted transactions"
+                        desc="Bulk auto-tag suggestions"
+                        onClick={() => { setPlusOpen(false); send('List my transactions still tagged "Other" and propose the right UAE category for each. Output as a markdown table.'); }}
+                      />
+                      <PlusMenuItem
+                        icon={Zap}
+                        title="Find duplicate or anomalous bills"
+                        desc="Subscriptions you forgot"
+                        onClick={() => { setPlusOpen(false); send('Scan my recurring bills + recent transactions. Flag duplicates, price hikes >10%, and any subscription I haven\'t used in 30 days.'); }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Hidden inputs — driven by the menu */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
                   accept="image/*,application/pdf,text/*,.csv,.json,.md,.log,.yml,.yaml,.xml,.html,.js,.ts,.py"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length) addFiles(files);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length) addFiles(files);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
                   onChange={(e) => {
                     const files = Array.from(e.target.files || []);
                     if (files.length) addFiles(files);
@@ -535,6 +625,24 @@ function EmptyWelcome({ onPick }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function PlusMenuItem({ icon: Icon, title, desc, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full cursor-pointer items-start gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
+    >
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-blue-100 group-hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex-1">
+        <span className="block text-sm font-semibold" style={{ color: INK }}>{title}</span>
+        <span className="block text-[11px] text-slate-500">{desc}</span>
+      </span>
+    </button>
   );
 }
 

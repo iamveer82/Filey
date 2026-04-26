@@ -1,6 +1,6 @@
-export const BRAND       = '#2A63E2';
-export const BRAND_DARK  = '#1E4BB0';
-export const BRAND_SOFT  = '#EBF1FF';
-export const BRAND_LIGHT = '#F5F8FF';
-export const INK         = '#0F172A';
-export const SLATE       = '#64748B';
+/**
+ * Legacy re-export. Prefer `@/lib/design/tokens` going forward — these
+ * constants will be removed once all pages migrate to Tailwind utilities
+ * (`bg-brand`, `text-fg`) in Phase 4 of the design-system rollout.
+ */
+export { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK, SLATE } from '@/lib/design/tokens';

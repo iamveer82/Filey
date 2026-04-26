@@ -2,35 +2,124 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Filey Design System — Tokens
+   All semantic colors live as HSL triplets so Tailwind utilities (`bg-primary`,
+   `text-fg-muted`, `border-strong`) and runtime CSS (`hsl(var(--brand))`) both
+   work. Light mode under :root, dark mode under html.dark.
+   ─────────────────────────────────────────────────────────────────────────── */
 @layer base {
-  html.dark {
-    color-scheme: dark;
-  }
+  html.dark { color-scheme: dark; }
+
   :root {
-    --background: 0 0% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 142 71% 45%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 60%;
-    --radius: 1rem;
-    --safe-top: env(safe-area-inset-top, 0px);
+    /* Surface */
+    --bg:               220 14% 97%;   /* #F5F7FA */
+    --bg-elevated:      0 0% 100%;     /* #FFFFFF */
+    --bg-muted:         210 40% 96%;   /* #F1F5F9 */
+    --bg-subtle:        210 40% 98%;   /* #F8FAFC */
+
+    /* Text */
+    --fg:               222 47% 11%;   /* #0F172A */
+    --fg-muted:         215 25% 35%;   /* #475569 */
+    --fg-subtle:        215 16% 47%;   /* #64748B */
+    --fg-disabled:      215 20% 65%;   /* #94A3B8 */
+    --fg-inverse:       0 0% 100%;
+
+    /* Border */
+    --border:           214 32% 91%;   /* #E2E8F0 */
+    --border-strong:    215 20% 80%;   /* #CBD5E1 */
+    --ring:             217 91% 60%;   /* same as brand */
+
+    /* Brand (#2A63E2) */
+    --brand:            218 76% 53%;
+    --brand-fg:         0 0% 100%;
+    --brand-soft:       219 100% 96%;  /* #EBF1FF */
+    --brand-strong:     220 70% 40%;   /* #1E4BB0 */
+
+    /* Status */
+    --success:          152 65% 38%;   /* #15803D-ish */
+    --success-fg:       0 0% 100%;
+    --success-soft:     143 64% 95%;
+    --warning:          38 92% 50%;
+    --warning-fg:       38 92% 15%;
+    --warning-soft:     45 100% 96%;
+    --danger:           0 78% 56%;
+    --danger-fg:        0 0% 100%;
+    --danger-soft:      0 100% 97%;
+    --info:             204 94% 50%;
+    --info-fg:          0 0% 100%;
+    --info-soft:        204 100% 97%;
+
+    /* Shape + motion */
+    --radius:           1rem;
+    --radius-sm:        0.5rem;
+    --radius-md:        0.75rem;
+    --radius-lg:        1rem;
+    --radius-xl:        1.25rem;
+
+    /* Shadow elevation tokens (Tailwind shadow utilities still apply) */
+    --shadow-sm:        0 1px 2px 0 rgba(15,23,42,0.04);
+    --shadow-md:        0 4px 12px -2px rgba(15,23,42,0.06), 0 2px 4px -2px rgba(15,23,42,0.04);
+    --shadow-lg:        0 12px 24px -8px rgba(15,23,42,0.10), 0 4px 8px -4px rgba(15,23,42,0.05);
+    --shadow-xl:        0 24px 48px -12px rgba(15,23,42,0.15);
+
+    /* Motion */
+    --ease-out:         cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring:      cubic-bezier(0.34, 1.56, 0.64, 1);
+    --duration-fast:    150ms;
+    --duration-base:    250ms;
+    --duration-slow:    400ms;
+
+    /* shadcn-compat aliases (keeps existing components working) */
+    --background:           var(--bg);
+    --foreground:           var(--fg);
+    --card:                 var(--bg-elevated);
+    --card-foreground:      var(--fg);
+    --popover:              var(--bg-elevated);
+    --popover-foreground:   var(--fg);
+    --primary:              var(--brand);
+    --primary-foreground:   var(--brand-fg);
+    --secondary:            var(--bg-muted);
+    --secondary-foreground: var(--fg);
+    --muted:                var(--bg-muted);
+    --muted-foreground:     var(--fg-muted);
+    --accent:               var(--success);
+    --accent-foreground:    var(--success-fg);
+    --destructive:          var(--danger);
+    --destructive-foreground: var(--danger-fg);
+    --input:                var(--border);
+
+    /* Safe-area insets (mobile) */
+    --safe-top:    env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left: env(safe-area-inset-left, 0px);
-    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-left:   env(safe-area-inset-left, 0px);
+    --safe-right:  env(safe-area-inset-right, 0px);
+  }
+
+  html.dark {
+    --bg:               222 47% 7%;    /* #0B1220 */
+    --bg-elevated:      222 47% 11%;   /* #0F172A */
+    --bg-muted:         217 33% 17%;   /* #1E293B */
+    --bg-subtle:        217 33% 13%;
+
+    --fg:               210 40% 96%;
+    --fg-muted:         215 16% 65%;
+    --fg-subtle:        215 16% 55%;
+    --fg-disabled:      215 16% 40%;
+
+    --border:           217 33% 20%;
+    --border-strong:    217 19% 30%;
+
+    --brand-soft:       218 76% 18%;
+    --success-soft:     152 50% 14%;
+    --warning-soft:     38 60% 15%;
+    --danger-soft:      0 60% 18%;
+    --info-soft:        204 60% 15%;
+
+    --shadow-sm:  0 1px 2px 0 rgba(0,0,0,0.4);
+    --shadow-md:  0 4px 12px -2px rgba(0,0,0,0.45);
+    --shadow-lg:  0 12px 24px -8px rgba(0,0,0,0.55);
+    --shadow-xl:  0 24px 48px -12px rgba(0,0,0,0.65);
   }
 }
 
@@ -39,11 +128,8 @@
     @apply border-border;
     -webkit-tap-highlight-color: transparent;
   }
-  html.dark body {
-    @apply bg-[#0B1220] text-slate-100;
-  }
   body {
-    @apply bg-[#F7F8FA] text-[#0F172A] antialiased;
+    @apply bg-bg text-fg antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -59,21 +145,27 @@
     height: -webkit-fill-available;
     height: 100dvh;
   }
-  body {
-    min-height: -webkit-fill-available;
-    min-height: 100dvh;
-  }
+  body { min-height: -webkit-fill-available; min-height: 100dvh; }
+
+  /* Heading scale — tight tracking, display weight */
+  h1, .h1 { @apply text-4xl font-bold tracking-tight; }
+  h2, .h2 { @apply text-3xl font-bold tracking-tight; }
+  h3, .h3 { @apply text-xl  font-semibold tracking-tight; }
+  h4, .h4 { @apply text-base font-semibold; }
+  small, .text-caption { @apply text-xs text-fg-subtle; }
 }
 
 /* Scrollbar */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border-strong)); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--fg-subtle)); }
+::-webkit-scrollbar-track { background: transparent; }
 
-/* iOS standalone mode adjustments */
+/* iOS standalone */
 @media all and (display-mode: standalone) {
-  body {
-    padding-top: env(safe-area-inset-top);
-  }
+  body { padding-top: env(safe-area-inset-top); }
 }
 
 /* iOS rubber-band prevention for fixed layouts */
@@ -83,12 +175,8 @@
 }
 
 /* iOS input zoom prevention */
-input, select, textarea {
-  font-size: 16px !important;
-}
-input:focus, select:focus, textarea:focus {
-  font-size: 16px !important;
-}
+input, select, textarea { font-size: 16px !important; }
+input:focus, select:focus, textarea:focus { font-size: 16px !important; }
 
 /* Skeleton pulse */
 @keyframes shimmer {
@@ -96,69 +184,50 @@ input:focus, select:focus, textarea:focus {
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background: linear-gradient(90deg, hsl(var(--bg-muted)) 25%, hsl(var(--bg-subtle)) 50%, hsl(var(--bg-muted)) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 8px;
 }
 
-/* Pull to refresh indicator */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-.spinner {
-  animation: spin 0.8s linear infinite;
-}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { animation: spin 0.8s linear infinite; }
 
 /* Glass effect */
 .glass {
-  background: rgba(255, 255, 255, 0.8);
+  background: hsl(var(--bg-elevated) / 0.8);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
-/* iOS-style active press */
-.press-scale {
-  transition: transform 0.12s ease;
-}
-.press-scale:active {
-  transform: scale(0.97);
-}
+/* iOS press */
+.press-scale { transition: transform 0.12s ease; }
+.press-scale:active { transform: scale(0.97); }
 
-/* Hide iOS call-out menus */
-img, a {
-  -webkit-touch-callout: none;
-}
+img, a { -webkit-touch-callout: none; }
 
-/* Fix for iOS keyboard pushing viewport */
 @supports (-webkit-touch-callout: none) {
-  .fixed-bottom {
-    position: fixed;
-    bottom: 0;
-    bottom: env(safe-area-inset-bottom);
-  }
+  .fixed-bottom { position: fixed; bottom: 0; bottom: env(safe-area-inset-bottom); }
 }
 
-/* Prevent text selection on UI elements */
-button, nav, .no-select {
-  -webkit-user-select: none;
-  user-select: none;
-}
+button, nav, .no-select { -webkit-user-select: none; user-select: none; }
 
 /* Focus rings — accessibility */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid #2A63E2;
+  outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 /* Card hover lift */
 .card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform var(--duration-base) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out),
+              border-color var(--duration-base) var(--ease-out);
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Respect reduced motion */
@@ -171,42 +240,35 @@ button, nav, .no-select {
   }
 }
 
-/* Dark mode blanket overrides — apply once, cover all pages. */
-html.dark .bg-white { background-color: #0F172A !important; }
-html.dark .bg-slate-50 { background-color: #111827 !important; }
-html.dark .bg-slate-50\/50 { background-color: rgba(17,24,39,0.5) !important; }
-html.dark .bg-slate-100 { background-color: #1E293B !important; }
-html.dark .bg-slate-900\/60 { background-color: rgba(15,23,42,0.6) !important; }
+/* ─────────────────────────────────────────────────────────────────────────────
+   DEPRECATED transition shim — pages still using `bg-white` / `text-slate-900`
+   etc. need dark-mode coverage until they migrate to semantic utilities
+   (`bg-card` / `text-fg`). Phase 4 of the design-system rollout removes this
+   block once every page is refactored.
+   ─────────────────────────────────────────────────────────────────────────── */
+html.dark .bg-white         { background-color: hsl(var(--bg-elevated)) !important; }
+html.dark .bg-slate-50      { background-color: hsl(var(--bg-muted))    !important; }
+html.dark .bg-slate-50\/50  { background-color: hsl(var(--bg-muted) / 0.5) !important; }
+html.dark .bg-slate-100     { background-color: hsl(var(--bg-muted))    !important; }
+html.dark .bg-slate-900\/60 { background-color: hsl(var(--bg) / 0.6)    !important; }
 
-html.dark .text-slate-900 { color: #F1F5F9 !important; }
-html.dark .text-slate-800 { color: #E2E8F0 !important; }
-html.dark .text-slate-700 { color: #CBD5E1 !important; }
-html.dark .text-slate-600 { color: #94A3B8 !important; }
-html.dark .text-slate-500 { color: #94A3B8 !important; }
-html.dark .text-slate-400 { color: #64748B !important; }
+html.dark .text-slate-900 { color: hsl(var(--fg))         !important; }
+html.dark .text-slate-800 { color: hsl(var(--fg))         !important; }
+html.dark .text-slate-700 { color: hsl(var(--fg-muted))   !important; }
+html.dark .text-slate-600 { color: hsl(var(--fg-muted))   !important; }
+html.dark .text-slate-500 { color: hsl(var(--fg-subtle))  !important; }
+html.dark .text-slate-400 { color: hsl(var(--fg-disabled))!important; }
 
-html.dark .border-slate-200 { border-color: #1E293B !important; }
-html.dark .border-slate-100 { border-color: #1E293B !important; }
-html.dark .border-slate-300 { border-color: #334155 !important; }
-html.dark .border-slate-200\/60 { border-color: rgba(30,41,59,0.6) !important; }
+html.dark .border-slate-200      { border-color: hsl(var(--border))        !important; }
+html.dark .border-slate-100      { border-color: hsl(var(--border))        !important; }
+html.dark .border-slate-300      { border-color: hsl(var(--border-strong)) !important; }
+html.dark .border-slate-200\/60  { border-color: hsl(var(--border) / 0.6)  !important; }
 
-html.dark .bg-\[\#F3F5F9\] { background-color: #0B1220 !important; }
-html.dark .bg-\[\#F7F8FA\] { background-color: #0B1220 !important; }
+html.dark .bg-\[\#F3F5F9\] { background-color: hsl(var(--bg)) !important; }
+html.dark .bg-\[\#F7F8FA\] { background-color: hsl(var(--bg)) !important; }
 
-/* Keep tinted status bg readable */
-html.dark .bg-emerald-50 { background-color: rgba(16,185,129,0.12) !important; }
-html.dark .bg-red-50     { background-color: rgba(239,68,68,0.12)  !important; }
-html.dark .bg-amber-50   { background-color: rgba(245,158,11,0.12) !important; }
-html.dark .bg-blue-50    { background-color: rgba(42,99,226,0.15)  !important; }
-
-/* Dark scrollbar */
-html.dark ::-webkit-scrollbar { width: 10px; height: 10px; }
-html.dark ::-webkit-scrollbar-track { background: #0B1220; }
-html.dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 8px; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
-
-/* Light scrollbar polish */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-::-webkit-scrollbar-track { background: transparent; }
+/* Status tints stay readable */
+html.dark .bg-emerald-50 { background-color: hsl(var(--success-soft)) !important; }
+html.dark .bg-red-50     { background-color: hsl(var(--danger-soft))  !important; }
+html.dark .bg-amber-50   { background-color: hsl(var(--warning-soft)) !important; }
+html.dark .bg-blue-50    { background-color: hsl(var(--info-soft))    !important; }
