@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   User, Shield, Bot, Palette, Download, Upload, Trash2, Check, AlertCircle,
   Key, Globe, Bell, Moon, Sun, Save, Crown, CreditCard, Sparkles, Zap, ArrowRight,
+  Plug, Copy as CopyIcon, ExternalLink,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
@@ -269,6 +270,9 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {/* MCP server */}
+        <McpServerCard />
+
         {/* Data */}
         <Card icon={Download} title="Data management" className="lg:col-span-3">
           <div className="grid gap-3 md:grid-cols-3">
@@ -431,6 +435,111 @@ function PlanBillingCard() {
         </div>
       </div>
     </div>
+  );
+}
+
+function McpServerCard() {
+  const [origin, setOrigin] = useState('https://filey.ae');
+  const [token, setToken] = useState('');
+  const [copied, setCopied] = useState('');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setOrigin(window.location.origin);
+    try { setToken(localStorage.getItem('filey.web.mcpToken') || ''); } catch {}
+  }, []);
+  const url = `${origin}/api/mcp`;
+  const generate = () => {
+    const t = `fky_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
+    setToken(t);
+    try { localStorage.setItem('filey.web.mcpToken', t); } catch {}
+  };
+  const clearToken = () => { setToken(''); try { localStorage.removeItem('filey.web.mcpToken'); } catch {} };
+  const claudeConfig = JSON.stringify({
+    mcpServers: {
+      filey: {
+        url,
+        ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      },
+    },
+  }, null, 2);
+  const cliCmd = `claude mcp add filey ${url}${token ? ` --header "Authorization: Bearer ${token}"` : ''}`;
+  const copy = (label, text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label); setTimeout(() => setCopied(''), 1500);
+  };
+  return (
+    <Card icon={Plug} title="MCP server — let Claude drive Filey" className="lg:col-span-3">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Filey ships a Model Context Protocol endpoint at <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-800">/api/mcp</code>.
+            Plug it into Claude Desktop, Claude Code, Cursor, or any MCP-aware client and it gets a UAE-aware finance toolbelt — VAT math, TRN validation, merchant categorisation, invoice totals, receipt parsing, and BYOK vision extraction.
+          </p>
+          <p className="mt-3 text-xs text-slate-500">
+            All tools are <strong>stateless</strong>. Filey never reads your ledger from the server — pass any data inline. Add an optional bearer token below if you self-host on the public internet.
+          </p>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Endpoint</div>
+            <div className="mt-1 flex items-center gap-2">
+              <code className="flex-1 rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs dark:bg-slate-800">{url}</code>
+              <button onClick={() => copy('url', url)} className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50">
+                {copied === 'url' ? <Check className="h-4 w-4 text-emerald-600" /> : <CopyIcon className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bearer token (optional)</div>
+            <div className="mt-1 flex items-center gap-2">
+              <code className="flex-1 truncate rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs dark:bg-slate-800">{token || '(no token — endpoint is open)'}</code>
+              {token ? (
+                <>
+                  <button onClick={() => copy('token', token)} className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50">
+                    {copied === 'token' ? <Check className="h-4 w-4 text-emerald-600" /> : <CopyIcon className="h-4 w-4" />}
+                  </button>
+                  <button onClick={clearToken} className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <button onClick={generate} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm" style={{ background: BRAND }}>
+                  <Sparkles className="h-3.5 w-3.5" /> Generate
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Token is stored in <code>localStorage</code> only. To enforce it on the public deploy, also set <code>MCP_TOKEN</code> as an env var on the server.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Claude Desktop config</span>
+            <button onClick={() => copy('json', claudeConfig)} className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-900">
+              {copied === 'json' ? <Check className="h-3 w-3 text-emerald-600" /> : <CopyIcon className="h-3 w-3" />} Copy
+            </button>
+          </div>
+          <pre className="overflow-x-auto rounded-xl bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-100"><code>{claudeConfig}</code></pre>
+          <p className="mt-1 text-[11px] text-slate-500">Add to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> on macOS or <code>%APPDATA%\Claude\claude_desktop_config.json</code> on Windows.</p>
+        </div>
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Claude Code (one-liner)</span>
+            <button onClick={() => copy('cli', cliCmd)} className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-900">
+              {copied === 'cli' ? <Check className="h-3 w-3 text-emerald-600" /> : <CopyIcon className="h-3 w-3" />} Copy
+            </button>
+          </div>
+          <pre className="overflow-x-auto rounded-xl bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-100"><code>{cliCmd}</code></pre>
+          <a href={`${origin}/api/mcp`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: BRAND }}>
+            <ExternalLink className="h-3 w-3" /> Probe endpoint
+          </a>
+        </div>
+      </div>
+    </Card>
   );
 }
 
