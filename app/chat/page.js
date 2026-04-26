@@ -15,6 +15,7 @@ import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
 import { useLocalList, SEED_THREADS, SEED_MESSAGES, formatWhen, buildFinanceContext } from '@/lib/webStore';
 import { readAttachment, attachmentSupport } from '@/lib/chatAttachments';
+import { parseSlash, lookupCommand, suggestionsFor, COMMANDS } from '@/lib/chatCommands';
 import { toast } from 'sonner';
 
 const SUGGESTIONS = [
@@ -51,9 +52,16 @@ function ChatInner() {
   const [abortCtrl, setAbortCtrl] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [slashIdx, setSlashIdx] = useState(0);
   const listRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  // When user fires a new message mid-stream, the in-flight stream aborts
+  // and the queued payload runs in the abort-handler tail.
+  const queuedSendRef = useRef(null);
+
+  const slashSuggestions = draft.startsWith('/') ? suggestionsFor(draft) : [];
+  const showSlash = slashSuggestions.length > 0;
 
   useEffect(() => { setAi(loadAI()); }, []);
   useEffect(() => { if (!activeId && threads.length) setActiveId(threads[0].id); }, [threads, activeId]);
@@ -141,9 +149,83 @@ function ChatInner() {
 
   const removeAtt = (id) => setPendingAtts((prev) => prev.filter(a => a.id !== id));
 
+  // Append a synthetic assistant message (no API call) — used by /help, /model etc.
+  const appendSystem = useCallback((mdText) => {
+    const sys = { id: `s_${Date.now()}`, role: 'assistant', content: mdText, ts: Date.now(), system: true };
+    persist([...messages, sys]);
+  }, [messages, persist]);
+
+  // Run a slash command. Returns true if handled (caller should stop).
+  const runSlashCommand = useCallback(async (raw) => {
+    const parsed = parseSlash(raw); if (!parsed) return false;
+    const cmd = lookupCommand(parsed.name);
+    if (!cmd) {
+      appendSystem(`⚠ Unknown command: \`/${parsed.name}\`. Try \`/help\`.`);
+      setDraft('');
+      return true;
+    }
+    const result = await cmd.run({ rest: parsed.rest, ctx: { messages, activeId } });
+    setDraft('');
+    switch (result?.kind) {
+      case 'navigate':
+        router.push(result.url);
+        break;
+      case 'inject':
+        setDraft(result.text || '');
+        setTimeout(() => textareaRef.current?.focus(), 30);
+        break;
+      case 'send':
+        // Defer one tick so the draft state clears before send() reads it
+        setTimeout(() => send(result.text), 0);
+        break;
+      case 'system':
+        appendSystem(result.text || '');
+        break;
+      case 'patch-ai': {
+        try {
+          const prev = JSON.parse(localStorage.getItem('filey.web.ai') || '{}');
+          const next = { ...prev, ...(result.patch || {}) };
+          localStorage.setItem('filey.web.ai', JSON.stringify(next));
+          setAi(next);
+        } catch {}
+        if (result.system) appendSystem(result.system);
+        break;
+      }
+      case 'clear-thread':
+        if (activeId) {
+          try { localStorage.removeItem(`filey.web.msgs.${activeId}`); } catch {}
+        }
+        setMessages([]);
+        break;
+      case 'new-thread':
+        newThread();
+        break;
+      default:
+        break;
+    }
+    return true;
+  }, [appendSystem, messages, activeId, router]);
+
   const send = async (text) => {
     const content = (text || draft).trim();
-    if ((!content && pendingAtts.length === 0) || sending) return;
+
+    // Slash commands take priority over the LLM round-trip
+    if (content.startsWith('/') && !text /* only intercept user-typed text */) {
+      const handled = await runSlashCommand(content);
+      if (handled) return;
+    }
+
+    if (!content && pendingAtts.length === 0) return;
+
+    // Interrupt-on-send: if the assistant is mid-stream and the user fires
+    // another message, queue the new payload and abort the current stream.
+    // The abort handler in the in-flight send() will dequeue and recurse.
+    if (sending && abortCtrl) {
+      queuedSendRef.current = { content, attachments: pendingAtts };
+      setDraft(''); setPendingAtts([]);
+      abortCtrl.abort();
+      return;
+    }
 
     const cfg = loadAI();
     if (!cfg?.apiKey) {
@@ -206,9 +288,25 @@ function ChatInner() {
       if (e.name !== 'AbortError') {
         persist([...baseline, { ...asstMsg, content: `⚠ ${String(e)}`, streaming: false, error: true }]);
       } else {
-        persist((prev => prev.map(m => m.id === asstId ? { ...m, streaming: false, content: m.content + '\n\n_(stopped)_' } : m))(messages));
+        // Strip the empty placeholder if the abort happened before any token
+        // streamed back; otherwise mark the partial response as stopped.
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.id === asstId && !last.content) return prev.slice(0, -1);
+          return prev.map(m => m.id === asstId ? { ...m, streaming: false, content: (m.content || '') + '\n\n_(interrupted)_' } : m);
+        });
       }
-    } finally { setSending(false); setAbortCtrl(null); }
+    } finally {
+      setSending(false); setAbortCtrl(null);
+      // If a queued send is waiting (from interrupt-on-typing), fire it now.
+      const queued = queuedSendRef.current;
+      if (queued) {
+        queuedSendRef.current = null;
+        setPendingAtts(queued.attachments || []);
+        // Defer one tick so React commits the cleared state before send re-runs.
+        setTimeout(() => send(queued.content), 0);
+      }
+    }
   };
 
   const stop = () => { abortCtrl?.abort(); };
@@ -217,7 +315,7 @@ function ChatInner() {
 
   const activeThread = threads.find(t => t.id === activeId);
   const hasKey = !!ai?.apiKey;
-  const providerLabel = ai?.provider ? ({ anthropic: 'Claude', openai: 'GPT', google: 'Gemini', groq: 'Groq', mistral: 'Mistral', openrouter: 'OpenRouter', together: 'Together', ollama: 'Ollama', 'openai-compat': 'Custom' }[ai.provider] || ai.provider) : 'Not configured';
+  const providerLabel = ai?.provider ? ({ anthropic: 'Claude', openai: 'GPT', google: 'Gemini', groq: 'Groq', mistral: 'Mistral', openrouter: 'OpenRouter', together: 'Together', ollama: 'Ollama', 'ollama-cloud': 'Ollama Cloud', 'openai-compat': 'Custom' }[ai.provider] || ai.provider) : 'Not configured';
 
   return (
     <Shell title="Chat AI" subtitle={hasKey ? `Connected to ${providerLabel} · ${ai.model || ''}` : 'No AI brain connected — set one in Settings'}>
@@ -320,16 +418,57 @@ function ChatInner() {
                 </div>
               )}
               <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:border-slate-700 dark:bg-slate-800">
+                {/* Slash autocomplete */}
+                {showSlash && (
+                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                    <div className="border-b border-slate-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Slash commands · ↑↓ to pick · Tab/Enter to apply · Esc to cancel</div>
+                    {slashSuggestions.map((c, i) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onMouseEnter={() => setSlashIdx(i)}
+                        onClick={() => {
+                          setDraft(`/${c.name}${c.args ? ' ' : ''}`);
+                          setTimeout(() => textareaRef.current?.focus(), 10);
+                        }}
+                        className={`flex w-full cursor-pointer items-start gap-3 px-3 py-2 text-left text-sm transition ${i === slashIdx ? 'bg-slate-50 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      >
+                        <span className="font-mono text-xs font-bold" style={{ color: BRAND }}>/{c.name}</span>
+                        {c.args && <span className="font-mono text-[11px] text-slate-400">{c.args}</span>}
+                        <span className="ml-auto text-xs text-slate-500">{c.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   ref={textareaRef}
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  onChange={(e) => { setDraft(e.target.value); setSlashIdx(0); }}
+                  onKeyDown={(e) => {
+                    if (showSlash) {
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIdx(i => Math.min(i + 1, slashSuggestions.length - 1)); return; }
+                      if (e.key === 'ArrowUp')   { e.preventDefault(); setSlashIdx(i => Math.max(i - 1, 0)); return; }
+                      if (e.key === 'Tab')       { e.preventDefault(); const c = slashSuggestions[slashIdx]; if (c) setDraft(`/${c.name}${c.args ? ' ' : ''}`); return; }
+                      if (e.key === 'Escape')    { e.preventDefault(); setDraft(''); return; }
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (showSlash) {
+                        // If exact match exists, just submit; otherwise apply highlighted suggestion.
+                        const exact = slashSuggestions.find(s => `/${s.name}` === draft.split(/\s/)[0]);
+                        if (!exact) {
+                          const c = slashSuggestions[slashIdx];
+                          if (c) { setDraft(`/${c.name}${c.args ? ' ' : ''}`); return; }
+                        }
+                      }
+                      send();
+                    }
+                  }}
                   onPaste={(e) => {
                     const files = Array.from(e.clipboardData?.files || []);
                     if (files.length) { e.preventDefault(); addFiles(files); }
                   }}
-                  placeholder={hasKey ? (dragOver ? 'Drop files to attach…' : 'Message Filey AI…  (Shift+Enter for newline · paste or drop files)') : 'Set an API key in Settings to start chatting'}
+                  placeholder={hasKey ? (dragOver ? 'Drop files to attach…' : 'Message Filey AI…  (Shift+Enter for newline · / for commands · paste or drop files)') : 'Set an API key in Settings to start chatting'}
                   rows={1}
                   className="block w-full resize-none rounded-2xl bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none placeholder-slate-400 dark:text-slate-100"
                   style={{ minHeight: 52 }}
@@ -357,7 +496,7 @@ function ChatInner() {
                   className="hidden"
                 />
                 {sending ? (
-                  <button onClick={stop} aria-label="Stop" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90" style={{ background: '#1E293B' }}>
+                  <button onClick={stop} aria-label="Stop" title="Stop the response (or just type a new message to interrupt)" className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-white shadow-sm transition hover:opacity-90" style={{ background: '#1E293B' }}>
                     <Square className="h-4 w-4" />
                   </button>
                 ) : (
