@@ -255,7 +255,7 @@ export default function TeamScreen({ darkMode }) {
         {tab === 'transactions' ? (
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 20 }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
             showsVerticalScrollIndicator={false}
           >
             {transactions.length === 0 && (
@@ -308,7 +308,7 @@ export default function TeamScreen({ darkMode }) {
             <ScrollView
               ref={chatRef}
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 20, paddingBottom: 20 }}
+              contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: true })}
             >
@@ -358,7 +358,7 @@ export default function TeamScreen({ darkMode }) {
 
             <View style={[styles.inputBar, {
               backgroundColor: c.card, borderColor: c.borderSubtle,
-              marginBottom: insets.bottom + 8, marginHorizontal: 16,
+              marginBottom: Platform.OS === 'ios' ? 102 : 92, marginHorizontal: 16,
             }]}>
               <TextInput
                 value={chatInput}

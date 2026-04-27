@@ -828,7 +828,7 @@ HARD RULES:
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140, paddingTop: 12 }}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
@@ -1030,7 +1030,7 @@ HARD RULES:
           onAttach={() => setShowAttach(true)}
           loading={loading}
           placeholder="Ask Filey AI anything…"
-          bottomOffset={Platform.OS === 'ios' ? 4 : 4}
+          bottomOffset={Platform.OS === 'ios' ? 102 : 92}
         />
       </View>
 

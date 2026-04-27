@@ -197,7 +197,7 @@ export default function ChatInputBox({
   const sendBg = hasContent && !loading && !isRecording ? PRIMARY : BG_ELEVATED;
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 4) + bottomOffset }]}>
+    <View style={[styles.container, { paddingBottom: bottomOffset }]}>
       <View style={styles.box}>
         {/* Text Input */}
         <View style={styles.inputWrap}>
