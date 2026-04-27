@@ -142,7 +142,6 @@ export default function AIMessagingHub(props) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showAttach, setShowAttach] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [showVatSummary, setShowVatSummary] = useState(false);
   const [activeThread, setActiveThread] = useState(null);
@@ -486,7 +485,6 @@ HARD RULES:
   }, [loading, messages, runTurn]);
 
   const runScan = useCallback(async (source) => {
-    setShowAttach(false);
     setScanning(true);
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     pushMessage({
@@ -526,7 +524,6 @@ HARD RULES:
   }, [pushMessage]);
 
   const runPdfPicker = useCallback(async () => {
-    setShowAttach(false);
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     try {
       const res = await DocumentPicker.getDocumentAsync({
@@ -717,7 +714,6 @@ HARD RULES:
   }, [pushMessage, dedupGuard, submitterName]);
 
   const runMergeScan = useCallback(async () => {
-    setShowAttach(false);
     setScanning(true);
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     pushMessage({ role: 'system', content: 'Multi-page merge — pick 2-6 pages of one invoice.' });
@@ -743,7 +739,6 @@ HARD RULES:
   }, [pushMessage]);
 
   const runBulkScan = useCallback(async () => {
-    setShowAttach(false);
     setScanning(true);
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     pushMessage({ role: 'system', content: 'Bulk scan started. Pick up to 20 receipts.' });
@@ -1027,58 +1022,14 @@ HARD RULES:
           value={input}
           onChangeText={setInput}
           onSend={(msg, files) => send(msg)}
-          onAttach={() => setShowAttach(true)}
+          onCamera={() => runScan('camera')}
+          onPhotos={() => runScan('gallery')}
+          onFileUpload={runPdfPicker}
           loading={loading}
           placeholder="Ask Filey AI anything…"
           bottomOffset={Platform.OS === 'ios' ? 102 : 92}
         />
       </View>
-
-      <Modal visible={showAttach} transparent animationType="slide" onRequestClose={() => setShowAttach(false)}>
-        <Pressable style={styles.attachBackdrop} onPress={() => setShowAttach(false)}>
-          <Pressable style={styles.attachSheet} onPress={() => {}}>
-            <View style={styles.attachHandle} />
-            <Text style={styles.attachTitle}>Add to chat</Text>
-
-            <SpringPressable onPress={() => runScan('camera')} style={styles.attachRow}>
-              <View style={[styles.attachIcon, { backgroundColor: '#2A63E2' }]}>
-                <Ionicons name="camera" size={20} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachLabel}>Camera</Text>
-                <Text style={styles.attachSub}>Scan a receipt or invoice</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(0,0,0,0.25)" />
-            </SpringPressable>
-
-            <SpringPressable onPress={() => runScan('gallery')} style={styles.attachRow}>
-              <View style={[styles.attachIcon, { backgroundColor: '#8B5CF6' }]}>
-                <Ionicons name="images" size={20} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachLabel}>Photo Library</Text>
-                <Text style={styles.attachSub}>Pick an image from Photos</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(0,0,0,0.25)" />
-            </SpringPressable>
-
-            <SpringPressable onPress={runPdfPicker} style={styles.attachRow}>
-              <View style={[styles.attachIcon, { backgroundColor: '#16A34A' }]}>
-                <Ionicons name="document-text" size={20} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachLabel}>Files</Text>
-                <Text style={styles.attachSub}>PDF invoices or documents</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(0,0,0,0.25)" />
-            </SpringPressable>
-
-            <Pressable onPress={() => setShowAttach(false)} style={styles.attachCancel}>
-              <Text style={styles.attachCancelText}>Cancel</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <VatSummaryModal visible={showVatSummary} onClose={() => setShowVatSummary(false)} />
       <ThreadPicker
@@ -1340,37 +1291,4 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  attachBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  attachSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28,
-    gap: 8,
-    borderTopWidth: 1, borderColor: Colors.light.border,
-  },
-  attachHandle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: Colors.light.border,
-    alignSelf: 'center', marginVertical: 8,
-  },
-  attachTitle: { color: Colors.light.text, fontSize: 17, fontWeight: '700', letterSpacing: -0.3, marginBottom: 8 },
-  attachRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: Colors.light.card,
-    padding: 14, borderRadius: 14,
-    borderWidth: 1, borderColor: Colors.light.borderSubtle,
-  },
-  attachIcon: {
-    width: 42, height: 42, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  attachLabel: { color: Colors.light.text, fontSize: 15, fontWeight: '700' },
-  attachSub: { color: Colors.light.textSecondary, fontSize: 12, marginTop: 2 },
-  attachCancel: {
-    marginTop: 8, paddingVertical: 14,
-    alignItems: 'center', borderRadius: 14,
-    backgroundColor: Colors.light.cardElevated,
-    borderWidth: 1, borderColor: Colors.light.border,
-  },
-  attachCancelText: { color: Colors.light.text, fontSize: 15, fontWeight: '600' },
 });
