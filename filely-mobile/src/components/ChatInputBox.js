@@ -8,14 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-const BG = '#1F2023';
-const BG_ELEVATED = '#2E3033';
-const BORDER = '#333333';
-const BORDER_SUBTLE = 'rgba(255,255,255,0.08)';
-const TEXT_PRIMARY = '#FFFFFF';
-const TEXT_SECONDARY = 'rgba(255,255,255,0.72)';
-const TEXT_MUTED = '#9CA3AF';
-const PRIMARY = '#FFFFFF';
+const BG = '#FFFFFF';
+const BG_ELEVATED = '#F8FAFC';
+const BORDER = 'rgba(11,20,53,0.08)';
+const BORDER_SUBTLE = 'rgba(11,20,53,0.06)';
+const TEXT_PRIMARY = '#0B1435';
+const TEXT_SECONDARY = 'rgba(11,20,53,0.65)';
+const TEXT_MUTED = '#94A3B8';
+const PRIMARY = '#2A63E2';
 
 function AnimatedIcon({ name, size, color, active, activeColor }) {
   const rotation = useRef(new Animated.Value(0)).current;
@@ -193,11 +193,11 @@ export default function ChatInputBox({
   };
 
   const sendIcon = loading ? 'stop' : isRecording ? 'stop-circle' : hasContent ? 'arrow-up' : 'mic';
-  const sendColor = loading || isRecording ? '#EF4444' : hasContent ? '#1F2023' : '#9CA3AF';
+  const sendColor = loading || isRecording ? '#EF4444' : hasContent ? '#FFFFFF' : '#9CA3AF';
   const sendBg = hasContent && !loading && !isRecording ? PRIMARY : BG_ELEVATED;
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) + 8 + bottomOffset }]}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 4) + bottomOffset }]}>
       <View style={styles.box}>
         {/* Text Input */}
         <View style={styles.inputWrap}>
@@ -302,11 +302,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.24,
-    shadowRadius: 30,
-    elevation: 8,
+    shadowColor: '#0B1435',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   inputWrap: {
     minHeight: 44,

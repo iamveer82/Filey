@@ -990,7 +990,7 @@ HARD RULES:
       </ScrollView>
       </ErrorBoundary>
 
-      <View style={[styles.composer, { paddingBottom: 8 }]}>
+      <View style={styles.composer}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1293,9 +1293,9 @@ const styles = StyleSheet.create({
 
   composer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-    paddingTop: 8,
-    backgroundColor: 'transparent',
+    borderTopColor: 'rgba(11,20,53,0.06)',
+    paddingTop: 6,
+    backgroundColor: '#FFFFFF',
   },
   quickRow: {
     paddingHorizontal: 16, paddingBottom: 10,
