@@ -45,7 +45,15 @@ import TeamScreen from './src/screens/TeamScreen';
 import ComplianceVault from './src/screens/ComplianceVault';
 import ServicesScreen from './src/screens/ServicesScreen';
 import ScannerScreen from './src/screens/ScannerScreen';
+import SignatureScreen from './src/screens/SignatureScreen';
+import ExportScreen from './src/screens/ExportScreen';
+import MergePdfScreen from './src/screens/MergePdfScreen';
+import ProtectPDFScreen from './src/screens/ProtectPDFScreen';
+import WatermarkPDFScreen from './src/screens/WatermarkPDFScreen';
+import CompressPDFScreen from './src/screens/CompressPDFScreen';
+import SplitPDFScreen from './src/screens/SplitPDFScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import TransactionReviewScreen from './src/screens/TransactionReviewScreen';
 
 const Tab = createBottomTabNavigator();
 const ClipStack = createNativeStackNavigator();
@@ -145,7 +153,7 @@ function AnimatedTabIcon({ routeName, focused, darkMode }) {
 
   const icons = TAB_ICONS[routeName];
   const iconName = focused ? icons.active : icons.inactive;
-  const inactiveColor = darkMode ? 'rgba(255,255,255,0.35)' : '#94A3B8';
+  const inactiveColor = darkMode ? 'rgba(255,255,255,0.35)' : '#0F172A';
 
   return (
     <View style={tabIconStyles.wrapper}>
@@ -203,10 +211,10 @@ const tabIconStyles = StyleSheet.create({
 function CustomTabBar({ state, descriptors, navigation, darkMode }) {
   const barBg = darkMode
     ? 'rgba(14, 19, 35, 0.88)'
-    : 'rgba(255, 255, 255, 0.82)';
+    : '#FFFFFF';
   const barBorder = darkMode
     ? 'rgba(255,255,255,0.06)'
-    : 'rgba(15,23,42,0.06)';
+    : 'rgba(15,23,42,0.10)';
   const barShadowColor = darkMode ? '#2A63E2' : '#000000';
 
   return (
@@ -257,7 +265,7 @@ function CustomTabBar({ state, descriptors, navigation, darkMode }) {
               onPress={onPress}
               onLongPress={onLongPress}
               style={customBarStyles.tab}
-              android_ripple={{ color: 'rgba(68,229,113,0.15)', borderless: true }}
+              android_ripple={{ color: darkMode ? 'rgba(68,229,113,0.15)' : 'rgba(15,23,42,0.10)', borderless: true }}
             >
               <AnimatedTabIcon
                 routeName={route.name}
@@ -427,7 +435,7 @@ function AppContent() {
   // ── Main tab navigator ──────────────────────────────────────────────────────
 
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <NavigationContainer theme={theme}>
         <Tab.Navigator
@@ -477,6 +485,62 @@ function AppContent() {
                   }}
                 />
                 <ClipStack.Screen
+                  name="Signature"
+                  component={SignatureScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Export"
+                  component={ExportScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Merge"
+                  component={MergePdfScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Protect"
+                  component={ProtectPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Watermark"
+                  component={WatermarkPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Compress"
+                  component={CompressPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Split"
+                  component={SplitPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
                   name="TransactionReview"
                   component={TransactionReviewScreen}
                   options={{
@@ -497,7 +561,7 @@ function AppContent() {
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
-    </SafeAreaProvider>
+    </>
   );
 }
 
@@ -521,9 +585,11 @@ const headerStyles = StyleSheet.create({
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

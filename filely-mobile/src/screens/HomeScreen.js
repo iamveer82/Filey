@@ -41,8 +41,6 @@ import { useFocusEffect } from '@react-navigation/native';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 const TABS = ['Dashboard', 'Cards', 'Analytics', 'Recurring'];
 
 const RECENT_SEND = [
@@ -564,11 +562,6 @@ export default function HomeScreen({ navigation, darkMode = true }) {
     [metricIds]
   );
 
-  const fabScale = useSharedValue(1);
-  const fabStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }],
-  }));
-
   const balance = useMemo(() => 'AED 365,500', []);
 
   const [bills, setBills] = useState([]);
@@ -899,19 +892,6 @@ export default function HomeScreen({ navigation, darkMode = true }) {
           )}
         </View>
       </ScrollView>
-
-      {/* Floating New Payment FAB */}
-      <View pointerEvents="box-none" style={styles.fabWrap}>
-        <AnimatedPressable
-          onPressIn={() => { fabScale.value = withSpring(0.94, { damping: 14, stiffness: 240 }); }}
-          onPressOut={() => { fabScale.value = withSpring(1, { damping: 14, stiffness: 240 }); }}
-          onPress={() => navigation?.navigate?.('NewPayment')}
-          style={[styles.fab, fabStyle]}
-        >
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.fabText}>New Payment</Text>
-        </AnimatedPressable>
-      </View>
 
       <CustomizeSheet
         visible={showCustomize}
@@ -1626,33 +1606,6 @@ const styles = StyleSheet.create({
   bodyMuted: {
     color: 'rgba(11,20,53,0.58)',
     fontSize: 13,
-  },
-  fabWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 24,
-    alignItems: 'center',
-  },
-  fab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 160,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2A63E2',
-    shadowColor: '#2A63E2',
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  fabText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    marginLeft: 6,
   },
   emptyCarousel: {
     alignItems: 'center', justifyContent: 'center',

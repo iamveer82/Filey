@@ -9,6 +9,7 @@
  */
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import api from '../api/client';
 import { recognizeText, isOcrAvailable } from './visionOcr';
 import { compressIfLarge } from './imageCompressor';
 import { parseHijriDate } from './hijriDate';
@@ -73,14 +74,42 @@ export async function scanReceipt(source = 'gallery') {
         imageMimeType: asset.mimeType || 'image/jpeg',
       };
     } else {
-      // No native Vision module yet — try using base64 with backend
-      console.warn('[ReceiptPipeline] Vision OCR not available. Image captured but text extraction requires native module.');
+      // No native Vision module — try backend AI OCR
+      console.warn('[ReceiptPipeline] Vision OCR not available. Falling back to backend AI scan.');
+      try {
+        const backend = await api.scanReceipt(asset.base64, asset.mimeType || 'image/jpeg');
+        if (backend?.transaction) {
+          return {
+            success: true,
+            transaction: {
+              id: generateId(),
+              merchant: backend.transaction.merchant,
+              date: backend.transaction.date,
+              amount: backend.transaction.amount,
+              vat: backend.transaction.vat,
+              trn: backend.transaction.trn,
+              currency: backend.transaction.currency || 'AED',
+              category: backend.transaction.category,
+              paymentMethod: backend.transaction.paymentMethod,
+              status: 'pending',
+            },
+            imageUri: workingUri,
+            ocrText: backend.ocrText || '',
+            ocrConfidence: backend.confidence || 0,
+            compressed: compressed.compressed,
+          };
+        }
+      } catch (e) {
+        console.warn('[ReceiptPipeline] Backend scan failed:', e.message);
+      }
+      // Backend unavailable — return image so chat can display it
       return {
         success: false,
-        error: 'OCR text extraction requires a native module. Falling back to manual entry.',
+        error: 'OCR unavailable. Image uploaded to chat for manual review.',
         needsBackend: true,
         imageBase64: asset.base64,
         imageMimeType: asset.mimeType || 'image/jpeg',
+        imageUri: workingUri,
       };
     }
 

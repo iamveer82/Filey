@@ -6,17 +6,11 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { convertPdfToWord, convertPdfToExcel, pickPdf } from '../services/pdfConverter';
 import { scanReceipt } from '../services/receiptPipeline';
-import { exportCSV, exportPDF } from '../services/exportLedger';
 import { exportPeppolBatch } from '../services/eInvoiceExport';
 import apiClient from '../api/client';
 import { createShareLink } from '../services/publicShare';
 import { useAuth } from '../context/AuthContext';
 import { listFiles, addFile, removeFile, subscribeFiles, formatWhen } from '../services/recentFiles';
-import { removeWatermarkInteractive } from '../services/watermarkRemover';
-import { signDocument } from '../services/esign';
-import { mergePdfsInteractive } from '../services/pdfMerger';
-import { compressPdfInteractive } from '../services/pdfCompressor';
-import { scanDocument, scanMultiPageDocument } from '../services/documentScanner';
 
 const BRAND = '#2A63E2';
 
@@ -98,106 +92,31 @@ export default function ServicesScreen({ navigation }) {
           break;
         }
         case 'sign': {
-          const res = await signDocument();
-          if (res.success) {
-            await addFile({ name: `Signed-${Date.now()}.pdf`, kind: 'pdf', uri: res.outputUri });
-            Alert.alert('Success', res.message || 'Document signed!');
-          } else if (res.error) {
-            Alert.alert('eSign failed', res.error);
-          }
+          navigation.navigate('Signature');
           break;
         }
         case 'watermark': {
-          const res = await removeWatermarkInteractive();
-          if (res.success) {
-            if (res.outputUri) {
-              await addFile({ name: `Cleaned-${Date.now()}.png`, kind: 'image', uri: res.outputUri });
-            }
-            Alert.alert('Watermark', res.message || res.error || 'Done');
-          } else if (res.error) {
-            Alert.alert('Watermark failed', res.error);
-          }
+          navigation.navigate('Watermark');
           break;
         }
         case 'split': {
-          const { splitPdfsInteractive } = require('../services/pdfMerger');
-          const pick = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
-          if (pick.canceled || !pick.assets?.[0]) break;
-          const pdf = pick.assets[0];
-          // Default: split in half
-          const { NativeModules } = require('react-native');
-          const NativePdfTools = NativeModules.PdfTools;
-          let pageCount = 1;
-          if (NativePdfTools) {
-            try { const info = await NativePdfTools.getPageCount(pdf.uri); pageCount = info.pageCount || 1; } catch {}
-          }
-          const half = Math.ceil(pageCount / 2);
-          const ranges = [
-            { start: 1, end: half },
-            { start: half + 1, end: pageCount },
-          ];
-          const result = await splitPdfsInteractive(pdf.uri, ranges, pdf.name || 'split');
-          if (result.success) {
-            Alert.alert('Split complete', result.message);
-          } else if (result.error) {
-            Alert.alert('Split failed', result.error);
-          }
+          navigation.navigate('Split');
           break;
         }
         case 'merge': {
-          const res = await mergePdfsInteractive();
-          if (res.success) {
-            await addFile({ name: `Merged-${Date.now()}.pdf`, kind: 'pdf', uri: res.outputUri });
-            Alert.alert('Merge successful', res.message);
-          } else if (res.error) {
-            Alert.alert('Merge failed', res.error);
-          }
+          navigation.navigate('Merge');
           break;
         }
         case 'protect': {
-          const protectPick = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
-          if (protectPick.canceled || !protectPick.assets?.[0]) break;
-          const pdf2 = protectPick.assets[0];
-          const { NativeModules } = require('react-native');
-          const NativePdfTools2 = NativeModules.PdfTools;
-          if (NativePdfTools2) {
-            Alert.prompt(
-              'Password Protect',
-              'Enter a password to lock this PDF:',
-              async (password) => {
-                if (!password) return;
-                const res = await NativePdfTools2.protectPdf(
-                  pdf2.uri,
-                  password,           // userPassword
-                  password,           // ownerPassword (same for simplicity)
-                  pdf2.name || 'protected',
-                  {                   // permissions
-                    printing: true,
-                    copying: false,    // disable copy for security
-                    modifying: false,
-                    annotating: true
-                  }
-                );
-                if (res.success) {
-                  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(res.uri, { mimeType: 'application/pdf', dialogTitle: 'Save Protected PDF' });
-                  Alert.alert('Protected', 'PDF locked with password.');
-                }
-              },
-              'secure-text'
-            );
-          } else {
-            Alert.alert('Error', 'Native PDF tools not available.');
-          }
+          navigation.navigate('Protect');
           break;
         }
         case 'compress': {
-          const res = await compressPdfInteractive();
-          if (res.success) {
-            await addFile({ name: `Compressed-${Date.now()}.pdf`, kind: 'pdf', uri: res.outputUri });
-            Alert.alert('Compression successful', res.message);
-          } else if (res.error) {
-            Alert.alert('Compression failed', res.error);
-          }
+          navigation.navigate('Compress');
+          break;
+        }
+        case 'watermark': {
+          navigation.navigate('Watermark');
           break;
         }
         case 'all':
@@ -209,13 +128,7 @@ export default function ServicesScreen({ navigation }) {
           break;
         }
         case 'export': {
-          const list = await apiClient.getTransactions({});
-          const rows = Array.isArray(list) ? list : list?.transactions || [];
-          Alert.alert('Export', `${rows.length} transactions`, [
-            { text: 'CSV', onPress: () => exportCSV(rows, {}) },
-            { text: 'PDF', onPress: () => exportPDF(rows, {}) },
-            { text: 'Cancel', style: 'cancel' },
-          ]);
+          navigation.navigate('Export');
           break;
         }
         case 'peppol': {
@@ -269,6 +182,23 @@ export default function ServicesScreen({ navigation }) {
 
       {/* Blue section: tool grid only */}
       <View style={styles.blueSection}>
+        {/* Search bar */}
+        <Animated.View entering={FadeInUp.duration(400)} style={styles.searchBarHero}>
+          <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.7)" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search tools or files…"
+            placeholderTextColor="rgba(255,255,255,0.55)"
+            style={styles.searchInputHero}
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          )}
+        </Animated.View>
+
         {/* Tool grid - blue background */}
         <View style={styles.scroll}>
           <View style={styles.grid}>
@@ -279,7 +209,7 @@ export default function ServicesScreen({ navigation }) {
                   disabled={busy === t.id}
                   accessibilityRole="button"
                   accessibilityLabel={t.label}
-                  style={({ pressed }) => [styles.toolBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  style={({ pressed }) => [styles.toolBtn, pressed && styles.toolBtnPressed]}
                 >
                   <View style={[styles.toolCircle, { backgroundColor: t.bg }]}>
                     <Ionicons name={t.icon} size={24} color={t.tint} />
@@ -297,7 +227,7 @@ export default function ServicesScreen({ navigation }) {
                   <Pressable
                     onPress={() => handle(t.id)}
                     disabled={busy === t.id}
-                    style={({ pressed }) => [styles.toolBtn, { opacity: pressed ? 0.7 : 1 }]}
+                    style={({ pressed }) => [styles.toolBtn, pressed && styles.toolBtnPressed]}
                   >
                     <View style={[styles.toolCircle, { backgroundColor: t.bg }]}>
                       <Ionicons name={t.icon} size={22} color={t.tint} />
@@ -328,14 +258,18 @@ export default function ServicesScreen({ navigation }) {
             </View>
           )}
 
-          {filteredFiles.map((f) => {
+          {filteredFiles.map((f, i) => {
             const fi = fileIcon(f.kind);
             return (
-              <View key={f.id} style={styles.fileCard}>
-                <View style={styles.fileThumb}>
+              <Animated.View
+                key={f.id}
+                entering={FadeInUp.delay(i * 40).duration(300)}
+                style={[styles.fileCard, { borderLeftWidth: 4, borderLeftColor: fi.tint }]}
+              >
+                <View style={[styles.fileThumb, { backgroundColor: fi.tint + '14' }]}>
                   <Ionicons name={fi.icon} size={22} color={fi.tint} />
                 </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
                   <Text style={styles.fileDate}>{formatWhen(f.ts)}</Text>
                 </View>
@@ -345,7 +279,7 @@ export default function ServicesScreen({ navigation }) {
                 <Pressable hitSlop={8} onPress={() => removeFile(f.id)} style={styles.fileIconBtn}>
                   <Ionicons name="ellipsis-vertical" size={18} color="#0B1435" />
                 </Pressable>
-              </View>
+              </Animated.View>
             );
           })}
 
@@ -425,15 +359,17 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   cell: { width: '25%', paddingHorizontal: 8, marginBottom: 20, alignItems: 'center' },
-  toolBtn: { alignItems: 'center', width: '100%' },
+  toolBtn: { alignItems: 'center', width: '100%', paddingVertical: 4 },
+  toolBtnPressed: { opacity: 0.7 },
   toolCircle: {
     width: 56, height: 56, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 8,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   toolLabel: {
     fontSize: 11.5, fontWeight: '600',
-    color: '#0B1435', textAlign: 'center', lineHeight: 14,
+    color: '#FFFFFF', textAlign: 'center', lineHeight: 14,
   },
 
   recentHeader: {

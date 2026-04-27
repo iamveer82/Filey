@@ -13,8 +13,9 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../theme/colors';
 
-const BRAND = '#2A63E2';
+const BRAND = Colors.dark.primary;
 const CORNER_SIZE = 28;
 const HANDLE_SIZE = 16;
 const STROKE_WIDTH = 3;
@@ -55,6 +56,29 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
   const [hasDetected, setHasDetected] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
   const scanLineAnim = useState(new Animated.Value(0))[0];
+  const scanPulseAnim = useState(new Animated.Value(0.7))[0];
+
+  // Pulse animation for scan line glow
+  useEffect(() => {
+    if (isDetecting) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanPulseAnim, {
+            toValue: 1,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scanPulseAnim, {
+            toValue: 0.7,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      scanPulseAnim.setValue(0.7);
+    }
+  }, [isDetecting]);
 
   // Sync with parent corners
   useEffect(() => {
@@ -185,7 +209,7 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
         </View>
       )}
 
-      {/* Scanning line animation */}
+      {/* Scanning line animation with pulse glow */}
       {isDetecting && hasDetected && (
         <Animated.View
           style={[
@@ -199,6 +223,11 @@ export default function ScannerOverlay({ cameraRef, onDetect, isDetecting, corne
               }],
               width: boundary.width,
               left: boundary.left,
+              opacity: scanPulseAnim,
+              shadowRadius: scanPulseAnim.interpolate({
+                inputRange: [0.7, 1],
+                outputRange: [10, 20],
+              }),
             },
           ]}
         />
@@ -283,7 +312,7 @@ const styles = StyleSheet.create({
     width: HANDLE_SIZE,
     height: HANDLE_SIZE,
     borderRadius: HANDLE_SIZE / 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.dark.text,
     borderWidth: 2.5,
     borderColor: BRAND,
     shadowColor: '#000',
@@ -294,7 +323,7 @@ const styles = StyleSheet.create({
   },
   cornerHandleActive: {
     backgroundColor: BRAND,
-    borderColor: '#FFFFFF',
+    borderColor: Colors.dark.text,
     transform: [{ scale: 1.2 }],
   },
 
@@ -302,11 +331,12 @@ const styles = StyleSheet.create({
   scanLine: {
     position: 'absolute',
     height: 2,
-    backgroundColor: 'rgba(42, 99, 226, 0.8)',
+    backgroundColor: BRAND,
     shadowColor: BRAND,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 10,
+    borderRadius: 1,
   },
 
   // Instructions
@@ -318,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   instructionsText: {
-    color: '#FFFFFF',
+    color: Colors.dark.text,
     fontSize: 15,
     fontWeight: '500',
     textShadowColor: 'rgba(0,0,0,0.7)',

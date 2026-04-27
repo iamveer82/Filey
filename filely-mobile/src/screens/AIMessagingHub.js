@@ -37,11 +37,15 @@ import { pickPdf, convertPdfToWord, convertPdfToExcel } from '../services/pdfCon
 import { seedVersion } from '../services/txVersioning';
 import ThreadPicker from '../components/ThreadPicker';
 import ErrorBoundary from '../components/ErrorBoundary';
+import ChatInputBox from '../components/ChatInputBox';
 import {
   ensureActiveThread, msgKey, memKey, setActiveThreadId as setActiveThreadIdPersist,
   deriveTitle, renameThread, touchThread, createThread,
 } from '../services/threads';
 import { TOOL_SCHEMAS, toAnthropicTools, runTool, normalizeToolCalls } from '../services/aiTools';
+
+import { LinearGradient } from 'expo-linear-gradient';
+import { Colors } from '../theme/colors';
 
 const MAX_MEMORY = 40;
 function parseMovementsFallback(text) {
@@ -120,7 +124,9 @@ const QUICK_ACTIONS = [
   { id: 'qa_pdf_excel', label: 'PDF → Excel',  icon: 'grid-outline',          action: 'pdfToExcel' },
 ];
 
-export default function AIMessagingHub() {
+export default function AIMessagingHub(props) {
+  const { darkMode } = props;
+  const c = Colors[darkMode ? 'dark' : 'light'];
   const insets = useSafeAreaInsets();
   const { profile, user, orgId, userId } = useAuth();
   const submitterName = profile?.name || user?.email?.split('@')[0] || 'member';
@@ -490,7 +496,16 @@ HARD RULES:
     try {
       const result = await scanReceipt(source);
       if (!result.success) {
-        pushMessage({ role: 'assistant', content: result.error || 'Could not process receipt.' });
+        if (result.needsBackend && result.imageUri) {
+          // OCR unavailable — push image to chat so user can see it
+          pushMessage({ role: 'user', kind: 'image', uri: result.imageUri });
+          pushMessage({
+            role: 'assistant',
+            content: result.error || 'OCR unavailable. I can see the image — please describe the transaction details (amount, merchant, date) and I will log it for you.',
+          });
+        } else {
+          pushMessage({ role: 'assistant', content: result.error || 'Could not process receipt.' });
+        }
         return;
       }
       if (result.imageUri) {
@@ -776,33 +791,36 @@ HARD RULES:
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#0A0A0A' }}
+      style={{ flex: 1, backgroundColor: '#FFFFFF' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <StatusBar style="light" />
 
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 12, backgroundColor: '#2A63E2' }]}>
         <View style={styles.topLeft}>
-          <View style={styles.avatarDot}>
-            <Ionicons name="sparkles" size={12} color="#0A0A0A" />
+          <View style={[styles.avatarDot, { backgroundColor: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.25)' }]}>
+            <Ionicons name="sparkles" size={12} color="#FFFFFF" />
           </View>
           <Pressable onPress={() => setShowThreads(true)} style={{ flex: 1 }}>
-            <Text style={styles.topTitle} numberOfLines={1}>
+            <Text style={[styles.topTitle, { color: '#FFFFFF' }]} numberOfLines={1}>
               {activeThread?.title || 'Filey AI'}
-              <Text style={{ color: 'rgba(255,255,255,0.4)' }}>  ▾</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.65)' }}>  ▾</Text>
             </Text>
             <View style={styles.statusRow}>
-              <View style={styles.liveDot} />
-              <Text style={styles.statusText}>{memoryCount} in memory · tap to switch</Text>
+              <View style={[styles.liveDot, { backgroundColor: '#FFFFFF' }]} />
+              <Text style={[styles.statusText, { color: 'rgba(255,255,255,0.72)' }]}>{memoryCount} in memory · tap to switch</Text>
             </View>
           </Pressable>
         </View>
-        <Pressable onPress={newThread} hitSlop={10} style={[styles.clearBtn, { marginRight: 8 }]}>
-          <Ionicons name="create-outline" size={18} color="rgba(255,255,255,0.6)" />
+        <Pressable onPress={newThread} hitSlop={10} style={[styles.clearBtn, { marginRight: 8, backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+          <Ionicons name="create-outline" size={18} color="#FFFFFF" />
         </Pressable>
-        <Pressable onPress={clearMemory} hitSlop={10} style={styles.clearBtn}>
-          <Ionicons name="ellipsis-horizontal" size={18} color="rgba(255,255,255,0.6)" />
+        <Pressable onPress={() => doExport('pdf')} hitSlop={10} style={[styles.clearBtn, { marginRight: 8, backgroundColor: 'rgba(255,255,255,0.14)' }]} accessibilityLabel="Export PDF">
+          <Ionicons name="download-outline" size={18} color="#FFFFFF" />
+        </Pressable>
+        <Pressable onPress={clearMemory} hitSlop={10} style={[styles.clearBtn, { backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+          <Ionicons name="ellipsis-horizontal" size={18} color="#FFFFFF" />
         </Pressable>
       </View>
 
@@ -816,13 +834,38 @@ HARD RULES:
       >
         {showWelcome && (
           <Animated.View entering={FadeIn.duration(500)} style={styles.welcome}>
-            <View style={styles.welcomeIcon}>
-              <Ionicons name="sparkles" size={28} color="#FFFFFF" />
+            <View style={styles.welcomeCard}>
+              <LinearGradient
+                colors={['#2A63E2', '#1E3A8A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.welcomeGradient}
+              >
+                <View style={styles.welcomeBlob} />
+                <Ionicons name="sparkles" size={28} color="#FFFFFF" />
+                <Text style={styles.welcomeTitle}>Hi {name}.</Text>
+                <Text style={styles.welcomeSub}>
+                  Scan receipts, ask about VAT, get advice on your spending. I remember the last {MAX_MEMORY} messages.
+                </Text>
+              </LinearGradient>
             </View>
-            <Text style={styles.welcomeTitle}>Hi {name}. How can I help?</Text>
-            <Text style={styles.welcomeSub}>
-              Scan receipts, ask about VAT, get advice on your spending. I remember the last {MAX_MEMORY} messages on this device.
-            </Text>
+
+            <Text style={styles.suggestLabel}>Try asking</Text>
+            <View style={styles.suggestRow}>
+              {[
+                'How much VAT can I reclaim?',
+                'Summarize this month',
+                'I paid 500 AED to Ravi',
+              ].map((q) => (
+                <Pressable
+                  key={q}
+                  onPress={() => send(q)}
+                  style={styles.suggestChip}
+                >
+                  <Text style={styles.suggestText} numberOfLines={1}>{q}</Text>
+                </Pressable>
+              ))}
+            </View>
           </Animated.View>
         )}
 
@@ -947,7 +990,7 @@ HARD RULES:
       </ScrollView>
       </ErrorBoundary>
 
-      <View style={[styles.composer, { paddingBottom: (Platform.OS === 'ios' ? 112 : 102) + (insets.bottom > 0 ? 0 : 4) }]}>
+      <View style={[styles.composer, { paddingBottom: 8 }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -959,7 +1002,7 @@ HARD RULES:
               onPress={() => handleQuickAction(qa)}
               style={styles.quickPill}
             >
-              <Ionicons name={qa.icon} size={13} color="#FFFFFF" />
+              <Ionicons name={qa.icon} size={13} color={Colors.light.text} />
               <Text style={styles.quickPillText}>{qa.label}</Text>
             </SpringPressable>
           ))}
@@ -973,39 +1016,22 @@ HARD RULES:
                 onPress={() => { setFollowups([]); send(q); }}
                 style={styles.followupChip}
               >
-                <Ionicons name="sparkles" size={11} color="#93C5FD" />
+                <Ionicons name="sparkles" size={11} color={Colors.light.primary} />
                 <Text style={styles.followupText} numberOfLines={1}>{q}</Text>
               </SpringPressable>
             ))}
           </Animated.View>
         )}
 
-        <View style={styles.inputBar}>
-          <SpringPressable
-            onPress={() => setShowAttach(true)}
-            style={styles.attachBtn}
-            accessibilityLabel="Attach"
-          >
-            <Ionicons name="add" size={22} color="#FFFFFF" />
-          </SpringPressable>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Ask Filey AI anything…"
-            placeholderTextColor="rgba(255,255,255,0.35)"
-            style={styles.input}
-            multiline
-            maxLength={4000}
-          />
-          <SpringPressable
-            onPress={() => send()}
-            disabled={!input.trim() || loading}
-            style={[styles.sendBtn, { opacity: input.trim() && !loading ? 1 : 0.4 }]}
-            accessibilityLabel="Send"
-          >
-            <Ionicons name="arrow-up" size={18} color="#0A0A0A" />
-          </SpringPressable>
-        </View>
+        <ChatInputBox
+          value={input}
+          onChangeText={setInput}
+          onSend={(msg, files) => send(msg)}
+          onAttach={() => setShowAttach(true)}
+          loading={loading}
+          placeholder="Ask Filey AI anything…"
+          bottomOffset={Platform.OS === 'ios' ? 4 : 4}
+        />
       </View>
 
       <Modal visible={showAttach} transparent animationType="slide" onRequestClose={() => setShowAttach(false)}>
@@ -1022,7 +1048,7 @@ HARD RULES:
                 <Text style={styles.attachLabel}>Camera</Text>
                 <Text style={styles.attachSub}>Scan a receipt or invoice</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(0,0,0,0.25)" />
             </SpringPressable>
 
             <SpringPressable onPress={() => runScan('gallery')} style={styles.attachRow}>
@@ -1033,7 +1059,7 @@ HARD RULES:
                 <Text style={styles.attachLabel}>Photo Library</Text>
                 <Text style={styles.attachSub}>Pick an image from Photos</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(0,0,0,0.25)" />
             </SpringPressable>
 
             <SpringPressable onPress={runPdfPicker} style={styles.attachRow}>
@@ -1044,7 +1070,7 @@ HARD RULES:
                 <Text style={styles.attachLabel}>Files</Text>
                 <Text style={styles.attachSub}>PDF invoices or documents</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(0,0,0,0.25)" />
             </SpringPressable>
 
             <Pressable onPress={() => setShowAttach(false)} style={styles.attachCancel}>
@@ -1066,48 +1092,48 @@ HARD RULES:
 }
 
 const mdStyles = {
-  body: { color: '#F9FAFB', fontSize: 15.5, lineHeight: 23 },
-  strong: { color: '#FFFFFF', fontWeight: '700' },
-  em: { color: '#F9FAFB', fontStyle: 'italic' },
+  body: { color: '#1F2937', fontSize: 15.5, lineHeight: 23 },
+  strong: { color: '#0B1735', fontWeight: '700' },
+  em: { color: '#1F2937', fontStyle: 'italic' },
   bullet_list: { marginVertical: 4 },
   ordered_list: { marginVertical: 4 },
-  list_item: { color: '#F9FAFB', fontSize: 15.5, lineHeight: 23 },
+  list_item: { color: '#1F2937', fontSize: 15.5, lineHeight: 23 },
   code_inline: { backgroundColor: '#1F1F1F', color: '#BEF264', paddingHorizontal: 4, borderRadius: 4 },
   code_block: { backgroundColor: '#1F1F1F', color: '#E5E7EB', padding: 10, borderRadius: 10 },
   fence: { backgroundColor: '#1F1F1F', color: '#E5E7EB', padding: 10, borderRadius: 10 },
-  heading1: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-  heading2: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  heading3: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  link: { color: '#93C5FD' },
-  blockquote: { backgroundColor: '#1F1F1F', borderLeftWidth: 3, borderLeftColor: '#2A63E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  heading1: { color: '#0B1735', fontSize: 20, fontWeight: '800' },
+  heading2: { color: '#0B1735', fontSize: 17, fontWeight: '800' },
+  heading3: { color: '#0B1735', fontSize: 15, fontWeight: '700' },
+  link: { color: '#2563EB' },
+  blockquote: { backgroundColor: '#F3F4F6', borderLeftWidth: 3, borderLeftColor: '#2A63E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
 };
 
 const styles = StyleSheet.create({
   streamBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginTop: 8, paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#262626',
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.light.borderSubtle,
   },
   streamDot: {
     width: 7, height: 7, borderRadius: 4,
-    backgroundColor: '#22C55E',
+    backgroundColor: Colors.positive,
   },
-  streamText: { color: '#9CA3AF', fontSize: 11, fontWeight: '600', flex: 1 },
+  streamText: { color: Colors.light.textMuted, fontSize: 11, fontWeight: '600', flex: 1 },
   stopBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 10, backgroundColor: '#1F1F1F',
-    borderWidth: 1, borderColor: '#2A2A2A',
+    borderRadius: 10, backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
   },
-  stopText: { color: '#F9FAFB', fontSize: 11, fontWeight: '700' },
+  stopText: { color: Colors.light.text, fontSize: 11, fontWeight: '700' },
   regenBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     alignSelf: 'flex-start',
     marginTop: 6, paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 10, backgroundColor: '#1F1F1F',
-    borderWidth: 1, borderColor: '#2A2A2A',
+    borderRadius: 10, backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
   },
-  regenText: { color: '#E5E7EB', fontSize: 11, fontWeight: '600' },
+  regenText: { color: Colors.light.textSecondary, fontSize: 11, fontWeight: '600' },
   followupWrap: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 7,
     paddingHorizontal: 16, paddingVertical: 8,
@@ -1116,136 +1142,160 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 11, paddingVertical: 7,
     borderRadius: 14,
-    backgroundColor: 'rgba(147,197,253,0.08)',
-    borderWidth: 1, borderColor: 'rgba(147,197,253,0.2)',
+    backgroundColor: Colors.light.primaryLight,
+    borderWidth: 1, borderColor: Colors.light.borderAccent,
     maxWidth: '100%',
   },
-  followupText: { color: '#BFDBFE', fontSize: 12, fontWeight: '600' },
+  followupText: { color: Colors.primary, fontSize: 12, fontWeight: '600' },
   topBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   topLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarDot: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.light.primaryBg,
     alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.light.borderAccent,
   },
-  topTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  topTitle: { color: Colors.light.text, fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
-  statusText: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '500' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.positive },
+  statusText: { color: Colors.light.textSecondary, fontSize: 11, fontWeight: '500' },
   clearBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
   },
 
-  welcome: { alignItems: 'flex-start', paddingTop: 24, paddingBottom: 12, gap: 10 },
-  welcomeIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center', justifyContent: 'center',
+  welcome: { paddingTop: 12, paddingBottom: 12, gap: 14 },
+  welcomeCard: { borderRadius: 20, overflow: 'hidden', width: '100%' },
+  welcomeGradient: {
+    padding: 20, paddingVertical: 24, borderRadius: 20,
+    alignItems: 'flex-start', gap: 8,
   },
-  welcomeTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '700', letterSpacing: -0.6, marginTop: 6 },
-  welcomeSub: { color: 'rgba(255,255,255,0.55)', fontSize: 14, lineHeight: 20, maxWidth: 340 },
+  welcomeBlob: {
+    position: 'absolute', width: 140, height: 140, borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.08)', top: -40, right: -30,
+  },
+  welcomeTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5, marginTop: 6 },
+  welcomeSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13.5, lineHeight: 20, maxWidth: 320 },
+  suggestLabel: { color: Colors.light.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginTop: 4 },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  suggestChip: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14,
+    backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
+  },
+  suggestText: { color: Colors.light.text, fontSize: 12.5, fontWeight: '600' },
 
   systemRow: { alignItems: 'center', marginVertical: 10 },
   systemText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: Colors.light.textMuted,
     fontSize: 11.5, fontWeight: '600',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Colors.light.card,
     paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: 10,
     letterSpacing: 0.3,
+    borderWidth: 1, borderColor: Colors.light.borderSubtle,
   },
 
   userRow: { alignItems: 'flex-end', marginVertical: 6 },
   userBubble: {
-    backgroundColor: '#1F1F1F',
+    backgroundColor: Colors.light.card,
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 18, borderBottomRightRadius: 6,
     maxWidth: '88%',
+    borderWidth: 1, borderColor: Colors.light.border,
   },
-  userText: { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
+  userText: { color: Colors.light.text, fontSize: 15, lineHeight: 21 },
   attachedImage: {
     width: 180, height: 240,
-    borderRadius: 16, backgroundColor: '#1F1F1F',
+    borderRadius: 16, backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
   },
   fileCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1F1F1F',
+    backgroundColor: Colors.light.card,
     paddingHorizontal: 12, paddingVertical: 10,
     borderRadius: 14, maxWidth: '88%',
+    borderWidth: 1, borderColor: Colors.light.border,
   },
   fileIcon: {
     width: 32, height: 32, borderRadius: 10,
-    backgroundColor: '#2A63E2',
+    backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
-  fileName: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '600' },
-  fileMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 },
+  fileName: { color: Colors.light.text, fontSize: 13.5, fontWeight: '600' },
+  fileMeta: { color: Colors.light.textMuted, fontSize: 11, marginTop: 2 },
 
   aiRow: { alignItems: 'flex-start', marginVertical: 10, maxWidth: '100%' },
-  aiText: { color: '#FFFFFF', fontSize: 15.5, lineHeight: 23 },
-  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FFFFFF' },
+  aiText: { color: Colors.light.text, fontSize: 15.5, lineHeight: 23 },
+  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.light.text },
 
   txCard: {
     marginTop: 12,
-    backgroundColor: '#141414',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
     borderRadius: 18, padding: 14,
     width: '100%',
   },
   txHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   txIcon: {
     width: 22, height: 22, borderRadius: 7,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.light.primaryBg,
     alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.light.borderAccent,
   },
-  txLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2 },
-  txMerchant: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 8, letterSpacing: -0.3 },
+  txLabel: { color: Colors.primary, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2 },
+  txMerchant: { color: Colors.light.text, fontSize: 18, fontWeight: '700', marginTop: 8, letterSpacing: -0.3 },
   txGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 10 },
   txCell: {
     flexBasis: '47%', flexGrow: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Colors.light.cardElevated,
     padding: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.light.borderSubtle,
   },
-  txCellLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10.5, fontWeight: '600', letterSpacing: 0.5 },
-  txCellValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', marginTop: 3 },
+  txCellLabel: { color: Colors.light.textMuted, fontSize: 10.5, fontWeight: '600', letterSpacing: 0.5 },
+  txCellValue: { color: Colors.light.text, fontSize: 14, fontWeight: '700', marginTop: 3 },
   saveBtn: {
     marginTop: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, height: 42, borderRadius: 21,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  saveBtnText: { color: '#0A0A0A', fontSize: 13.5, fontWeight: '700' },
+  saveBtnText: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' },
   citationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   citationChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 8, paddingVertical: 4,
-    borderRadius: 10, backgroundColor: '#1F1F1F',
+    borderRadius: 10, backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
     maxWidth: 220,
   },
-  citationText: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
-  providerHint: { color: '#6B7280', fontSize: 10.5, marginTop: 6, fontStyle: 'italic' },
+  citationText: { color: Colors.light.textSecondary, fontSize: 11, fontWeight: '600' },
+  providerHint: { color: Colors.light.textMuted, fontSize: 10.5, marginTop: 6, fontStyle: 'italic' },
   savedChip: {
     marginTop: 10,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(16,185,129,0.12)',
-    borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)',
+    backgroundColor: Colors.positiveLight,
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.4)',
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
   },
-  savedChipText: { color: '#10B981', fontSize: 12, fontWeight: '700' },
+  savedChipText: { color: Colors.positive, fontSize: 12, fontWeight: '700' },
 
   composer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    paddingTop: 10,
-    backgroundColor: '#0A0A0A',
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    paddingTop: 8,
+    backgroundColor: 'transparent',
   },
   quickRow: {
     paddingHorizontal: 16, paddingBottom: 10,
@@ -1255,65 +1305,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1, borderColor: Colors.light.border,
   },
-  quickPillText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' },
+  quickPillText: { color: Colors.light.text, fontSize: 12.5, fontWeight: '600' },
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: 12, gap: 8,
   },
   attachBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Colors.light.card,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: Colors.light.border,
   },
   input: {
     flex: 1,
-    color: '#FFFFFF',
+    color: Colors.light.text,
     fontSize: 15.5,
-    backgroundColor: '#161616',
+    backgroundColor: Colors.light.cardElevated,
     borderRadius: 20,
     paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10,
     maxHeight: 130, minHeight: 40,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: Colors.light.borderSubtle,
   },
   sendBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
 
-  attachBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  attachBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   attachSheet: {
-    backgroundColor: '#141414',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28,
     gap: 8,
-    borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderTopWidth: 1, borderColor: Colors.light.border,
   },
   attachHandle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: Colors.light.border,
     alignSelf: 'center', marginVertical: 8,
   },
-  attachTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', letterSpacing: -0.3, marginBottom: 8 },
+  attachTitle: { color: Colors.light.text, fontSize: 17, fontWeight: '700', letterSpacing: -0.3, marginBottom: 8 },
   attachRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Colors.light.card,
     padding: 14, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.light.borderSubtle,
   },
   attachIcon: {
     width: 42, height: 42, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
-  attachLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  attachSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 },
+  attachLabel: { color: Colors.light.text, fontSize: 15, fontWeight: '700' },
+  attachSub: { color: Colors.light.textSecondary, fontSize: 12, marginTop: 2 },
   attachCancel: {
     marginTop: 8, paddingVertical: 14,
     alignItems: 'center', borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Colors.light.cardElevated,
+    borderWidth: 1, borderColor: Colors.light.border,
   },
-  attachCancelText: { color: 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: '600' },
+  attachCancelText: { color: Colors.light.text, fontSize: 15, fontWeight: '600' },
 });

@@ -13,10 +13,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  FadeIn,
+  FadeInUp,
+  FadeInDown,
+  FadeOut,
+  ZoomIn,
+  ZoomOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import ScannerOverlay from '../components/ScannerOverlay';
 import WoodBackground from '../components/WoodBackground';
 import { addFile } from '../services/recentFiles';
 import DemoConfig from '../lib/demoMode';
+import { Colors } from '../theme/colors';
 
 // Conditionally import demo vs real services
 const {
@@ -34,15 +47,11 @@ const { parseReceipt } = DemoConfig.enabled
   ? require('../services/gemmaInference.demo')
   : require('../services/gemmaInference');
 
-const BRAND = '#2A63E2';
-const SCAN_MODES = [
-  { key: 'book', label: 'Book', icon: 'book-outline' },
-  { key: 'id_card', label: 'ID Card', icon: 'card-outline' },
-  { key: 'document', label: 'Document', icon: 'document-text-outline' },
-  { key: 'business_card', label: 'Business Card', icon: 'id-card-outline' },
-];
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ScannerScreen({ navigation, route }) {
+  // Capture button scale animation
+  const captureScale = useSharedValue(1);
   const cameraRef = useRef(null);
   const [hasPermission, setHasPermission] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
@@ -79,6 +88,7 @@ export default function ScannerScreen({ navigation, route }) {
   const handleDetect = useCallback(async (detection) => {
     setDetectedCorners(detection.corners);
     setIsDetecting(true);
+    try { Haptics.selectionAsync(); } catch {}
 
     if (lastPhoto && detection.corners) {
       await processPhoto(lastPhoto, detection.corners);
@@ -128,6 +138,7 @@ export default function ScannerScreen({ navigation, route }) {
       };
 
       setCapturedImages(prev => [...prev, newImage]);
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
 
       const merchantInfo = extractedData?.merchant
         ? `Found: ${extractedData.merchant} (${extractedData.amount || 0} ${extractedData.currency || 'AED'})`
@@ -164,6 +175,7 @@ export default function ScannerScreen({ navigation, route }) {
     } catch (error) {
       console.error('[ScannerScreen] Process error:', error);
       Alert.alert('Error', 'Failed to process document');
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error); } catch {}
     } finally {
       setProcessing(false);
     }
@@ -173,6 +185,7 @@ export default function ScannerScreen({ navigation, route }) {
   const handleCapture = useCallback(async (photo) => {
     setLastPhoto(photo);
     setIsDetecting(true);
+    try { Haptics.selectionAsync(); } catch {}
 
     try {
       const edges = await detectDocumentEdges(photo.uri);
@@ -224,6 +237,12 @@ export default function ScannerScreen({ navigation, route }) {
 
   const handleCapturePress = async () => {
     if (!cameraRef?.current) return;
+    // Button press animation
+    captureScale.value = withSpring(0.92, { damping: 15, stiffness: 400 });
+    setTimeout(() => {
+      captureScale.value = withSpring(1, { damping: 15, stiffness: 400 });
+    }, 150);
+
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
@@ -342,37 +361,49 @@ export default function ScannerScreen({ navigation, route }) {
             <Ionicons name="images-outline" size={26} color="#FFFFFF" />
           </Pressable>
 
-          <Pressable onPress={handleCapturePress} style={styles.captureButton}>
+          <AnimatedPressable
+            onPress={handleCapturePress}
+            style={[
+              styles.captureButton,
+              { transform: [{ scale: captureScale }] }
+            ]}
+          >
             <View style={styles.captureButtonInner} />
-          </Pressable>
+          </AnimatedPressable>
 
           <View style={styles.placeholderButton} />
         </View>
 
-        {/* Processing indicator */}
+        {/* Processing indicator - fade in */}
         {processing && (
-          <View style={styles.processingOverlay}>
-            <Text style={styles.processingText}>Processing...</Text>
-          </View>
+          <Animated.View entering={FadeIn.duration(200)} style={styles.processingOverlay}>
+            <Animated.Text entering={FadeInUp.duration(300)} style={styles.processingText}>Processing...</Animated.Text>
+          </Animated.View>
         )}
 
-        {/* Captured preview strip */}
+        {/* Captured preview strip - slide in */}
         {capturedImages.length > 0 && (
-          <View style={styles.previewStrip}>
+          <Animated.View entering={FadeInDown.duration(400).springify()} style={styles.previewStrip}>
             {capturedImages.map((img, index) => (
-              <View key={index} style={styles.previewThumb}>
+              <Animated.View
+                key={index}
+                entering={FadeIn.duration(300).delay(index * 100)}
+                style={styles.previewThumb}
+              >
                 <Image source={{ uri: img.uri }} style={styles.thumbImage} resizeMode="cover" />
-              </View>
+              </Animated.View>
             ))}
             <Pressable onPress={handleRetake} style={styles.retakeButton}>
-              <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="trash-outline" size={20} color={Colors.dark.text} />
             </Pressable>
-          </View>
+          </Animated.View>
         )}
       </WoodBackground>
     </View>
   );
 }
+
+const BRAND = Colors.dark.primary;
 
 const styles = StyleSheet.create({
   container: {
@@ -385,7 +416,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   permissionText: {
-    color: '#FFFFFF',
+    color: Colors.dark.text,
     fontSize: 16,
     textAlign: 'center',
     paddingHorizontal: 40,
@@ -416,7 +447,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toolbarTitle: {
-    color: '#FFFFFF',
+    color: Colors.dark.text,
     fontSize: 17,
     fontWeight: '600',
     textShadowColor: 'rgba(0,0,0,0.5)',
@@ -464,7 +495,7 @@ const styles = StyleSheet.create({
   },
   modeTabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: '#2A63E2',
+    borderBottomColor: Colors.dark.primary,
   },
   modeTabText: {
     color: 'rgba(255,255,255,0.6)',
@@ -473,7 +504,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   modeTabTextActive: {
-    color: '#FFFFFF',
+    color: Colors.dark.text,
     fontWeight: '600',
   },
 
@@ -498,7 +529,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.dark.text,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
@@ -532,7 +563,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   processingText: {
-    color: '#FFFFFF',
+    color: Colors.dark.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -568,7 +599,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(239, 68, 68, 0.3)',
     borderWidth: 2,
-    borderColor: '#EF4444',
+    borderColor: Colors.dark.negative,
     alignItems: 'center',
     justifyContent: 'center',
   },

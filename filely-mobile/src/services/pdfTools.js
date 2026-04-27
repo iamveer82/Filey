@@ -32,9 +32,13 @@ export async function splitPdf(pdfUri, ranges, filename = 'split') {
  * @param {string} pdfUri
  * @param {string} password
  * @param {string} filename
+ * @param {{printing?:boolean,copying?:boolean,modifying?:boolean,annotating?:boolean}} permissions
  * @returns {Promise<{ uri, protectionInfo, success }>}
  */
-export async function protectPdf(pdfUri, password, filename = 'protected') {
+export async function protectPdf(pdfUri, password, filename = 'protected', permissions = null) {
+  if (permissions) {
+    return Native.protectPdf(pdfUri, password, password, filename, permissions);
+  }
   return Native.protectPdf(pdfUri, password, filename);
 }
 
