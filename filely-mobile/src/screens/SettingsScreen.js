@@ -12,6 +12,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import AISettingsScreen from './AISettingsScreen';
+import SmartSearchScreen from './subscreens/SmartSearchScreen';
+import ReferralScreen from './subscreens/ReferralScreen';
+import PublicShareScreen from './subscreens/PublicShareScreen';
+import ProjectsScreen from './subscreens/ProjectsScreen';
+import DeputyScreen from './subscreens/DeputyScreen';
+import StatementImportScreen from './subscreens/StatementImportScreen';
+import ReclaimExplorerScreen from './subscreens/ReclaimExplorerScreen';
+import VersionsScreen from './subscreens/VersionsScreen';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -65,6 +74,7 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
   const { user, profile: authProfile, signOut } = useAuth();
   const [profile, setProfile] = useState(authProfile);
   const [notifications, setNotifications] = useState(true);
+  const [subScreen, setSubScreen] = useState(null); // 'ai' | 'search' | 'referral' | 'share' | 'projects' | 'deputy' | 'statement' | 'reclaim' | 'versions' | null
 
   useEffect(() => {
     (async () => {
@@ -88,6 +98,17 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
       } },
     ]);
   }, [signOut, doSignOut]);
+
+  const back = () => setSubScreen(null);
+  if (subScreen === 'ai')        return <AISettingsScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'search')    return <SmartSearchScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'referral')  return <ReferralScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'share')     return <PublicShareScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'projects')  return <ProjectsScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'deputy')    return <DeputyScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'statement') return <StatementImportScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'reclaim')   return <ReclaimExplorerScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'versions')  return <VersionsScreen darkMode={darkMode} onBack={back} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -149,10 +170,28 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
             <Row icon="globe-outline" label="Language" c={c} onPress={() => {}} />
           </Section>
 
-          <Section title="COMPLIANCE" c={c} delay={160}>
-            <Row icon="shield-checkmark-outline" label="VAT settings" c={c} onPress={() => {}} />
+          <Section title="AI & INTEGRATIONS" c={c} delay={150}>
+            <Row icon="sparkles-outline" label="LLM provider & API keys" c={c} onPress={() => setSubScreen('ai')} />
+            <Row icon="globe-outline" label="Web search provider" c={c} onPress={() => setSubScreen('ai')} />
+          </Section>
+
+          <Section title="WORKSPACE" c={c} delay={170}>
+            <Row icon="search-outline" label="Smart search" c={c} onPress={() => setSubScreen('search')} />
+            <Row icon="folder-open-outline" label="Projects & clients" c={c} onPress={() => setSubScreen('projects')} />
+            <Row icon="people-outline" label="Out-of-office deputy" c={c} onPress={() => setSubScreen('deputy')} />
+            <Row icon="time-outline" label="Audit trail" c={c} onPress={() => setSubScreen('versions')} />
+          </Section>
+
+          <Section title="COMPLIANCE" c={c} delay={180}>
+            <Row icon="shield-checkmark-outline" label="VAT reclaim explorer" c={c} onPress={() => setSubScreen('reclaim')} />
+            <Row icon="document-attach-outline" label="Bank statement import" c={c} onPress={() => setSubScreen('statement')} />
+            <Row icon="share-outline" label="Share with accountant" c={c} onPress={() => setSubScreen('share')} />
             <Row icon="receipt-outline" label="FTA integration" c={c} onPress={() => {}} />
             <Row icon="download-outline" label="Export data" c={c} onPress={() => {}} />
+          </Section>
+
+          <Section title="GROW" c={c} delay={190}>
+            <Row icon="gift-outline" label="Invite & earn" c={c} onPress={() => setSubScreen('referral')} />
           </Section>
 
           <Section title="SUPPORT" c={c} delay={200}>
@@ -182,7 +221,7 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
 
 const s = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 48,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,

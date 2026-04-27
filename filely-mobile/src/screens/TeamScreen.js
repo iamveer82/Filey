@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TextInput, Pressable, StyleSheet,
+  View, Text, Image, ScrollView, TextInput, Pressable, StyleSheet,
   Modal, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import Animated, {
@@ -34,26 +34,6 @@ function SpringPressable({ children, style, onPress, disabled, ...rest }) {
   );
 }
 
-function PulseDot() {
-  const s = useSharedValue(1);
-  useEffect(() => {
-    s.value = withRepeat(withSequence(
-      withTiming(1.6, { duration: 900 }),
-      withTiming(1, { duration: 900 }),
-    ), -1, false);
-  }, []);
-  const anim = useAnimatedStyle(() => ({
-    transform: [{ scale: s.value }],
-    opacity: 2 - s.value,
-  }));
-  return (
-    <View style={styles.pulseWrap}>
-      <Animated.View style={[styles.pulseRing, anim]} />
-      <View style={styles.pulseCore} />
-    </View>
-  );
-}
-
 function Avatar({ name, size = 36, isAdmin, stackOffset }) {
   const letter = (name || '?')[0]?.toUpperCase();
   return (
@@ -63,7 +43,7 @@ function Avatar({ name, size = 36, isAdmin, stackOffset }) {
       stackOffset ? { marginLeft: -12 } : null,
       isAdmin ? styles.avatarAdmin : styles.avatarMember,
     ]}>
-      <Text style={{ color: isAdmin ? '#3B6BFF' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
+      <Text style={{ color: isAdmin ? '#2A63E2' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
         {letter}
       </Text>
     </View>
@@ -71,13 +51,13 @@ function Avatar({ name, size = 36, isAdmin, stackOffset }) {
 }
 
 export default function TeamScreen({ darkMode }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const insets = useSafeAreaInsets();
   const { orgId, userId, profile } = useAuth();
   const isWeb = Platform.OS === 'web';
 
   const [team, setTeam] = useState(null);
-  const [activity, setActivity] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [teamChat, setTeamChat] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -85,7 +65,9 @@ export default function TeamScreen({ darkMode }) {
   const [invName, setInvName] = useState('');
   const [invEmail, setInvEmail] = useState('');
   const [invRole, setInvRole] = useState('member');
-  const [tab, setTab] = useState('activity');
+  const [tab, setTab] = useState('transactions');
+  const [showAllMembers, setShowAllMembers] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState(null);
   const chatRef = useRef();
 
   useEffect(() => { fetchAll(); }, []);
@@ -95,24 +77,35 @@ export default function TeamScreen({ darkMode }) {
     try {
       if (!isWeb && orgId && orgId !== 'default') {
         const { db } = require('../lib/supabase');
-        const [t, a, ch] = await Promise.all([
+        const [t, tx, ch] = await Promise.all([
           db.getTeam(orgId).catch(() => null),
-          db.getTeamActivity(orgId).catch(() => null),
+          db.getTransactions?.(orgId).catch(() => null) || api.getTransactions({ orgId }),
           db.getTeamChat(orgId).catch(() => null),
         ]);
         if (t?.data) setTeam(t.data);
-        if (a?.data) setActivity(a.data);
+        const txList = Array.isArray(tx) ? tx : tx?.data || tx?.transactions || [];
+        setTransactions(txList);
         if (ch?.data) setTeamChat(ch.data);
       } else {
-        const t = await api.getTeam(); setTeam(t.team);
-        const a = await api.getTeamActivity(); setActivity(a.activity || []);
-        const ch = await api.getTeamChat(); setTeamChat(ch.messages || []);
+        const [t, tx, ch] = await Promise.all([
+          api.getTeam().catch(() => ({ team: null })),
+          api.getTransactions({ orgId }).catch(() => ({ transactions: [] })),
+          api.getTeamChat().catch(() => ({ messages: [] })),
+        ]);
+        if (t?.team) setTeam(t.team);
+        setTransactions(Array.isArray(tx) ? tx : tx?.transactions || []);
+        setTeamChat(ch?.messages || []);
       }
     } catch {
       try {
-        const t = await api.getTeam(); setTeam(t.team);
-        const a = await api.getTeamActivity(); setActivity(a.activity || []);
-        const ch = await api.getTeamChat(); setTeamChat(ch.messages || []);
+        const [t, tx, ch] = await Promise.all([
+          api.getTeam().catch(() => ({ team: null })),
+          api.getTransactions({ orgId }).catch(() => ({ transactions: [] })),
+          api.getTeamChat().catch(() => ({ messages: [] })),
+        ]);
+        if (t?.team) setTeam(t.team);
+        setTransactions(Array.isArray(tx) ? tx : tx?.transactions || []);
+        setTeamChat(ch?.messages || []);
       } catch {}
     }
   };
@@ -174,50 +167,74 @@ export default function TeamScreen({ darkMode }) {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: c.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      keyboardVerticalOffset={0}
     >
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={[styles.hero, { paddingTop: insets.top + 10 }]}>
         <Animated.View entering={FadeInDown.duration(500)} style={styles.heroInner}>
-          <View style={styles.heroTopRow}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.liveRow}>
-                <PulseDot />
-                <Text style={styles.liveLabel}>LIVE</Text>
+          {/* Company Logo */}
+          <View style={styles.companySection}>
+            <Pressable style={styles.logoWrap} onPress={() => Alert.alert('Upload Logo', 'Company logo upload coming soon.')}>
+              <View style={styles.logoCircle}>
+                {companyLogo ? (
+                  <Image source={{ uri: companyLogo }} style={styles.logoImg} />
+                ) : (
+                  <Ionicons name="camera" size={28} color="rgba(255,255,255,0.6)" />
+                )}
               </View>
-              <Text style={styles.heroTitle}>Team</Text>
-              <Text style={styles.heroSub}>
-                {members.length} {members.length === 1 ? 'member' : 'members'} · {activity.length} events
-              </Text>
-            </View>
-            <SpringPressable
-              onPress={() => setShowInvite(true)}
-              style={styles.inviteChip}
-              accessibilityLabel="Invite member"
-            >
-              <Ionicons name="person-add" size={14} color="#3B6BFF" />
-              <Text style={{ color: '#3B6BFF', fontWeight: '700', fontSize: 12.5 }}>Invite</Text>
-            </SpringPressable>
+              <View style={styles.logoEdit}>
+                <Ionicons name="pencil" size={10} color="#FFFFFF" />
+              </View>
+            </Pressable>
+
+            <Text style={styles.companyName}>{profile?.company || team?.company || 'My Company'}</Text>
+            <Text style={styles.companySub}>{members.length} {members.length === 1 ? 'member' : 'members'}</Text>
           </View>
 
-          <View style={styles.avatarStack}>
-            {members.slice(0, 6).map((m, i) => (
-              <Animated.View
-                key={`${m.name}-${i}`}
-                entering={FadeInUp.delay(100 + i * 60).duration(400)}
+          {/* Avatar Group */}
+          <View style={styles.avatarGroupRow}>
+            <View style={styles.avatarGroup}>
+              {(showAllMembers ? members : members.slice(0, 5)).map((m, i) => (
+                <Animated.View
+                  key={`${m.name}-${i}`}
+                  entering={FadeInUp.delay(80 + i * 50).duration(350)}
+                  style={[
+                    styles.groupAvatarWrap,
+                    i > 0 && { marginLeft: -14 },
+                    { zIndex: members.length - i },
+                  ]}
+                >
+                  <View style={[styles.groupAvatar, m.isAdmin && styles.groupAvatarAdmin]}>
+                    <Text style={styles.groupAvatarText}>{(m.name || '?')[0].toUpperCase()}</Text>
+                  </View>
+                </Animated.View>
+              ))}
+
+              {!showAllMembers && members.length > 5 && (
+                <View style={[styles.groupAvatarWrap, { marginLeft: -14, zIndex: 0 }]}>
+                  <View style={[styles.groupAvatar, styles.groupAvatarMore]}>
+                    <Text style={[styles.groupAvatarText, { color: '#0F172A' }]}>+{members.length - 5}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {members.length > 5 && (
+              <Pressable
+                onPress={() => setShowAllMembers(p => !p)}
+                style={styles.expandBtn}
               >
-                <Avatar name={m.name} isAdmin={m.isAdmin} stackOffset={i > 0} size={40} />
-              </Animated.View>
-            ))}
-            {members.length > 6 && (
-              <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12 }]}>
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>+{members.length - 6}</Text>
-              </View>
+                <Ionicons
+                  name={showAllMembers ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color="#FFFFFF"
+                />
+              </Pressable>
             )}
           </View>
 
           <View style={styles.pillRow}>
-            {[['activity', 'Activity'], ['chat', 'Chat']].map(([v, l]) => (
+            {[['transactions', 'Transactions'], ['chat', 'Chat']].map(([v, l]) => (
               <SpringPressable
                 key={v}
                 onPress={() => setTab(v)}
@@ -225,7 +242,7 @@ export default function TeamScreen({ darkMode }) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: tab === v }}
               >
-                <Text style={[styles.pillText, { color: tab === v ? '#3B6BFF' : '#FFFFFF' }]}>{l}</Text>
+                <Text style={[styles.pillText, { color: tab === v ? '#FFFFFF' : '#0F172A' }]}>{l}</Text>
               </SpringPressable>
             ))}
           </View>
@@ -235,47 +252,54 @@ export default function TeamScreen({ darkMode }) {
       <View style={[styles.sheet, { backgroundColor: c.bg }]}>
         <View style={styles.handle} />
 
-        {tab === 'activity' ? (
+        {tab === 'transactions' ? (
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 140 }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
             showsVerticalScrollIndicator={false}
           >
-            {activity.length === 0 && (
+            {transactions.length === 0 && (
               <Animated.View entering={FadeIn.duration(400)} style={styles.empty}>
                 <View style={[styles.emptyIcon, { backgroundColor: c.primaryLight }]}>
-                  <Ionicons name="pulse" size={32} color={c.primary} />
+                  <Ionicons name="receipt" size={32} color={c.primary} />
                 </View>
-                <Text style={[styles.emptyTitle, { color: c.text }]}>No activity yet</Text>
+                <Text style={[styles.emptyTitle, { color: c.text }]}>No transactions yet</Text>
                 <Text style={[styles.emptySub, { color: c.textMuted }]}>
-                  Invite members and actions will show up here in real-time.
+                  Transactions from your team will appear here.
                 </Text>
               </Animated.View>
             )}
 
-            {activity.map((ev, i) => (
+            {transactions.map((tx, i) => (
               <Animated.View
-                key={ev.id || i}
-                entering={SlideInRight.delay(Math.min(i * 40, 240)).duration(350)}
+                key={tx.id || i}
+                entering={FadeInUp.delay(Math.min(i * 40, 240)).duration(350)}
                 layout={Layout.springify()}
-                style={styles.timelineRow}
+                style={[styles.txCard, { backgroundColor: c.card, borderColor: c.border }]}
               >
-                <View style={styles.timelineCol}>
-                  <View style={[styles.timelineDot, { backgroundColor: c.primary }]} />
-                  {i < activity.length - 1 && <View style={[styles.timelineLine, { backgroundColor: c.borderSubtle }]} />}
-                </View>
-                <View style={[styles.eventCard, { backgroundColor: c.card, borderColor: c.borderSubtle }]}>
-                  <View style={styles.eventHead}>
-                    <Avatar name={ev.user || ev.actor || '?'} size={24} />
-                    <Text style={[styles.eventUser, { color: c.text }]}>{ev.user || ev.actor || 'User'}</Text>
-                    <Text style={[styles.eventTime, { color: c.textMuted }]}>
-                      {ev.time || ev.timestamp || 'now'}
+                <View style={styles.txHead}>
+                  <View style={[styles.txIcon, { backgroundColor: c.primaryLight }]}>
+                    <Ionicons name="receipt" size={16} color={c.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.txMerchant, { color: c.text }]} numberOfLines={1}>
+                      {tx.merchant || tx.counterparty || 'Transaction'}
+                    </Text>
+                    <Text style={[styles.txMeta, { color: c.textMuted }]}>
+                      {tx.date || tx.created_at || '—'} · {tx.submittedByName || 'Team'}
                     </Text>
                   </View>
-                  <Text style={[styles.eventText, { color: c.textSecondary }]}>
-                    {ev.action || ev.message || ev.description || '—'}
+                  <Text style={[styles.txAmount, { color: tx.direction === 'in' ? '#16A34A' : c.text }]}>
+                    {tx.direction === 'in' ? '+' : '-'}AED {tx.amount?.toLocaleString?.() || tx.amount || '0'}
                   </Text>
                 </View>
+                {tx.category && (
+                  <View style={styles.txTag}>
+                    <Text style={[styles.txTagText, { color: c.primary }]} numberOfLines={1}>
+                      {tx.category}
+                    </Text>
+                  </View>
+                )}
               </Animated.View>
             ))}
           </ScrollView>
@@ -284,7 +308,7 @@ export default function TeamScreen({ darkMode }) {
             <ScrollView
               ref={chatRef}
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 20, paddingBottom: 20 }}
+              contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: true })}
             >
@@ -334,7 +358,7 @@ export default function TeamScreen({ darkMode }) {
 
             <View style={[styles.inputBar, {
               backgroundColor: c.card, borderColor: c.borderSubtle,
-              marginBottom: insets.bottom + 90, marginHorizontal: 16,
+              marginBottom: Platform.OS === 'ios' ? 102 : 92, marginHorizontal: 16,
             }]}>
               <TextInput
                 value={chatInput}
@@ -351,7 +375,7 @@ export default function TeamScreen({ darkMode }) {
                 style={[styles.sendBtn, { backgroundColor: chatInput.trim() && !sending ? c.primary : c.borderSubtle }]}
                 accessibilityLabel="Send"
               >
-                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-up" size={18} color={chatInput.trim() && !sending ? '#FFFFFF' : c.textMuted} />
               </SpringPressable>
             </View>
           </View>
@@ -415,49 +439,78 @@ export default function TeamScreen({ darkMode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 40,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
   heroInner: { gap: 18 },
-  heroTopRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 10.5, fontWeight: '700', letterSpacing: 1.2 },
-  heroTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
-  heroSub: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 },
-  inviteChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18,
-  },
-  avatarStack: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#3B6BFF',
+    borderWidth: 2, borderColor: '#2A63E2',
   },
   avatarAdmin: { backgroundColor: '#FFFFFF' },
   avatarMember: { backgroundColor: 'rgba(255,255,255,0.2)' },
-  avatarMore: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+  companySection: { alignItems: 'center', gap: 10, marginBottom: 8 },
+  logoWrap: { position: 'relative' },
+  logoCircle: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#3B6BFF',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
   },
-  pulseWrap: { width: 10, height: 10, alignItems: 'center', justifyContent: 'center' },
-  pulseRing: {
+  logoImg: { width: 72, height: 72, borderRadius: 36 },
+  logoEdit: {
     position: 'absolute',
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#22C55E',
+    bottom: 0, right: 0,
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: '#2A63E2',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#FFFFFF',
   },
-  pulseCore: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+  companyName: {
+    color: '#FFFFFF', fontSize: 22, fontWeight: '800',
+    letterSpacing: -0.4, marginTop: 4,
+  },
+  companySub: {
+    color: 'rgba(255,255,255,0.75)', fontSize: 13,
+  },
+  avatarGroupRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 12,
+    marginVertical: 12,
+  },
+  avatarGroup: { flexDirection: 'row', alignItems: 'center' },
+  groupAvatarWrap: {},
+  groupAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#FFFFFF',
+  },
+  groupAvatarAdmin: { backgroundColor: '#FFFFFF' },
+  groupAvatarMore: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  groupAvatarText: {
+    color: '#FFFFFF', fontSize: 14, fontWeight: '800',
+  },
+  expandBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#2A63E2',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#2A63E2', shadowOpacity: 0.4,
+    shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
   pillRow: { flexDirection: 'row', gap: 8 },
   pill: {
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
   },
-  pillActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
-  pillIdle: { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.22)' },
+  pillActive: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
+  pillIdle: { backgroundColor: 'rgba(11,23,53,0.06)', borderColor: 'rgba(11,23,53,0.12)' },
   pillText: { fontSize: 13, fontWeight: '700' },
   sheet: {
     flex: 1, marginTop: -24,
@@ -476,6 +529,24 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, fontWeight: '800' },
   emptySub: { fontSize: 13.5, textAlign: 'center', marginTop: 6 },
+  txCard: {
+    padding: 14, borderRadius: 16, borderWidth: 1,
+    marginBottom: 10,
+  },
+  txHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  txIcon: {
+    width: 36, height: 36, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  txMerchant: { fontSize: 15, fontWeight: '700', flex: 1 },
+  txMeta: { fontSize: 11.5, fontWeight: '500', marginTop: 2 },
+  txAmount: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  txTag: {
+    alignSelf: 'flex-start',
+    marginTop: 8, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 8, backgroundColor: 'rgba(42,99,226,0.08)',
+  },
+  txTagText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   timelineRow: { flexDirection: 'row', gap: 12 },
   timelineCol: { alignItems: 'center', width: 14 },
   timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 14 },

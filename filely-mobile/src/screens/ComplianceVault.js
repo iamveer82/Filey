@@ -277,7 +277,7 @@ export default function ComplianceVault({ darkMode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 44,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,

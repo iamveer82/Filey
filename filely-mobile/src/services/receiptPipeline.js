@@ -9,8 +9,12 @@
  */
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import api from '../api/client';
 import { recognizeText, isOcrAvailable } from './visionOcr';
+import { compressIfLarge } from './imageCompressor';
+import { parseHijriDate } from './hijriDate';
 import { parseReceipt, isModelReady } from './gemmaInference';
+import { autoCategorize } from './categories';
 
 /**
  * Scan a receipt from camera or gallery.
@@ -48,12 +52,16 @@ export async function scanReceipt(source = 'gallery') {
 
     const asset = imageResult.assets[0];
 
+    // Compress if large — keeps OCR fast and upload cheap
+    const compressed = await compressIfLarge(asset.uri);
+    const workingUri = compressed.uri;
+
     // Step 2: Run OCR
     let ocrText = '';
     let ocrConfidence = 0;
 
     if (isOcrAvailable()) {
-      const ocrResult = await recognizeText(asset.uri);
+      const ocrResult = await recognizeText(workingUri);
       ocrText = ocrResult.text;
       ocrConfidence = ocrResult.confidence;
     } else if (Platform.OS === 'web') {
@@ -66,14 +74,42 @@ export async function scanReceipt(source = 'gallery') {
         imageMimeType: asset.mimeType || 'image/jpeg',
       };
     } else {
-      // No native Vision module yet — try using base64 with backend
-      console.warn('[ReceiptPipeline] Vision OCR not available. Image captured but text extraction requires native module.');
+      // No native Vision module — try backend AI OCR
+      console.warn('[ReceiptPipeline] Vision OCR not available. Falling back to backend AI scan.');
+      try {
+        const backend = await api.scanReceipt(asset.base64, asset.mimeType || 'image/jpeg');
+        if (backend?.transaction) {
+          return {
+            success: true,
+            transaction: {
+              id: generateId(),
+              merchant: backend.transaction.merchant,
+              date: backend.transaction.date,
+              amount: backend.transaction.amount,
+              vat: backend.transaction.vat,
+              trn: backend.transaction.trn,
+              currency: backend.transaction.currency || 'AED',
+              category: backend.transaction.category,
+              paymentMethod: backend.transaction.paymentMethod,
+              status: 'pending',
+            },
+            imageUri: workingUri,
+            ocrText: backend.ocrText || '',
+            ocrConfidence: backend.confidence || 0,
+            compressed: compressed.compressed,
+          };
+        }
+      } catch (e) {
+        console.warn('[ReceiptPipeline] Backend scan failed:', e.message);
+      }
+      // Backend unavailable — return image so chat can display it
       return {
         success: false,
-        error: 'OCR text extraction requires a native module. Falling back to manual entry.',
+        error: 'OCR unavailable. Image uploaded to chat for manual review.',
         needsBackend: true,
         imageBase64: asset.base64,
         imageMimeType: asset.mimeType || 'image/jpeg',
+        imageUri: workingUri,
       };
     }
 
@@ -88,6 +124,23 @@ export async function scanReceipt(source = 'gallery') {
     // Step 3: Parse with Gemma or local parser
     const transaction = await parseReceipt(ocrText);
 
+    // Hijri date fallback — some UAE merchants print هـ only
+    if (!transaction.date) {
+      const hijri = parseHijriDate(ocrText);
+      if (hijri) transaction.date = hijri;
+    }
+
+    // Step 4: Auto-categorize if parser didn't return a valid category
+    let category = transaction.category;
+    if (!category || category === 'other' || category === 'unknown') {
+      const cat = await autoCategorize({
+        merchant: transaction.merchant,
+        amount: transaction.amount,
+        ocrText,
+      });
+      category = cat.id;
+    }
+
     return {
       success: true,
       transaction: {
@@ -98,18 +151,84 @@ export async function scanReceipt(source = 'gallery') {
         vat: transaction.vat,
         trn: transaction.trn,
         currency: transaction.currency || 'AED',
-        category: transaction.category,
+        category,
         paymentMethod: transaction.paymentMethod,
         status: 'pending',
       },
+      imageUri: workingUri,
       ocrText,
       ocrConfidence,
+      compressed: compressed.compressed,
     };
 
   } catch (error) {
     console.error('[ReceiptPipeline] Scan error:', error);
     return { success: false, error: error.message || 'Failed to scan receipt.' };
   }
+}
+
+/**
+ * Multi-image single-tx scan: pick N images (e.g. 2-page invoice), OCR each,
+ * concat text, single parseReceipt → one merged transaction.
+ */
+export async function scanReceiptMerged() {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') return { success: false, error: 'Photo permission required.' };
+
+  const pick = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true,
+    selectionLimit: 6,
+    base64: false,
+    quality: 0.8,
+  });
+  if (pick.canceled || !pick.assets?.length) return { success: false, error: 'Cancelled.' };
+  if (pick.assets.length < 2) return { success: false, error: 'Pick at least 2 images to merge.' };
+
+  if (!isOcrAvailable()) {
+    return { success: false, error: 'On-device OCR not available.' };
+  }
+
+  const parts = [];
+  const uris = [];
+  for (let i = 0; i < pick.assets.length; i++) {
+    const asset = pick.assets[i];
+    uris.push(asset.uri);
+    try {
+      const ocr = await recognizeText(asset.uri);
+      if (ocr.text?.trim()) parts.push(`--- PAGE ${i + 1} ---\n${ocr.text}`);
+    } catch (e) {
+      parts.push(`--- PAGE ${i + 1} (failed: ${e.message}) ---`);
+    }
+  }
+  const ocrText = parts.join('\n\n');
+  if (!ocrText.trim()) return { success: false, error: 'No text detected across images.' };
+
+  const parsed = await parseReceipt(ocrText);
+  let category = parsed.category;
+  if (!category || category === 'other' || category === 'unknown') {
+    const cat = await autoCategorize({ merchant: parsed.merchant, amount: parsed.amount, ocrText });
+    category = cat.id;
+  }
+
+  return {
+    success: true,
+    transaction: {
+      id: generateId(),
+      merchant: parsed.merchant,
+      date: parsed.date,
+      amount: parsed.amount,
+      vat: parsed.vat,
+      trn: parsed.trn,
+      currency: parsed.currency || 'AED',
+      category,
+      status: 'pending',
+      pageCount: pick.assets.length,
+    },
+    imageUri: uris[0],
+    imageUris: uris,
+    ocrText,
+  };
 }
 
 /**
@@ -150,6 +269,68 @@ export async function parseExpenseText(text) {
     ...parsed,
     status: 'pending',
   };
+}
+
+/**
+ * Bulk scan: pick multiple images, OCR+parse each sequentially.
+ * onProgress({done, total, current}) fires per image.
+ * Returns: { results: [{success, transaction?, error?}], count }
+ */
+export async function scanReceiptBulk(onProgress) {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    return { results: [], count: 0, error: 'Photo library permission required.' };
+  }
+  const pick = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true,
+    selectionLimit: 20,
+    base64: true,
+    quality: 0.8,
+  });
+  if (pick.canceled || !pick.assets?.length) return { results: [], count: 0 };
+
+  const results = [];
+  for (let i = 0; i < pick.assets.length; i++) {
+    const asset = pick.assets[i];
+    onProgress?.({ done: i, total: pick.assets.length, current: asset.uri });
+    try {
+      if (!isOcrAvailable()) {
+        results.push({ success: false, error: 'OCR not available', imageUri: asset.uri });
+        continue;
+      }
+      const ocr = await recognizeText(asset.uri);
+      if (!ocr.text?.trim()) {
+        results.push({ success: false, error: 'No text detected', imageUri: asset.uri });
+        continue;
+      }
+      const parsed = await parseReceipt(ocr.text);
+      let category = parsed.category;
+      if (!category || category === 'other' || category === 'unknown') {
+        const cat = await autoCategorize({ merchant: parsed.merchant, amount: parsed.amount, ocrText: ocr.text });
+        category = cat.id;
+      }
+      results.push({
+        success: true,
+        imageUri: asset.uri,
+        transaction: {
+          id: generateId(),
+          merchant: parsed.merchant,
+          date: parsed.date,
+          amount: parsed.amount,
+          vat: parsed.vat,
+          trn: parsed.trn,
+          currency: parsed.currency || 'AED',
+          category,
+          status: 'pending',
+        },
+      });
+    } catch (e) {
+      results.push({ success: false, error: e.message, imageUri: asset.uri });
+    }
+  }
+  onProgress?.({ done: pick.assets.length, total: pick.assets.length, current: null });
+  return { results, count: pick.assets.length };
 }
 
 function generateId() {

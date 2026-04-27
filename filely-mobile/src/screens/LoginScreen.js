@@ -30,7 +30,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function CreditCard({ variant, label, number, holder, extra, style }) {
   const isBlue = variant === 'blue';
-  const bg = isBlue ? '#3B6BFF' : '#111827';
+  const bg = isBlue ? '#2A63E2' : '#111827';
   const accentBg = isBlue ? '#2E5BFF' : '#1F2937';
 
   return (
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

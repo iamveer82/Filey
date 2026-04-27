@@ -27,6 +27,7 @@ RCT_EXPORT_MODULE()
 
 // Exported method: recognizeText(imageUri)
 RCT_EXPORT_METHOD(recognizeText:(NSString *)imageUri
+                  options:(NSDictionary *)options
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 {
@@ -42,8 +43,10 @@ RCT_EXPORT_METHOD(recognizeText:(NSString *)imageUri
                 return;
             }
 
+            NSArray<NSString *> *languages = options[@"languages"] ?: @[@"ar-SA", @"en-US"];
+
             // Perform OCR using Vision framework
-            [self recognizeTextInImage:image completion:^(NSDictionary *result, NSError *error) {
+            [self recognizeTextInImage:image languages:languages completion:^(NSDictionary *result, NSError *error) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (error) {
                         reject(@"OCR_ERROR", error.localizedDescription, error);
@@ -87,14 +90,14 @@ RCT_EXPORT_METHOD(recognizeText:(NSString *)imageUri
 }
 
 // Perform OCR using Vision framework
-- (void)recognizeTextInImage:(UIImage *)image completion:(void(^)(NSDictionary *, NSError *))completion {
+- (void)recognizeTextInImage:(UIImage *)image languages:(NSArray<NSString *> *)languages completion:(void(^)(NSDictionary *, NSError *))completion {
     CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
 
     // Create text recognition request with accuracy level
     VNRecognizeTextRequest *recognizeRequest = [VNRecognizeTextRequest new];
     recognizeRequest.recognitionLevels = VNImageTextRecognitionLevelAccurate;
     recognizeRequest.usesLanguageCorrection = YES;
-    recognizeRequest.recognitionLanguages = @[@"en-US", @"en-GB"];
+    recognizeRequest.recognitionLanguages = (languages.count > 0) ? languages : @[@"ar-SA", @"en-US"];
 
     // Create image request handler with the actual image
     VNImageRequestHandler *requestHandler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];

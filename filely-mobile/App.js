@@ -9,6 +9,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { registerRootComponent } from 'expo';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +31,10 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { initTelemetry } from './src/services/telemetry';
+
+initTelemetry();
+
 import LoginScreen from './src/screens/LoginScreen';
 import AIInitializationScreen from './src/screens/AIInitializationScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
@@ -38,9 +43,20 @@ import HomeScreen from './src/screens/HomeScreen';
 import AIMessagingHub from './src/screens/AIMessagingHub';
 import TeamScreen from './src/screens/TeamScreen';
 import ComplianceVault from './src/screens/ComplianceVault';
+import ServicesScreen from './src/screens/ServicesScreen';
+import ScannerScreen from './src/screens/ScannerScreen';
+import SignatureScreen from './src/screens/SignatureScreen';
+import ExportScreen from './src/screens/ExportScreen';
+import MergePdfScreen from './src/screens/MergePdfScreen';
+import ProtectPDFScreen from './src/screens/ProtectPDFScreen';
+import WatermarkPDFScreen from './src/screens/WatermarkPDFScreen';
+import CompressPDFScreen from './src/screens/CompressPDFScreen';
+import SplitPDFScreen from './src/screens/SplitPDFScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import TransactionReviewScreen from './src/screens/TransactionReviewScreen';
 
 const Tab = createBottomTabNavigator();
+const ClipStack = createNativeStackNavigator();
 // const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Themes ────────────────────────────────────────────────────────────────────
@@ -53,7 +69,7 @@ const FilelyLightTheme = {
     card: '#FFFFFF',
     text: '#0F172A',
     border: 'rgba(15,23,42,0.08)',
-    primary: '#3B6BFF',
+    primary: '#2A63E2',
   },
 };
 
@@ -65,7 +81,7 @@ const FilelyDarkTheme = {
     card: '#141B2D',
     text: '#FFFFFF',
     border: 'rgba(255,255,255,0.08)',
-    primary: '#3B6BFF',
+    primary: '#2A63E2',
   },
 };
 
@@ -74,12 +90,12 @@ const FilelyDarkTheme = {
 const TAB_ICONS = {
   Home:     { active: 'home',             inactive: 'home-outline'             },
   Chat:     { active: 'chatbubbles',      inactive: 'chatbubbles-outline'      },
-  Vault:    { active: 'shield-checkmark', inactive: 'shield-checkmark-outline' },
+  Clip:     { active: 'attach',           inactive: 'attach-outline'           },
   Team:     { active: 'people',           inactive: 'people-outline'           },
   Settings: { active: 'settings',         inactive: 'settings-outline'         },
 };
 
-const TAB_KEYS = ['Home', 'Chat', 'Vault', 'Team', 'Settings'];
+const TAB_KEYS = ['Home', 'Chat', 'Clip', 'Team', 'Settings'];
 
 // ─── Spring configs ────────────────────────────────────────────────────────────
 
@@ -137,7 +153,7 @@ function AnimatedTabIcon({ routeName, focused, darkMode }) {
 
   const icons = TAB_ICONS[routeName];
   const iconName = focused ? icons.active : icons.inactive;
-  const inactiveColor = darkMode ? 'rgba(255,255,255,0.35)' : '#94A3B8';
+  const inactiveColor = darkMode ? 'rgba(255,255,255,0.35)' : '#0F172A';
 
   return (
     <View style={tabIconStyles.wrapper}>
@@ -151,6 +167,7 @@ function AnimatedTabIcon({ routeName, focused, darkMode }) {
           name={iconName}
           size={focused ? 22 : 24}
           color={focused ? '#FFFFFF' : inactiveColor}
+          style={routeName === 'Clip' ? { transform: [{ scaleX: -1 }] } : undefined}
         />
       </Animated.View>
     </View>
@@ -176,8 +193,8 @@ const tabIconStyles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#3B6BFF',
-    shadowColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
+    shadowColor: '#2A63E2',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 14,
@@ -194,11 +211,11 @@ const tabIconStyles = StyleSheet.create({
 function CustomTabBar({ state, descriptors, navigation, darkMode }) {
   const barBg = darkMode
     ? 'rgba(14, 19, 35, 0.88)'
-    : 'rgba(255, 255, 255, 0.82)';
+    : '#FFFFFF';
   const barBorder = darkMode
     ? 'rgba(255,255,255,0.06)'
-    : 'rgba(15,23,42,0.06)';
-  const barShadowColor = darkMode ? '#3B6BFF' : '#000000';
+    : 'rgba(15,23,42,0.10)';
+  const barShadowColor = darkMode ? '#2A63E2' : '#000000';
 
   return (
     <View style={[
@@ -248,7 +265,7 @@ function CustomTabBar({ state, descriptors, navigation, darkMode }) {
               onPress={onPress}
               onLongPress={onLongPress}
               style={customBarStyles.tab}
-              android_ripple={{ color: 'rgba(68,229,113,0.15)', borderless: true }}
+              android_ripple={{ color: darkMode ? 'rgba(68,229,113,0.15)' : 'rgba(15,23,42,0.10)', borderless: true }}
             >
               <AnimatedTabIcon
                 routeName={route.name}
@@ -362,8 +379,8 @@ function AppContent() {
     text:      darkMode ? '#FFFFFF'                 : '#0F172A',
     textMuted: darkMode ? 'rgba(255,255,255,0.35)'  : '#94A3B8',
     border:    darkMode ? 'rgba(255,255,255,0.08)'  : 'rgba(15,23,42,0.08)',
-    lime:      '#3B6BFF',
-    accent:    '#3B6BFF',
+    lime:      '#2A63E2',
+    accent:    '#2A63E2',
   };
 
   // ── Auth flow gates ─────────────────────────────────────────────────────────
@@ -371,7 +388,7 @@ function AppContent() {
   if (loading || checkingAi) {
     return (
       <View style={[gateStyles.center, { backgroundColor: c.bg }]}>
-        <ActivityIndicator size="large" color="#3B6BFF" />
+        <ActivityIndicator size="large" color="#2A63E2" />
       </View>
     );
   }
@@ -418,7 +435,7 @@ function AppContent() {
   // ── Main tab navigator ──────────────────────────────────────────────────────
 
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <NavigationContainer theme={theme}>
         <Tab.Navigator
@@ -426,6 +443,7 @@ function AppContent() {
             <CustomTabBar {...props} darkMode={darkMode} />
           )}
           screenOptions={{
+            headerShown: false,
             headerStyle: {
               backgroundColor: c.headerBg,
               shadowColor: 'transparent',
@@ -446,100 +464,104 @@ function AppContent() {
             },
           }}
         >
-          {/* ── Home ──────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Home"
-            options={{
-              headerTitle: 'Filey',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="wallet" size={22} color="#3B6BFF" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Home">
             {(props) => <HomeScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Chat ──────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Chat"
-            options={{
-              headerTitle: 'AI Hub',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="sparkles" size={22} color="#3B6BFF" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Chat">
             {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Vault ─────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Vault"
-            options={{
-              headerTitle: '5-Year Vault',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="shield-checkmark" size={22} color="#3B6BFF" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
-            {(props) => <ComplianceVault {...props} darkMode={darkMode} />}
+          <Tab.Screen name="Clip">
+            {(props) => (
+              <ClipStack.Navigator screenOptions={{ headerShown: false }}>
+                <ClipStack.Screen name="ClipHome">
+                  {(screenProps) => <ServicesScreen {...screenProps} darkMode={darkMode} />}
+                </ClipStack.Screen>
+                <ClipStack.Screen
+                  name="Scanner"
+                  component={ScannerScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Signature"
+                  component={SignatureScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Export"
+                  component={ExportScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Merge"
+                  component={MergePdfScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Protect"
+                  component={ProtectPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Watermark"
+                  component={WatermarkPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Compress"
+                  component={CompressPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Split"
+                  component={SplitPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="TransactionReview"
+                  component={TransactionReviewScreen}
+                  options={{
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+              </ClipStack.Navigator>
+            )}
           </Tab.Screen>
-
-          {/* ── Team ──────────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Team"
-            options={{
-              headerTitle: 'Team Hub',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="people" size={22} color="#3B6BFF" />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Team">
             {(props) => <TeamScreen {...props} darkMode={darkMode} />}
           </Tab.Screen>
-
-          {/* ── Settings ──────────────────────────────────────────────── */}
-          <Tab.Screen
-            name="Settings"
-            options={{
-              headerTitle: 'Settings',
-              headerLeft: () => (
-                <View style={headerStyles.iconLeft}>
-                  <Ionicons name="settings" size={22} color={c.textMuted} />
-                </View>
-              ),
-              headerRight: () => (
-                <DarkModeToggle darkMode={darkMode} onToggle={toggleDarkMode} />
-              ),
-            }}
-          >
+          <Tab.Screen name="Settings">
             {(props) => (
               <SettingsScreen {...props} darkMode={darkMode} onLogout={signOut} />
             )}
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
-    </SafeAreaProvider>
+    </>
   );
 }
 
@@ -563,9 +585,11 @@ const headerStyles = StyleSheet.create({
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

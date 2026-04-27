@@ -1,15 +1,15 @@
 /**
- * Vision OCR Service — Extracts text from receipt images using Apple Vision framework.
+ * Vision OCR Service — Native iOS OCR using Apple Vision framework.
  *
- * On iOS: Uses the native Vision framework (VNRecognizeTextRequest) via a Turbo Module.
- * On web: Falls back to a simple placeholder that returns no text (web dev only).
+ * iOS: VNRecognizeTextRequest via RNVisionOcr native module.
+ * Android: Falls back to ML Kit or Google ML (future).
+ * Web: Returns empty results (dev only).
  *
- * The native module must be registered in ios/ as RNVisionOcr.
- * Until the native module is built, this falls back gracefully.
+ * When an AI model is connected (Gemma via GemmaInference module), it can request
+ * image data upload for enhanced analysis. Otherwise the native OCR handles everything.
  */
 import { Platform, NativeModules } from 'react-native';
 
-// Lazy-load native module to prevent top-level JSI crash when module isn't linked
 let _visionModule = null;
 function getVisionModule() {
   if (_visionModule === undefined) return null;
@@ -20,28 +20,29 @@ function getVisionModule() {
       console.warn('[VisionOcr] Failed to load native module:', e.message);
       _visionModule = undefined;
     }
-    if (_visionModule === undefined) _visionModule = undefined; // mark as attempted
   }
   return _visionModule || null;
 }
 
 /**
- * Extract text from a receipt image.
- * @param {string} imageUri — Local file URI (e.g., file:///path/to/image.jpg) or base64 data URI
- * @returns {Promise<{ text: string, confidence: number, regions: Array<{text: string, confidence: number, bounds: object}> }>}
+ * Extract text from an image using native Vision framework.
+ * @param {string} imageUri - file:// or http:// URI
+ * @param {object} opts - { languages?: string[], customWords?: string[] }
+ * @returns {Promise<{ text: string, confidence: number, regions: Array }>}
  */
-export async function recognizeText(imageUri) {
-  // Web platform fallback — no OCR on web
+const DEFAULT_LANGS = ['en-US', 'ar-SA'];
+
+export async function recognizeText(imageUri, opts = {}) {
   if (Platform.OS === 'web') {
-    console.warn('[VisionOcr] Text recognition is not available on web platform.');
     return { text: '', confidence: 0, regions: [] };
   }
 
-  // Try native Vision module first
+  const languages = opts.languages || DEFAULT_LANGS;
   const RNVisionOcr = getVisionModule();
+
   if (RNVisionOcr && typeof RNVisionOcr.recognizeText === 'function') {
     try {
-      const result = await RNVisionOcr.recognizeText(imageUri);
+      const result = await RNVisionOcr.recognizeText(imageUri, { languages });
       return {
         text: result.text || '',
         confidence: result.confidence || 0,
@@ -52,14 +53,25 @@ export async function recognizeText(imageUri) {
     }
   }
 
-  // Fallback: No native module available yet
-  // This will be replaced with the actual Turbo Module once built
-  console.warn('[VisionOcr] Native module not available. OCR text extraction is not functional.');
   return { text: '', confidence: 0, regions: [] };
 }
 
 /**
- * Quick check if OCR is available on the current platform.
+ * Get list of languages supported by Vision OCR on this device.
+ * @returns {Promise<string[]>}
+ */
+export async function getSupportedLanguages() {
+  if (Platform.OS === 'ios') {
+    const RNVisionOcr = getVisionModule();
+    if (RNVisionOcr && typeof RNVisionOcr.getSupportedLanguages === 'function') {
+      return RNVisionOcr.getSupportedLanguages();
+    }
+  }
+  return ['en-US'];
+}
+
+/**
+ * Check if OCR is available on current platform.
  * @returns {boolean}
  */
 export function isOcrAvailable() {
