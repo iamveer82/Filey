@@ -43,7 +43,7 @@ function formatDate(str) {
 }
 
 export default function FilesScreen({ darkMode }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const insets = useSafeAreaInsets();
   const { orgId } = useAuth();
   const isWeb = Platform.OS === 'web';
@@ -136,7 +136,7 @@ export default function FilesScreen({ darkMode }) {
     const hasTRN = !!file.trn;
 
     return (
-      <View style={[styles.txnCard, darkMode ? CardPresets.cardDark : CardPresets.cardLight]}>
+      <View style={[styles.txnCard, CardPresets.cardLight]}>
         {isEditing ? (
           <View style={{ gap: Spacing.md }}>
             <TextInput
@@ -325,7 +325,7 @@ export default function FilesScreen({ darkMode }) {
           <ActivityIndicator size="large" color="#2A63E2" />
         </View>
       ) : filtered.length === 0 ? (
-        <View style={[styles.emptyCard, darkMode ? CardPresets.cardDark : CardPresets.cardLight, { marginHorizontal: Spacing.xxl }]}>
+        <View style={[styles.emptyCard, CardPresets.cardLight, { marginHorizontal: Spacing.xxl }]}>
           <Ionicons name="folder-open-outline" size={48} color={c.textMuted} />
           <Text style={[styles.emptyText, { color: c.textSecondary }]}>No records found</Text>
         </View>

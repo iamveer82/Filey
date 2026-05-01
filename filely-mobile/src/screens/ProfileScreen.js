@@ -16,7 +16,7 @@ const menuItems = [
 ];
 
 export default function ProfileScreen({ darkMode, onLogout }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
 
@@ -56,7 +56,7 @@ export default function ProfileScreen({ darkMode, onLogout }) {
           <Animated.View
             key={item.label}
             entering={FadeInRight.delay(i * 80).duration(400).springify()}
-            style={[styles.menuItem, darkMode ? CardPresets.cardDark : CardPresets.cardLight]}
+            style={[styles.menuItem, CardPresets.cardLight]}
           >
             <TouchableOpacity
               style={styles.menuItemInner}
