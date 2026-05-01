@@ -60,7 +60,7 @@ function StatPill({ label, value }) {
 }
 
 export default function ComplianceVault({ darkMode }) {
-  const c = Colors.light;
+  const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { orgId } = useAuth();
 

@@ -69,7 +69,7 @@ function Section({ title, children, c, delay = 80 }) {
 
 export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode, onSignOut, onLogout }) {
   const doSignOut = onSignOut || onLogout;
-  const c = Colors.light;
+  const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { user, profile: authProfile, signOut } = useAuth();
   const [profile, setProfile] = useState(authProfile);

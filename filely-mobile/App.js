@@ -7,8 +7,9 @@ import 'react-native-gesture-handler';
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { registerRootComponent } from 'expo';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import {
   View,
   ActivityIndicator,
   Platform,
+  TouchableOpacity,
   StyleSheet,
   Dimensions,
   Pressable,
@@ -29,21 +31,37 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { initTelemetry } from './src/services/telemetry';
+
+initTelemetry();
+
 import LoginScreen from './src/screens/LoginScreen';
+import AIInitializationScreen from './src/screens/AIInitializationScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import CompanySetupScreen from './src/screens/CompanySetupScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import ChatScreen from './src/screens/ChatScreen';
+import AIMessagingHub from './src/screens/AIMessagingHub';
 import TeamScreen from './src/screens/TeamScreen';
-import FilesScreen from './src/screens/FilesScreen';
 import ComplianceVault from './src/screens/ComplianceVault';
+import ServicesScreen from './src/screens/ServicesScreen';
+import ScannerScreen from './src/screens/ScannerScreen';
+import SignatureScreen from './src/screens/SignatureScreen';
+import ExportScreen from './src/screens/ExportScreen';
+import MergePdfScreen from './src/screens/MergePdfScreen';
+import ProtectPDFScreen from './src/screens/ProtectPDFScreen';
+import WatermarkPDFScreen from './src/screens/WatermarkPDFScreen';
+import CompressPDFScreen from './src/screens/CompressPDFScreen';
+import SplitPDFScreen from './src/screens/SplitPDFScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import TransactionReviewScreen from './src/screens/TransactionReviewScreen';
 
 const Tab = createBottomTabNavigator();
+const ClipStack = createNativeStackNavigator();
+// const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ─── Light Only Theme ──────────────────────────────────────────────────────────
+// ─── Themes ────────────────────────────────────────────────────────────────────
 
-const FilelyTheme = {
+const FilelyLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -51,31 +69,33 @@ const FilelyTheme = {
     card: '#FFFFFF',
     text: '#0F172A',
     border: 'rgba(15,23,42,0.08)',
-    primary: '#3B6BFF',
+    primary: '#2A63E2',
   },
 };
 
-// ─── Colors object for non-themed components ────────────────────────────────────
-
-const LIGHT = {
-  bg: '#F8FAFC',
-  navBg: 'rgba(255,255,255,0.95)',
-  headerBg: 'rgba(255,255,255,0.98)',
-  text: '#0F172A',
-  textMuted: '#94A3B8',
-  border: 'rgba(15,23,42,0.08)',
-  accent: '#3B6BFF',
+const FilelyDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: '#0B0F1E',
+    card: '#141B2D',
+    text: '#FFFFFF',
+    border: 'rgba(255,255,255,0.08)',
+    primary: '#2A63E2',
+  },
 };
 
-// ─── Tab icons ──────────────────────────────────────────────────────────────────
+// ─── Tab icon config ───────────────────────────────────────────────────────────
 
 const TAB_ICONS = {
   Home:     { active: 'home',             inactive: 'home-outline'             },
   Chat:     { active: 'chatbubbles',      inactive: 'chatbubbles-outline'      },
-  Files:    { active: 'document-text',    inactive: 'document-text-outline'    },
-  Vault:    { active: 'shield-checkmark', inactive: 'shield-checkmark-outline' },
+  Clip:     { active: 'attach',           inactive: 'attach-outline'           },
+  Team:     { active: 'people',           inactive: 'people-outline'           },
   Settings: { active: 'settings',         inactive: 'settings-outline'         },
 };
+
+const TAB_KEYS = ['Home', 'Chat', 'Clip', 'Team', 'Settings'];
 
 // ─── Spring configs ────────────────────────────────────────────────────────────
 
@@ -88,11 +108,15 @@ const SPRING_CONFIG = {
   restSpeedThreshold: 0.01,
 };
 
-const BOUNCE_SPRING = { damping: 10, stiffness: 200, mass: 0.6 };
+const BOUNCE_SPRING = {
+  damping: 10,
+  stiffness: 200,
+  mass: 0.6,
+};
 
-// ─── Animated Tab Icon (light only) ─────────────────────────────────────────────
+// ─── Animated Tab Icon ─────────────────────────────────────────────────────────
 
-function AnimatedTabIcon({ routeName, focused }) {
+function AnimatedTabIcon({ routeName, focused, darkMode }) {
   const scale = useSharedValue(focused ? 1 : 0.85);
   const pillScale = useSharedValue(focused ? 1 : 0);
   const pillOpacity = useSharedValue(focused ? 1 : 0);
@@ -100,7 +124,10 @@ function AnimatedTabIcon({ routeName, focused }) {
 
   useEffect(() => {
     if (focused) {
-      scale.value = withSpring(1.15, BOUNCE_SPRING, () => { scale.value = withSpring(1, SPRING_CONFIG); });
+      // Animate in: bounce scale + pill grows
+      scale.value = withSpring(1.15, BOUNCE_SPRING, () => {
+        scale.value = withSpring(1, SPRING_CONFIG);
+      });
       pillScale.value = withSpring(1, SPRING_CONFIG);
       pillOpacity.value = withTiming(1, { duration: 200 });
       iconTranslateY.value = withSpring(-2, SPRING_CONFIG);
@@ -112,58 +139,139 @@ function AnimatedTabIcon({ routeName, focused }) {
     }
   }, [focused]);
 
-  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }, { translateY: iconTranslateY.value }] }));
-  const pillStyle = useAnimatedStyle(() => ({ transform: [{ scale: pillScale.value }], opacity: pillOpacity.value }));
+  const animatedIconStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateY: iconTranslateY.value },
+    ],
+  }));
+
+  const animatedPillStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pillScale.value }],
+    opacity: pillOpacity.value,
+  }));
 
   const icons = TAB_ICONS[routeName];
   const iconName = focused ? icons.active : icons.inactive;
+  const inactiveColor = darkMode ? 'rgba(255,255,255,0.35)' : '#0F172A';
 
   return (
     <View style={tabIconStyles.wrapper}>
-      <Animated.View style={[tabIconStyles.pill, pillStyle]}>
+      {/* Lime pill background */}
+      <Animated.View style={[tabIconStyles.pill, animatedPillStyle]}>
         <View style={tabIconStyles.pillInner} />
       </Animated.View>
-      <Animated.View style={[tabIconStyles.iconContainer, iconStyle]}>
-        <Ionicons name={iconName} size={focused ? 22 : 24} color={focused ? '#FFFFFF' : '#94A3B8'} />
+      {/* Icon */}
+      <Animated.View style={[tabIconStyles.iconContainer, animatedIconStyle]}>
+        <Ionicons
+          name={iconName}
+          size={focused ? 22 : 24}
+          color={focused ? '#FFFFFF' : inactiveColor}
+          style={routeName === 'Clip' ? { transform: [{ scaleX: -1 }] } : undefined}
+        />
       </Animated.View>
     </View>
   );
 }
 
 const tabIconStyles = StyleSheet.create({
-  wrapper: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
-  pill: { position: 'absolute', width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  pillInner: {
-    width: 50, height: 50, borderRadius: 25, backgroundColor: '#3B6BFF',
-    shadowColor: '#3B6BFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 8,
+  wrapper: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconContainer: { alignItems: 'center', justifyContent: 'center' },
+  pill: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#2A63E2',
+    shadowColor: '#2A63E2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
-// ─── Custom Tab Bar (light only) ────────────────────────────────────────────────
+// ─── Custom Tab Bar ────────────────────────────────────────────────────────────
 
-function CustomTabBar({ state, descriptors, navigation }) {
+function CustomTabBar({ state, descriptors, navigation, darkMode }) {
+  const barBg = darkMode
+    ? 'rgba(14, 19, 35, 0.88)'
+    : '#FFFFFF';
+  const barBorder = darkMode
+    ? 'rgba(255,255,255,0.06)'
+    : 'rgba(15,23,42,0.10)';
+  const barShadowColor = darkMode ? '#2A63E2' : '#000000';
+
   return (
-    <View style={[customBarStyles.outer, { shadowColor: '#000', shadowOpacity: 0.12 }]}>
-      <View style={[customBarStyles.container, { backgroundColor: 'rgba(255,255,255,0.82)', borderColor: 'rgba(15,23,42,0.06)' }]}>
+    <View style={[
+      customBarStyles.outer,
+      {
+        shadowColor: barShadowColor,
+        shadowOpacity: darkMode ? 0.25 : 0.12,
+      },
+    ]}>
+      <View style={[
+        customBarStyles.container,
+        {
+          backgroundColor: barBg,
+          borderColor: barBorder,
+        },
+      ]}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
+
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
           };
+
+          const onLongPress = () => {
+            navigation.emit({
+              type: 'tabLongPress',
+              target: route.key,
+            });
+          };
+
           return (
             <Pressable
               key={route.key}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
               onPress={onPress}
+              onLongPress={onLongPress}
               style={customBarStyles.tab}
-              android_ripple={{ color: 'rgba(59,107,255,0.15)', borderless: true }}
+              android_ripple={{ color: darkMode ? 'rgba(68,229,113,0.15)' : 'rgba(15,23,42,0.10)', borderless: true }}
             >
-              <AnimatedTabIcon routeName={route.name} focused={isFocused} />
+              <AnimatedTabIcon
+                routeName={route.name}
+                focused={isFocused}
+                darkMode={darkMode}
+              />
             </Pressable>
           );
         })}
@@ -174,116 +282,314 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
 const customBarStyles = StyleSheet.create({
   outer: {
-    position: 'absolute', bottom: Platform.OS === 'ios' ? 28 : 18, left: 16, right: 16,
-    shadowOffset: { width: 0, height: 10 }, shadowRadius: 30, elevation: 24,
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 28 : 18,
+    left: 16,
+    right: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 30,
+    elevation: 24,
   },
   container: {
-    flexDirection: 'row', borderRadius: 32, height: 72, alignItems: 'center',
-    justifyContent: 'space-around', borderWidth: 1, overflow: 'hidden',
+    flexDirection: 'row',
+    borderRadius: 32,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderWidth: 1,
+    // Frosted glass reinforcement: inner shadow via overlapping borders
+    overflow: 'hidden',
   },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 72 },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 72,
+  },
 });
 
-// ─── Header Left Icon ──────────────────────────────────────────────────────────
+// ─── Header dark/light toggle button ──────────────────────────────────────────
 
-function HeaderIcon({ icon, color = '#3B6BFF' }) {
+function DarkModeToggle({ darkMode, onToggle }) {
+  const rotation = useSharedValue(darkMode ? 0 : 1);
+
+  useEffect(() => {
+    rotation.value = withSpring(darkMode ? 0 : 1, {
+      damping: 12,
+      stiffness: 100,
+    });
+  }, [darkMode]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { rotate: `${interpolate(rotation.value, [0, 1], [0, 180])}deg` },
+    ],
+  }));
+
+  const mutedColor = darkMode ? 'rgba(255,255,255,0.45)' : '#94A3B8';
+
   return (
-    <View style={headerStyles.iconLeft}>
-      <Ionicons name={icon} size={22} color={color} />
-    </View>
+    <TouchableOpacity
+      onPress={onToggle}
+      style={toggleStyles.button}
+      accessibilityRole="button"
+      accessibilityLabel={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      <Animated.View style={animatedStyle}>
+        <Ionicons
+          name={darkMode ? 'sunny' : 'moon'}
+          size={20}
+          color={mutedColor}
+        />
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
-const headerStyles = StyleSheet.create({ iconLeft: { marginLeft: 16 } });
+const toggleStyles = StyleSheet.create({
+  button: {
+    marginRight: 16,
+    padding: 6,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+  },
+});
 
 // ─── Main App Content ──────────────────────────────────────────────────────────
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [darkMode, setDarkMode]     = useState(true);   // default dark -- matches navy theme
+  const [aiReady, setAiReady]       = useState(true);   // demo mode: skip download
+  const [checkingAi]                = useState(false);
+
+  const [showOnboarding,   setShowOnboarding]   = useState(false);
   const [showCompanySetup, setShowCompanySetup] = useState(false);
 
-  if (loading) {
+  const toggleDarkMode = useCallback(() => setDarkMode(p => !p), []);
+  const theme = darkMode ? FilelyDarkTheme : FilelyLightTheme;
+
+  const c = {
+    bg:        darkMode ? '#0B0F1E'                 : '#F8FAFC',
+    navBg:     darkMode ? 'rgba(11,15,30,0.97)'     : 'rgba(255,255,255,0.95)',
+    headerBg:  darkMode ? 'rgba(20,27,45,0.98)'     : 'rgba(255,255,255,0.98)',
+    text:      darkMode ? '#FFFFFF'                 : '#0F172A',
+    textMuted: darkMode ? 'rgba(255,255,255,0.35)'  : '#94A3B8',
+    border:    darkMode ? 'rgba(255,255,255,0.08)'  : 'rgba(15,23,42,0.08)',
+    lime:      '#2A63E2',
+    accent:    '#2A63E2',
+  };
+
+  // ── Auth flow gates ─────────────────────────────────────────────────────────
+
+  if (loading || checkingAi) {
     return (
-      <View style={gateStyles.center}>
-        <ActivityIndicator size="large" color="#3B6BFF" />
+      <View style={[gateStyles.center, { backgroundColor: c.bg }]}>
+        <ActivityIndicator size="large" color="#2A63E2" />
       </View>
     );
   }
 
   if (!user) {
-    return <LoginScreen onNavigateToCompanySetup={() => setShowCompanySetup(true)} />;
+    return (
+      <LoginScreen
+        darkMode={darkMode}
+        onNavigateToCompanySetup={() => setShowCompanySetup(true)}
+      />
+    );
   }
 
   if (showCompanySetup) {
     return (
       <CompanySetupScreen
-        onComplete={() => { setShowCompanySetup(false); setShowOnboarding(true); }}
+        darkMode={darkMode}
+        onComplete={() => {
+          setShowCompanySetup(false);
+          setShowOnboarding(true);
+        }}
       />
     );
   }
 
   if (showOnboarding) {
-    return <OnboardingScreen onComplete={() => setShowOnboarding(false)} />;
+    return (
+      <OnboardingScreen
+        darkMode={darkMode}
+        onComplete={() => setShowOnboarding(false)}
+      />
+    );
   }
 
+  if (!aiReady && Platform.OS !== 'web') {
+    return (
+      <AIInitializationScreen
+        darkMode={darkMode}
+        onComplete={() => setAiReady(true)}
+      />
+    );
+  }
+
+  // ── Main tab navigator ──────────────────────────────────────────────────────
+
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <NavigationContainer theme={FilelyTheme}>
+    <>
+      <StatusBar style={darkMode ? 'light' : 'dark'} />
+      <NavigationContainer theme={theme}>
         <Tab.Navigator
-          tabBar={(props) => <CustomTabBar {...props} />}
+          tabBar={(props) => (
+            <CustomTabBar {...props} darkMode={darkMode} />
+          )}
           screenOptions={{
-            headerStyle: { backgroundColor: LIGHT.headerBg, shadowColor: 'transparent', elevation: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: LIGHT.border },
-            headerTitleStyle: { fontWeight: '800', fontSize: 20, letterSpacing: -0.5, color: LIGHT.text },
-            headerTintColor: LIGHT.text,
+            headerShown: false,
+            headerStyle: {
+              backgroundColor: c.headerBg,
+              shadowColor: 'transparent',
+              elevation: 0,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: c.border,
+            },
+            headerTitleStyle: {
+              fontWeight: '800',
+              fontSize: 20,
+              letterSpacing: -0.5,
+              color: c.text,
+            },
+            headerTintColor: c.text,
+            // Extra bottom padding so content doesn't hide behind floating bar
+            sceneStyle: {
+              paddingBottom: 0,
+            },
           }}
         >
-          <Tab.Screen
-            name="Home"
-            options={{ headerTitle: 'Filey', headerLeft: () => <HeaderIcon icon="wallet" /> }}
-            component={HomeScreen}
-          />
-          <Tab.Screen
-            name="Chat"
-            options={{ headerTitle: 'Fili Chat', headerLeft: () => <HeaderIcon icon="sparkles" /> }}
-            component={ChatScreen}
-          />
-          <Tab.Screen
-            name="Files"
-            options={{ headerTitle: 'Files', headerLeft: () => <HeaderIcon icon="document-text" /> }}
-            component={FilesScreen}
-          />
-          <Tab.Screen
-            name="Vault"
-            options={{ headerTitle: 'VAT Vault', headerLeft: () => <HeaderIcon icon="shield-checkmark" /> }}
-            component={ComplianceVault}
-          />
-          <Tab.Screen
-            name="Settings"
-            options={{ headerTitle: 'Settings', headerLeft: () => <HeaderIcon icon="settings" color="#94A3B8" /> }}
-          >
-            {(props) => <SettingsScreen {...props} onLogout={signOut} />}
+          <Tab.Screen name="Home">
+            {(props) => <HomeScreen {...props} darkMode={darkMode} />}
+          </Tab.Screen>
+          <Tab.Screen name="Chat">
+            {(props) => <AIMessagingHub {...props} darkMode={darkMode} />}
+          </Tab.Screen>
+          <Tab.Screen name="Clip">
+            {(props) => (
+              <ClipStack.Navigator screenOptions={{ headerShown: false }}>
+                <ClipStack.Screen name="ClipHome">
+                  {(screenProps) => <ServicesScreen {...screenProps} darkMode={darkMode} />}
+                </ClipStack.Screen>
+                <ClipStack.Screen
+                  name="Scanner"
+                  component={ScannerScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Signature"
+                  component={SignatureScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Export"
+                  component={ExportScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Merge"
+                  component={MergePdfScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Protect"
+                  component={ProtectPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Watermark"
+                  component={WatermarkPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Compress"
+                  component={CompressPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="Split"
+                  component={SplitPDFScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="TransactionReview"
+                  component={TransactionReviewScreen}
+                  options={{
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
+              </ClipStack.Navigator>
+            )}
+          </Tab.Screen>
+          <Tab.Screen name="Team">
+            {(props) => <TeamScreen {...props} darkMode={darkMode} />}
+          </Tab.Screen>
+          <Tab.Screen name="Settings">
+            {(props) => (
+              <SettingsScreen {...props} darkMode={darkMode} onLogout={signOut} />
+            )}
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
-    </SafeAreaProvider>
+    </>
   );
 }
 
-// ─── Shared ────────────────────────────────────────────────────────────────────
+// ─── Shared styles ─────────────────────────────────────────────────────────────
 
 const gateStyles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
+const headerStyles = StyleSheet.create({
+  iconLeft: {
+    marginLeft: 16,
+  },
 });
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
