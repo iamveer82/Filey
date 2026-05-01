@@ -155,8 +155,8 @@ function TransactionCard({ txn, onVerify, onEdit }) {
 
 // ─── Main ChatScreen ─────────────────────────────────────────
 
-export default function ChatScreen({ darkMode }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+export default function ChatScreen() {
+  const c = Colors.light;
   const { profile, orgId, userId } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');

@@ -71,7 +71,7 @@ function Avatar({ name, size = 36, isAdmin, stackOffset }) {
 }
 
 export default function TeamScreen({ darkMode }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const insets = useSafeAreaInsets();
   const { orgId, userId, profile } = useAuth();
   const isWeb = Platform.OS === 'web';

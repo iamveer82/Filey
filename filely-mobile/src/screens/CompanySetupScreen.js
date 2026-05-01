@@ -9,7 +9,7 @@ import api from '../api/client';
 const EMIRATES = ['Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Umm Al Quwain', 'Ras Al Khaimah', 'Fujairah'];
 
 export default function CompanySetupScreen({ darkMode, onComplete }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const [form, setForm] = useState({
     companyName: '',
     tradeLicense: '',

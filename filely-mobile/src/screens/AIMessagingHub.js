@@ -59,7 +59,7 @@ function TypingDots({ color }) {
 }
 
 export default function AIMessagingHub({ darkMode, activeTab = 'assistant' }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const insets = useSafeAreaInsets();
   const { profile, user } = useAuth();
   const [messages, setMessages] = useState([]);

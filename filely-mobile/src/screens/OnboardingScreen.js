@@ -72,7 +72,7 @@ function IllustrationCircle({ icon, c }) {
 }
 
 export default function OnboardingScreen({ darkMode = true, onComplete }) {
-  const c = darkMode ? Colors.dark : Colors.light;
+  const c = Colors.light;
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const isLast = step === STEPS.length - 1;
