@@ -71,7 +71,7 @@ function IllustrationCircle({ icon, c }) {
   );
 }
 
-export default function OnboardingScreen({ darkMode = true, onComplete }) {
+export default function OnboardingScreen({ darkMode = false, onComplete }) {
   const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);

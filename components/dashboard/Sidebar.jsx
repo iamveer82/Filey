@@ -37,14 +37,14 @@ export default function Sidebar() {
   const dark = mounted && theme === 'dark';
   const { plan, isPro } = usePlan();
   return (
-    <aside className="sticky top-0 flex h-screen w-[260px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6 dark:border-slate-800 dark:bg-slate-900">
+    <aside className="sticky top-0 flex h-screen w-[260px] shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
       <Link href="/" className="mb-6 flex items-center gap-2.5 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: BRAND }}>
           <Paperclip className="h-5 w-5 text-white" style={{ transform: 'scaleX(-1)' }} />
         </div>
-        <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white" style={{ color: INK }}>Filey</span>
+        <span className="text-xl font-bold tracking-tight text-slate-900" style={{ color: INK }}>Filey</span>
         {isPro && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" title={`${plan.name} plan`}>
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800" title={`${plan.name} plan`}>
             <Crown className="h-3 w-3" /> {plan.name}
           </span>
         )}
@@ -57,9 +57,9 @@ export default function Sidebar() {
           readOnly
           aria-label="Open command palette (Cmd+K)"
           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
-          className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-14 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:bg-slate-800"
+          className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-14 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:bg-white"
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">⌘ K</span>
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">⌘ K</span>
       </div>
 
       <SectionLabel>Main menu</SectionLabel>
@@ -96,7 +96,7 @@ export default function Sidebar() {
             onClick={() => setTheme(dark ? 'light' : 'dark')}
             aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
             aria-pressed={dark}
-            className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             <span className="flex items-center gap-3">
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -130,7 +130,7 @@ function NavLink({ item, active }) {
       className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${
         active
           ? 'text-white shadow-sm'
-          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
       }`}
       style={active ? { background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DARK})` } : undefined}
     >

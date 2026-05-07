@@ -83,23 +83,13 @@ export default function ChatInputBox({
     <>
       <View style={[styles.container, { paddingBottom: bottomOffset }]}>
         <View style={styles.box}>
-          {/* Text Input */}
-          <View style={styles.inputWrap}>
-            <TextInput
-              value={value}
-              onChangeText={onChangeText}
-              placeholder={isRecording ? 'Recording…' : (placeholder || 'Type your message…')}
-              placeholderTextColor="rgba(11,20,53,0.35)"
-              style={styles.input}
-              multiline
-              maxLength={4000}
-              editable={!isRecording && !loading}
-              onSubmitEditing={handleSend}
-            />
-          </View>
+          {/* Left: plus */}
+          <SpringPressable onPress={() => setShowMenu(true)} style={styles.iconBtn}>
+            <Ionicons name="add" size={24} color="#0B1435" />
+          </SpringPressable>
 
-          {/* Voice Recorder overlay */}
-          {isRecording && (
+          {/* Center: text input or recorder */}
+          {isRecording ? (
             <View style={styles.recorder}>
               <View style={styles.recorderHeader}>
                 <View style={styles.recordingDot} />
@@ -120,47 +110,45 @@ export default function ChatInputBox({
                 ))}
               </View>
             </View>
+          ) : (
+            <View style={styles.inputWrap}>
+              <TextInput
+                value={value}
+                onChangeText={onChangeText}
+                placeholder={placeholder || 'Chat with Claude'}
+                placeholderTextColor="rgba(11,20,53,0.35)"
+                style={styles.input}
+                multiline
+                maxLength={4000}
+                editable={!loading}
+                onSubmitEditing={handleSend}
+              />
+            </View>
           )}
 
-          {/* Actions Row */}
-          <View style={styles.actions}>
-            <View style={styles.leftActions}>
-              {/* Plus menu opener */}
-              <SpringPressable onPress={() => setShowMenu(true)} style={styles.iconBtn}>
-                <Ionicons name="add" size={22} color="#0B1435" />
-              </SpringPressable>
-
-              {/* Mic */}
-              <SpringPressable
-                onPress={handleMic}
-                style={[styles.iconBtn, isRecording && { backgroundColor: '#FEE2E2' }]}
-              >
-                <Ionicons
-                  name={isRecording ? 'stop-circle' : 'mic'}
-                  size={20}
-                  color={isRecording ? '#EF4444' : '#0B1435'}
-                />
-              </SpringPressable>
-            </View>
-
-            {/* Send Button */}
+          {/* Right: mic when empty, send arrow when has text */}
+          {!hasContent && !isRecording ? (
+            <SpringPressable onPress={handleMic} style={styles.iconBtn}>
+              <Ionicons name="mic" size={22} color="#0B1435" />
+            </SpringPressable>
+          ) : (
             <SpringPressable
               onPress={handleSend}
-              disabled={(!hasContent && !isRecording) || loading}
+              disabled={loading}
               style={[
                 styles.sendBtn,
-                (hasContent || isRecording) && !loading
+                !loading
                   ? { backgroundColor: '#2A63E2' }
-                  : { backgroundColor: '#F8FAFC', borderColor: 'rgba(11,20,53,0.12)' },
+                  : { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)' },
               ]}
             >
               <Ionicons
                 name={loading ? 'stop' : 'arrow-up'}
                 size={18}
-                color={(hasContent || isRecording) && !loading ? '#FFFFFF' : '#94A3B8'}
+                color={!loading ? '#FFFFFF' : '#94A3B8'}
               />
             </SpringPressable>
-          </View>
+          )}
         </View>
       </View>
 
@@ -229,31 +217,30 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   box: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#0B1435',
-    padding: 12,
-    shadowColor: '#0B1435',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#F4F5F7',
+    borderRadius: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
   },
   inputWrap: {
-    minHeight: 44,
+    flex: 1,
+    minHeight: 36,
     justifyContent: 'center',
   },
   input: {
     color: '#0B1435',
     fontSize: 15.5,
     lineHeight: 22,
-    paddingTop: 6,
-    paddingBottom: 6,
+    paddingTop: 4,
+    paddingBottom: 4,
     maxHeight: 120,
+    paddingHorizontal: 6,
   },
   recorder: {
-    paddingVertical: 10,
+    flex: 1,
+    paddingVertical: 4,
     alignItems: 'center',
   },
   recorderHeader: {
@@ -286,38 +273,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(11,20,53,0.35)',
     borderRadius: 2,
   },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(11,20,53,0.08)',
-  },
-  leftActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
   iconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.08)',
+    backgroundColor: 'transparent',
   },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
 
   /* Drop-up menu */

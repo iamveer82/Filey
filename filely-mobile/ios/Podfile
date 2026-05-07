@@ -24,6 +24,10 @@ target 'Filely' do
 
   # PDF operations: merge, split, protect, compress via PDFKit
   pod 'PdfTools', :path => './LocalPods/PdfTools'
+
+  # ZIP archive read/write — pure Swift, MIT licensed, no deps.
+  # Used by PdfTools for CBZ / EPUB / XLSX / PPTX / XPS / FB2 extraction.
+  pod 'ZIPFoundation', '~> 0.9.19'
   # ─────────────────────────────────────────────────────────────────────────
 
   # Vision framework is built into iOS 10.3+

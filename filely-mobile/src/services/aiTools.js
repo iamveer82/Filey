@@ -15,7 +15,14 @@ import { detectAnomaly, suggestFollowups } from './aiInsights';
 import { computeNudges } from './nudges';
 import { reclaimableVat, splitReclaim } from './vatRules';
 import { exportPeppolBatch } from './eInvoiceExport';
-import { addTx as addLedgerTx, listTx as listLedgerTx } from './localLedger';
+import {
+  addTx as addLedgerTx,
+  listTx as listLedgerTx,
+  getOpeningBalance as getLedgerOpening,
+  setOpeningBalance as setLedgerOpening,
+  updateTx as updateLedgerTx,
+  updateLastTx as updateLastLedgerTx,
+} from './localLedger';
 
 export const TOOL_SCHEMAS = [
   {
@@ -219,11 +226,11 @@ export const TOOL_SCHEMAS = [
     type: 'function',
     function: {
       name: 'log_money_movement',
-      description: 'Record a simple paid/received transaction on the home ledger (not a receipt). Use for statements like "I paid 15000 to Ravi" or "received 10000 from Veer".',
+      description: 'Record a money movement on the home ledger. Use for any sentence describing money going in or out: paid, sent, gave, transferred, spent, debited, charged, withdrawn, lost, donated, invested, lent, bought, booked, ordered (outgoing) OR received, got, credited, deposited, refunded, earned, won, borrowed, salary, bonus, dividend, commission, reimbursed, cashback (incoming). Examples: "I paid 15000 to Ravi", "received 10000 from Veer", "500 AED was credited", "200 debited by Amazon", "my salary of 5000 was deposited", "got a refund of 200".',
       parameters: {
         type: 'object',
         properties: {
-          direction: { type: 'string', enum: ['in', 'out'], description: 'in = received, out = paid' },
+          direction: { type: 'string', enum: ['in', 'out'], description: 'out = paid, sent, gave, transferred, spent, debited, charged, withdrawn, lost, donated, invested, lent, bought, booked, ordered. in = received, got, credited, deposited, refunded, earned, won, borrowed, salary, bonus, dividend, commission, reimbursed, cashback' },
           amount: { type: 'number' },
           counterparty: { type: 'string', description: 'Person or merchant name' },
           note: { type: 'string' },
@@ -258,6 +265,47 @@ export const TOOL_SCHEMAS = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'set_opening_balance',
+      description: 'Set the opening (starting) balance for the home dashboard. Use when user says any of: "set opening balance to X", "my starting balance is X", "opening balance X", "balance starts at X", "begin with X", "initial balance X". Total Balance on the dashboard = opening balance + all credits − all debits.',
+      parameters: {
+        type: 'object',
+        properties: {
+          amount: { type: 'number', description: 'New opening balance in AED. Can be negative.' },
+        },
+        required: ['amount'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_opening_balance',
+      description: 'Read the current opening balance for the home dashboard.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_transaction',
+      description: 'Edit an existing home-ledger entry. Use when the user says "change the name to X", "rename to X", "fix the amount to Y", "actually it was a debit", etc. If the user does not point to a specific transaction, edit the most recent one (omit txId).',
+      parameters: {
+        type: 'object',
+        properties: {
+          txId: { type: 'string', description: 'Optional. If omitted, the most recent transaction is updated.' },
+          counterparty: { type: 'string' },
+          amount: { type: 'number' },
+          direction: { type: 'string', enum: ['in', 'out'] },
+          note: { type: 'string' },
+          category: { type: 'string' },
+          date: { type: 'string', description: 'YYYY-MM-DD' },
+        },
+      },
+    },
+  },
 ];
 
 /** Convert OpenAI schema to Anthropic tool format. */
@@ -288,6 +336,17 @@ export async function runTool(name, args, ctx = {}) {
           ...(ctx.orgId ? { orgId: ctx.orgId, submittedBy: ctx.userId, submittedByName: ctx.submitterName } : {}),
         };
         const saved = await apiClient.createTransaction(tx);
+        // Mirror to local ledger so homepage reflects it immediately
+        try {
+          await addLedgerTx({
+            direction: 'out',
+            amount: tx.amount,
+            counterparty: tx.merchant || 'Unknown',
+            note: tx.notes || tx.category,
+            category: tx.category,
+            date: tx.date,
+          });
+        } catch {}
         return { ok: true, result: { id: saved?.id || saved?._id, ...tx } };
       }
 
@@ -436,6 +495,32 @@ export async function runTool(name, args, ctx = {}) {
 
       case 'list_categories': {
         return { ok: true, result: { categories: CATEGORIES } };
+      }
+
+      case 'set_opening_balance': {
+        const v = await setLedgerOpening(args.amount);
+        return {
+          ok: true,
+          result: { openingBalance: v },
+          side: { type: 'opening_balance_set', amount: v },
+        };
+      }
+
+      case 'get_opening_balance': {
+        const v = await getLedgerOpening();
+        return { ok: true, result: { openingBalance: v } };
+      }
+
+      case 'update_transaction': {
+        const patch = {};
+        for (const k of ['counterparty', 'note', 'category', 'date']) if (args[k]) patch[k] = args[k];
+        if (args.amount != null) patch.amount = Number(args.amount);
+        if (args.direction === 'in' || args.direction === 'out') patch.direction = args.direction;
+        const updated = args.txId
+          ? await updateLedgerTx(args.txId, patch)
+          : await updateLastLedgerTx(patch);
+        if (!updated) return { ok: false, error: 'No matching transaction found.' };
+        return { ok: true, result: updated, side: { type: 'ledger_updated', entry: updated } };
       }
 
       default:

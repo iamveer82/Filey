@@ -64,7 +64,7 @@ function CreditCard({ variant, label, number, holder, extra, style }) {
   );
 }
 
-export default function LoginScreen({ darkMode = true, onNavigateToCompanySetup }) {
+export default function LoginScreen({ darkMode = false, onNavigateToCompanySetup }) {
   const { signIn, signUp } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
   const [mode, setMode] = useState('signup');

@@ -38,9 +38,13 @@ export default function SignatureScreen({ navigation }) {
     }
   }, [navigation]);
 
-  const handleSignature = useCallback(async ({ svg, paths }) => {
+  const handleSignature = useCallback(async ({ uri }) => {
     if (!pdfUri) {
       Alert.alert('No PDF', 'Please select a PDF first.');
+      return;
+    }
+    if (!uri) {
+      Alert.alert('Empty signature', 'Draw your signature first.');
       return;
     }
     try {
@@ -48,11 +52,7 @@ export default function SignatureScreen({ navigation }) {
       const placement = await analyzeSignaturePlacement(pdfUri);
       const position = placement.pages?.[0] || { pageNumber: 1, x: 100, y: 700, width: 200, height: 60 };
 
-      const { FileSystem } = require('expo-file-system');
-      const svgPath = `${FileSystem.cacheDirectory}signature_${Date.now()}.svg`;
-      await FileSystem.writeAsStringAsync(svgPath, svg);
-
-      const result = await embedSignature(pdfUri, svgPath, position);
+      const result = await embedSignature(pdfUri, uri, position);
       if (result.success && result.outputUri) {
         await addFile({ name: `Signed-${Date.now()}.pdf`, kind: 'pdf', uri: result.outputUri });
         Alert.alert(

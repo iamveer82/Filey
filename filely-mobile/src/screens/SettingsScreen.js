@@ -13,6 +13,7 @@ import { Colors } from '../theme/colors';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import AISettingsScreen from './AISettingsScreen';
+import PersonaScreen from './PersonaScreen';
 import SmartSearchScreen from './subscreens/SmartSearchScreen';
 import ReferralScreen from './subscreens/ReferralScreen';
 import PublicShareScreen from './subscreens/PublicShareScreen';
@@ -67,14 +68,14 @@ function Section({ title, children, c, delay = 80 }) {
   );
 }
 
-export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode, onSignOut, onLogout }) {
+export default function SettingsScreen({ navigation, route, darkMode, onToggleDarkMode, onSignOut, onLogout }) {
   const doSignOut = onSignOut || onLogout;
   const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { user, profile: authProfile, signOut } = useAuth();
   const [profile, setProfile] = useState(authProfile);
   const [notifications, setNotifications] = useState(true);
-  const [subScreen, setSubScreen] = useState(null); // 'ai' | 'search' | 'referral' | 'share' | 'projects' | 'deputy' | 'statement' | 'reclaim' | 'versions' | null
+  const [subScreen, setSubScreen] = useState(null); // 'ai' | 'search' | 'referral' | 'share' | 'projects' | 'deputy' | 'statement' | 'reclaim' | 'versions' | 'persona' | null
 
   useEffect(() => {
     (async () => {
@@ -84,6 +85,15 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
       } catch {}
     })();
   }, []);
+
+  // Deep-link from other tabs: navigation.navigate('Settings', { open: 'ai' })
+  useEffect(() => {
+    const target = route?.params?.open;
+    if (!target) return;
+    setSubScreen(target);
+    // Clear the param so navigating back and re-entering doesn't re-trigger.
+    try { navigation?.setParams?.({ open: undefined }); } catch {}
+  }, [route?.params?.open]);
 
   const name = profile?.name || authProfile?.name || user?.email?.split('@')[0] || 'User';
   const email = user?.email || profile?.email || '';
@@ -101,6 +111,7 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
 
   const back = () => setSubScreen(null);
   if (subScreen === 'ai')        return <AISettingsScreen darkMode={darkMode} onBack={back} />;
+  if (subScreen === 'persona')   return <PersonaScreen darkMode={darkMode} onBack={back} />;
   if (subScreen === 'search')    return <SmartSearchScreen darkMode={darkMode} onBack={back} />;
   if (subScreen === 'referral')  return <ReferralScreen darkMode={darkMode} onBack={back} />;
   if (subScreen === 'share')     return <PublicShareScreen darkMode={darkMode} onBack={back} />;
@@ -172,6 +183,7 @@ export default function SettingsScreen({ navigation, darkMode, onToggleDarkMode,
 
           <Section title="AI & INTEGRATIONS" c={c} delay={150}>
             <Row icon="sparkles-outline" label="LLM provider & API keys" c={c} onPress={() => setSubScreen('ai')} />
+            <Row icon="color-wand-outline" label="Persona — voice, tone, soul" c={c} onPress={() => setSubScreen('persona')} />
             <Row icon="globe-outline" label="Web search provider" c={c} onPress={() => setSubScreen('ai')} />
           </Section>
 

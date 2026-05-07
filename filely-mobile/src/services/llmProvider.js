@@ -19,7 +19,60 @@ export const PROVIDERS = {
 
 const PREF_KEY = '@filey/llm_pref_v1';
 const OLLAMA_URL_KEY = '@filey/ollama_base_url';
+const RECENT_KEY = '@filey/llm_recent_v1';
 const DEFAULT_OLLAMA_URL = 'http://192.168.1.100:11434';
+
+// Friendly taglines per model id — shown under the name in dropdowns.
+export const MODEL_TAGLINES = {
+  'claude-opus-4-5':            'Most capable for ambitious work',
+  'claude-3-5-sonnet-latest':   'Most efficient for everyday tasks',
+  'claude-3-5-haiku-latest':    'Fastest for quick answers',
+  'gpt-4o':                     'OpenAI flagship — most capable',
+  'gpt-4o-mini':                'Fast and cheap for everyday work',
+  'gpt-4-turbo':                'Strong reasoning, broad knowledge',
+  'gemini-2.0-flash':           'Fast multimodal, low latency',
+  'gemini-1.5-pro':             'Long-context expert',
+  'gemma-2b-it':                'On-device offline, private',
+  'llama3.2':                   'Local Llama, balanced',
+  'llama3.1':                   'Local Llama, broad capability',
+  'qwen2.5':                    'Local Qwen, multilingual',
+  'mistral':                    'Local Mistral, fast',
+  'phi3':                       'Local Phi-3, compact',
+  'gemma2':                     'Local Gemma, lightweight',
+};
+export function modelTagline(model) {
+  if (!model) return '';
+  return MODEL_TAGLINES[model] || '';
+}
+
+/**
+ * Recent models: rolling list of the last 3 unique {provider, model} pairs the
+ * user actually used. The current selection lives at index 0; the dropdown
+ * shows index 0 as "current" plus up to two prior entries.
+ */
+export async function getRecentModels(limit = 3) {
+  try {
+    const raw = await AsyncStorage.getItem(RECENT_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.slice(0, limit) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function recordModelUse(provider, model) {
+  if (!provider || !model) return;
+  try {
+    const cur = await getRecentModels(10);
+    const filtered = cur.filter(e => !(e?.provider === provider && e?.model === model));
+    const next = [{ provider, model }, ...filtered].slice(0, 3);
+    await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+export async function clearRecentModels() {
+  try { await AsyncStorage.removeItem(RECENT_KEY); } catch {}
+}
 
 export async function getOllamaBaseUrl() {
   try {
@@ -50,6 +103,9 @@ export async function getPreference() {
 
 export async function setPreference(pref) {
   await AsyncStorage.setItem(PREF_KEY, JSON.stringify(pref));
+  if (pref?.provider && pref?.model) {
+    recordModelUse(pref.provider, pref.model).catch(() => {});
+  }
 }
 
 export async function getKey(provider) {

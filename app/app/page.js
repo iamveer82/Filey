@@ -634,7 +634,6 @@ function DashboardSection({ data, balanceVisible, setBalanceVisible, filteredTxn
             <Search className="w-4 h-4 text-gray-400" />
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search Transaction" className="flex-1 bg-transparent text-sm text-[#0F172A] placeholder:text-gray-400 focus:outline-none" />
           </div>
-          <motion.button whileTap={{ scale: 0.9 }} className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center cursor-pointer" aria-label="Filter"><Filter className="w-4 h-4 text-gray-400" /></motion.button>
         </div>
 
         <div className="space-y-2 pb-4">

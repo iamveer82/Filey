@@ -10,7 +10,7 @@ import {
   Send, Sparkles, Plus, MessageSquare, Trash2, Copy, Check, Square,
   PanelLeftClose, PanelLeftOpen, Settings as Cog, AlertTriangle, Bot,
   Paperclip, X, ImageIcon, FileText as FileIcon, FileType,
-  Camera, FileUp, Wand2, Receipt, Zap,
+  Camera, FileUp, Wand2, Receipt, Zap, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import Shell from '@/components/dashboard/Shell';
 import { BRAND, BRAND_DARK, BRAND_SOFT, INK } from '@/components/dashboard/theme';
@@ -19,16 +19,138 @@ import { readAttachment, attachmentSupport } from '@/lib/chatAttachments';
 import { parseSlash, lookupCommand, suggestionsFor, COMMANDS } from '@/lib/chatCommands';
 import { toast } from 'sonner';
 
-const SUGGESTIONS = [
-  { label: 'Log 500 AED paid to Zain today',           icon: '💸' },
-  { label: 'What is my VAT reclaimable this quarter?', icon: '📊' },
-  { label: 'Show 3 largest expenses this month',       icon: '🧾' },
-  { label: 'Export my Q1 ledger as CSV',               icon: '📤' },
-];
-
 function loadAI() {
   if (typeof window === 'undefined') return null;
   try { return JSON.parse(localStorage.getItem('filey.web.ai') || 'null'); } catch { return null; }
+}
+
+const PROVIDER_MODELS = {
+  anthropic: [
+    { id: 'claude-opus-4-20250514', label: 'Opus 4.7', desc: 'Most capable for ambitious work' },
+    { id: 'claude-sonnet-4-20250514', label: 'Sonnet 4.6', desc: 'Most efficient for everyday tasks' },
+    { id: 'claude-haiku-4-20250514', label: 'Haiku 4.5', desc: 'Fastest for quick answers' },
+  ],
+  openai: [
+    { id: 'gpt-4o', label: 'GPT-4o', desc: 'Most capable' },
+    { id: 'gpt-4o-mini', label: 'GPT-4o mini', desc: 'Fast and efficient' },
+    { id: 'o3-mini', label: 'o3 mini', desc: 'Reasoning model' },
+  ],
+  google: [
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'Most capable' },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Fast and efficient' },
+  ],
+  groq: [
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', desc: 'General purpose' },
+    { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', desc: 'Long context' },
+  ],
+  mistral: [
+    { id: 'mistral-large-latest', label: 'Mistral Large', desc: 'Most capable' },
+    { id: 'mistral-medium-latest', label: 'Mistral Medium', desc: 'Balanced' },
+  ],
+  openrouter: [
+    { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', desc: 'Via OpenRouter' },
+    { id: 'openai/gpt-4o', label: 'GPT-4o', desc: 'Via OpenRouter' },
+  ],
+  together: [
+    { id: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', label: 'Llama 3.3 70B', desc: 'General purpose' },
+  ],
+  ollama: [
+    { id: 'llama3.2', label: 'Llama 3.2', desc: 'Local' },
+    { id: 'qwen2.5', label: 'Qwen 2.5', desc: 'Local' },
+  ],
+  'ollama-cloud': [
+    { id: 'gpt-oss:120b-cloud', label: 'GPT-OSS 120B', desc: 'Cloud hosted' },
+  ],
+  'openai-compat': [],
+};
+
+function modelLabel(provider, modelId) {
+  const list = PROVIDER_MODELS[provider] || [];
+  const found = list.find(m => m.id === modelId);
+  return found ? found.label : (modelId || 'Unknown');
+}
+
+function ModelSelector({ ai, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const provider = ai?.provider || 'anthropic';
+  const modelId = ai?.model || '';
+  const label = modelLabel(provider, modelId);
+  const list = PROVIDER_MODELS[provider] || [];
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
+        style={{ color: INK }}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+      >
+        {label}
+        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-slate-200/50 bg-white/85 shadow-2xl dark:border-white/10 dark:bg-slate-900/85"
+            style={{
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            }}
+          >
+            <div className="max-h-80 overflow-y-auto py-2">
+              {list.map((m) => {
+                const active = m.id === modelId;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => { onChange(m.id); setOpen(false); }}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition ${active ? 'bg-slate-900/5 dark:bg-white/10' : 'hover:bg-slate-900/5 dark:hover:bg-white/5'}`}
+                    role="option"
+                    aria-selected={active}
+                  >
+                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                      {active ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <div className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className={`text-sm font-semibold ${active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>{m.label}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{m.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+              <div className="my-2 border-t border-slate-200/50 dark:border-white/10" />
+              <Link
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-900/5 dark:hover:bg-white/5"
+              >
+                <div className="h-4 w-4 shrink-0" />
+                <div className="flex flex-1 items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">More models</span>
+                  <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                </div>
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export default function ChatPage() {
@@ -387,8 +509,21 @@ function ChatInner() {
               <button onClick={() => setSidebarOpen(v => !v)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}>
                 {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
               </button>
-              <div className="font-bold" style={{ color: INK }}>{activeThread?.title || 'Filey AI'}</div>
+              <div className="hidden text-xs text-slate-500 dark:text-slate-400 sm:block max-w-[120px] truncate" title={activeThread?.title || 'Filey AI'}>
+                {activeThread?.title || 'Filey AI'}
+              </div>
             </div>
+            <ModelSelector
+              ai={ai}
+              onChange={(modelId) => {
+                try {
+                  const prev = JSON.parse(localStorage.getItem('filey.web.ai') || '{}');
+                  const next = { ...prev, model: modelId };
+                  localStorage.setItem('filey.web.ai', JSON.stringify(next));
+                  setAi(next);
+                } catch {}
+              }}
+            />
             <div className="flex items-center gap-2">
               {hasKey ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -615,14 +750,6 @@ function EmptyWelcome({ onPick }) {
       <div>
         <h2 className="text-2xl font-bold tracking-tight" style={{ color: INK }}>How can I help today?</h2>
         <p className="mt-2 text-sm text-slate-500">Your UAE finance copilot. Ask about VAT, log transactions, or query your ledger.</p>
-      </div>
-      <div className="grid w-full gap-2 sm:grid-cols-2">
-        {SUGGESTIONS.map((s) => (
-          <button key={s.label} onClick={() => onPick(s.label)} className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-            <span className="text-xl">{s.icon}</span>
-            <span className="flex-1">{s.label}</span>
-          </button>
-        ))}
       </div>
     </div>
   );

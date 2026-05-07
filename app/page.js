@@ -14,51 +14,91 @@ import InsightsCard from '@/components/dashboard/InsightsCard';
 import PrivacyBanner from '@/components/dashboard/PrivacyBanner';
 import OnboardingCards from '@/components/dashboard/OnboardingCards';
 import { BRAND, BRAND_DARK, BRAND_SOFT, BRAND_LIGHT, INK } from '@/components/dashboard/theme';
+import { useLocalList, SEED_TX, SEED_BILLS, computeInsights, formatAED } from '@/lib/webStore';
 
 // Lazy-load recharts (~120KB) — dashboard paints first without it
 const RevenueChart = dynamic(() => import('@/components/dashboard/RevenueChart'), {
   ssr: false,
-  loading: () => <div className="h-[260px] w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />,
+  loading: () => <div className="h-[260px] w-full animate-pulse rounded-xl bg-slate-100" />,
 });
 
-const STATS = [
-  { id: 'balance', href: '/transactions', icon: Wallet,       label: 'Total Balance',    value: 'AED 365,500', delta: '+12%', up: true,  sub: '+AED 42,300 from last month' },
-  { id: 'vat',     href: '/reports',      icon: ShieldCheck,  label: 'VAT Reclaimable',  value: 'AED 2,340',   delta: '+8%',  up: true,  sub: 'Filed Q1 PEPPOL • due May 28' },
-  { id: 'bills',   href: '/bills',        icon: Bell,         label: 'Bills Due',        value: '4',           delta: '-3',   up: false, sub: '−3 from last week' },
-];
-
-const CATEGORY = [
-  { name: 'Utilities',   pct: 45, color: BRAND },
-  { name: 'Food & Café', pct: 30, color: '#10B981' },
-  { name: 'Travel',      pct: 15, color: '#38BDF8' },
-  { name: 'Misc',        pct: 10, color: '#F59E0B' },
-];
-
-const TX_ROWS = [
-  { name: 'Noor Creative Co.', meta: 'Invoice #INV-2401',   loc: 'Jumeirah, Dubai', type: 'Income',  status: 'Settled', amount: 'AED 12,500' },
-  { name: 'Zain Wifi',         meta: 'Monthly subscription', loc: 'Bur Dubai',       type: 'Bill',    status: 'Paid',    amount: 'AED 310' },
-  { name: 'Talabat · Lunch',   meta: 'Food & beverages',     loc: 'Al Barsha',       type: 'Expense', status: 'Cleared', amount: 'AED 48' },
-];
-
 export default function HomePage() {
+  const { list: tx } = useLocalList('filey.web.tx', SEED_TX);
+  const { list: bills } = useLocalList('filey.web.bills', SEED_BILLS);
+
+  // ── Compute real stats ────────────────────────────────────────
+  const ins = computeInsights({ tx, bills });
+
+  const totalIncome = tx.filter(t => t.type === 'income').reduce((s, t) => s + (+t.amount || 0), 0);
+  const totalExpense = tx.filter(t => t.type === 'expense').reduce((s, t) => s + (+t.amount || 0), 0);
+  const balance = totalIncome - totalExpense;
+
+  const prevIncome = tx.filter(t => t.type === 'income' && t.ts < Date.now() - 30 * 86_400_000 && t.ts >= Date.now() - 60 * 86_400_000).reduce((s, t) => s + (+t.amount || 0), 0);
+  const prevExpense = tx.filter(t => t.type === 'expense' && t.ts < Date.now() - 30 * 86_400_000 && t.ts >= Date.now() - 60 * 86_400_000).reduce((s, t) => s + (+t.amount || 0), 0);
+  const prevNet = prevIncome - prevExpense;
+  const netChange = ins.net30 - prevNet;
+  const netPct = prevNet !== 0 ? Math.round((netChange / Math.abs(prevNet)) * 100) : (ins.net30 > 0 ? 100 : 0);
+
+  const upcomingBills = bills.filter(b => b.dueDate && new Date(b.dueDate).getTime() > Date.now()).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  const billsDue = upcomingBills.length;
+
+  const stats = [
+    {
+      id: 'balance', href: '/transactions', icon: Wallet,
+      label: 'Total Balance',
+      value: formatAED(balance),
+      delta: `${netChange >= 0 ? '+' : ''}${netPct}%`,
+      up: netChange >= 0,
+      sub: `${netChange >= 0 ? '+' : ''}${formatAED(Math.abs(netChange)).replace('AED ', 'AED ')} vs last 30 days`,
+    },
+    {
+      id: 'vat', href: '/reports', icon: ShieldCheck,
+      label: 'VAT Reclaimable',
+      value: formatAED(Math.abs(ins.vatNet)),
+      delta: ins.vatNet >= 0 ? '+8%' : '-8%',
+      up: ins.vatNet < 0,
+      sub: ins.vatNet >= 0 ? `Payable Q1 · ${formatAED(ins.vatNet)}` : `Refundable Q1 · ${formatAED(Math.abs(ins.vatNet))}`,
+    },
+    {
+      id: 'bills', href: '/bills', icon: Bell,
+      label: 'Bills Due',
+      value: String(billsDue),
+      delta: billsDue > 0 ? `+${billsDue}` : '0',
+      up: false,
+      sub: billsDue > 0 ? `Next: ${upcomingBills[0]?.name} · ${formatAED(upcomingBills[0]?.amount)}` : 'All clear for next 14 days',
+    },
+  ];
+
+  // ── Category breakdown ──────────────────────────────────────
+  const byCategory = {};
+  tx.filter(t => t.type === 'expense' && t.ts >= Date.now() - 30 * 86_400_000).forEach(t => {
+    byCategory[t.category || 'Other'] = (byCategory[t.category || 'Other'] || 0) + (+t.amount || 0);
+  });
+  const catTotal = Object.values(byCategory).reduce((a, b) => a + b, 0) || 1;
+  const spendingTotal30 = Object.values(byCategory).reduce((a, b) => a + b, 0);
+  const categoryColors = { Utilities: BRAND, Food: '#10B981', Travel: '#38BDF8', Freelance: '#F59E0B', Supplies: '#8B5CF6', Software: '#EC4899', Marketing: '#06B6D4', Rent: '#F97316', Other: '#94A3B8' };
+  const categories = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([name, amount]) => ({ name, pct: Math.round((amount / catTotal) * 100), color: categoryColors[name] || '#94A3B8' }));
+  if (categories.length === 0) {
+    categories.push({ name: 'No data', pct: 100, color: '#CBD5E1' });
+  }
+
+  // ── Recent transactions ─────────────────────────────────────
+  const recentTx = tx.slice().sort((a, b) => b.ts - a.ts).slice(0, 5);
+
   return (
     <FirstVisitGate>
-    <Shell title="Good Morning, Veer" subtitle="Here's your financial overview for today" wave>
-      {/* First-run onboarding (self-hides once tx seeded + AI configured, or dismissed) */}
-      <OnboardingCards />
-
-      {/* Privacy trust banner — dismissible */}
-      <PrivacyBanner variant="banner" />
-
-      {/* AI Insights — computed from user's real ledger */}
-      <InsightsCard />
-
-      {/* Quick actions — surface new tools (bulk, AI extract, categories, XLSX, self-host) */}
-      <QuickActions />
+    <Shell fixed title="Good Morning, Veer" subtitle="Here's your financial overview for today" wave>
+      <div className="flex-shrink-0"><OnboardingCards /></div>
+      <div className="flex-shrink-0"><PrivacyBanner variant="banner" /></div>
+      <div className="flex-shrink-0"><InsightsCard /></div>
+      <div className="flex-shrink-0"><QuickActions /></div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {STATS.map((s, i) => {
+      <div className="grid gap-4 md:grid-cols-3 flex-shrink-0">
+        {stats.map((s, i) => {
           const I = s.icon;
           return (
             <motion.div key={s.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.08 }} className="card-hover rounded-2xl border border-slate-200 bg-white p-5">
@@ -89,23 +129,23 @@ export default function HomePage() {
       </div>
 
       {/* Category + Revenue */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3 flex-shrink-0">
         {/* Category */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="rounded-2xl border border-slate-200 bg-white p-6">
           <SectionHead icon={BarChart3} title="Spending Summary" />
           <div className="mt-6 flex items-end gap-2">
-            <span className="text-4xl font-bold" style={{ color: INK }}>AED 27k</span>
+            <span className="text-4xl font-bold" style={{ color: INK }}>{spendingTotal30 >= 1000 ? `AED ${Math.round(spendingTotal30 / 1000)}k` : formatAED(spendingTotal30)}</span>
             <span className="mb-1 inline-flex items-center gap-0.5 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600">
               <TrendingUp className="h-3 w-3" /> +12%
             </span>
           </div>
           <div className="mt-5 flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
-            {CATEGORY.map((c, i) => (
+            {categories.map((c, i) => (
               <motion.div key={c.name} initial={{ width: 0 }} animate={{ width: `${c.pct}%` }} transition={{ duration: 0.8, delay: 0.4 + i * 0.1, ease: 'easeOut' }} style={{ background: c.color }} />
             ))}
           </div>
           <div className="mt-5 space-y-3">
-            {CATEGORY.map((c) => (
+            {categories.map((c) => (
               <div key={c.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: c.color }} />
@@ -139,13 +179,13 @@ export default function HomePage() {
       </div>
 
       {/* Tx + AI */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3 flex-1 min-h-0 overflow-hidden">
         {/* Tx */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.4 }} className="rounded-2xl border border-slate-200 bg-white p-6 md:col-span-2">
-          <SectionHead icon={Receipt} title="Recent Transactions" href="/transactions" />
-          <div className="mt-4 overflow-x-auto">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.4 }} className="rounded-2xl border border-slate-200 bg-white p-6 md:col-span-2 flex flex-col h-full overflow-hidden">
+          <div className="flex-shrink-0"><SectionHead icon={Receipt} title="Recent Transactions" href="/transactions" /></div>
+          <div className="mt-4 overflow-x-auto overflow-y-auto flex-1 min-h-0">
             <table className="w-full">
-              <thead>
+              <thead className="sticky top-0 bg-white z-10">
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   <th className="w-6 pb-3"><input type="checkbox" className="h-3.5 w-3.5 rounded border-slate-300" /></th>
                   <th className="pb-3">Name</th>
@@ -156,44 +196,51 @@ export default function HomePage() {
                 </tr>
               </thead>
               <tbody>
-                {TX_ROWS.map((r, i) => (
-                  <tr key={i} className="text-sm" style={i === 1 ? { background: BRAND_LIGHT } : undefined}>
-                    <td className="py-3"><input type="checkbox" defaultChecked={i === 1} className="h-3.5 w-3.5 rounded border-slate-300" /></td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full font-bold text-white" style={{ background: ['#3B82F6', '#10B981', '#F59E0B'][i] }}>
-                          {r.name.charAt(0)}
+                {recentTx.length === 0 && (
+                  <tr><td colSpan={6} className="py-8 text-center text-sm text-slate-400">No transactions yet</td></tr>
+                )}
+                {recentTx.map((r, i) => {
+                  const avatarColors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+                  const capitalizedType = r.type ? r.type.charAt(0).toUpperCase() + r.type.slice(1) : '';
+                  return (
+                    <tr key={r.id || i} className="text-sm">
+                      <td className="py-3"><input type="checkbox" className="h-3.5 w-3.5 rounded border-slate-300" /></td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full font-bold text-white" style={{ background: avatarColors[i % avatarColors.length] }}>
+                            {(r.name || '?').charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-semibold" style={{ color: INK }}>{r.name}</div>
+                            <div className="text-[11px] text-slate-500">{r.merchant || r.category || ''}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-semibold" style={{ color: INK }}>{r.name}</div>
-                          <div className="text-[11px] text-slate-500">{r.meta}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 text-slate-600">🇦🇪 {r.loc}</td>
-                    <td className="py-3 text-slate-600">{r.type}</td>
-                    <td className="py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                        r.status === 'Settled' ? 'bg-emerald-50 text-emerald-600' :
-                        r.status === 'Paid'    ? 'bg-blue-50 text-blue-600' :
-                                                 'bg-amber-50 text-amber-600'
-                      }`}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right font-bold" style={{ color: INK }}>{r.amount}</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3 text-slate-600">🇦🇪 Dubai</td>
+                      <td className="py-3 text-slate-600">{capitalizedType}</td>
+                      <td className="py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          r.status === 'Settled' ? 'bg-emerald-50 text-emerald-600' :
+                          r.status === 'Paid'    ? 'bg-blue-50 text-blue-600' :
+                                                   'bg-amber-50 text-amber-600'
+                        }`}>
+                          {r.status || 'Cleared'}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right font-bold" style={{ color: INK }}>{formatAED(r.amount)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <Link href="/transactions" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: BRAND }}>
+          <Link href="/transactions" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold flex-shrink-0" style={{ color: BRAND }}>
             View all transactions <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </motion.div>
 
         {/* AI promo */}
-        <Link href="/chat" className="block" aria-label="Open Chat AI">
+        <Link href="/chat" className="block h-full" aria-label="Open Chat AI">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.45 }} className="relative h-full overflow-hidden rounded-2xl p-6 text-white transition hover:shadow-xl" style={{ background: `linear-gradient(135deg, ${BRAND} 0%, ${BRAND_DARK} 100%)` }}>
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 60, repeat: Infinity, ease: 'linear' }} className="absolute -right-12 -bottom-12 h-60 w-60 opacity-40">
             <svg viewBox="0 0 200 200" className="h-full w-full">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,10 +29,10 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Modal, Switch } from 'react-native';
+import { Modal, Switch, Keyboard, Alert } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { listTx as listLedgerTx, LEDGER_EVENT, subscribeLedger } from '../services/localLedger';
+import { listTx as listLedgerTx, LEDGER_EVENT, subscribeLedger, getOpeningBalance } from '../services/localLedger';
 import { listBills, addBill, removeBill, toggleReminder, subscribeBills } from '../services/bills';
 import IconPicker, { BrandIcon } from '../components/IconPicker';
 import { guessIconId } from '../assets/billIcons';
@@ -43,13 +43,21 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 const TABS = ['Dashboard', 'Cards', 'Analytics', 'Recurring'];
 
-const RECENT_SEND = [
-  { name: 'Agnes',  color: '#FDE68A' },
-  { name: 'Isyana', color: '#FCA5A5' },
-  { name: 'Nurdin', color: '#A7F3D0' },
-  { name: 'Budi',   color: '#C7D2FE' },
-  { name: 'Broto',  color: '#FBCFE8' },
+const RECENT_COLORS = [
+  '#FDE68A', '#FCA5A5', '#A7F3D0', '#C7D2FE', '#FBCFE8',
+  '#FED7AA', '#D8B4FE', '#67E8F9', '#FCD34D', '#A5B4FC',
+  '#6EE7B7', '#F9A8D4',
 ];
+
+function hashName(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function getColorForName(name) {
+  return RECENT_COLORS[hashName(name) % RECENT_COLORS.length];
+}
 
 const ACTIVITY = [
   { id: 'a1', name: 'Salary',       subtitle: 'Monthly pay',     amount: 143,  type: 'in',  icon: 'briefcase-outline' },
@@ -78,22 +86,22 @@ const CARDS = [
 const METRIC_LIBRARY = {
   m_balance: {
     id: 'm_balance', label: 'Total Balance', sub: 'All accounts',
-    amount: 365500, prefix: 'AED ', delta: '+2.4%', deltaUp: true,
+    amount: 0, prefix: 'AED ', delta: '+2.4%', deltaUp: true,
     icon: 'wallet', gradient: ['#2A63E2', '#2E5BFF', '#1E3A8A'], chipLabel: 'PRIMARY',
   },
   m_income: {
     id: 'm_income', label: 'Income', sub: 'This month',
-    amount: 12480, prefix: 'AED ', delta: '+18.2%', deltaUp: true,
+    amount: 0, prefix: 'AED ', delta: '+0%', deltaUp: true,
     icon: 'arrow-down-circle', gradient: ['#16A34A', '#0F7A37', '#064E21'], chipLabel: 'INCOMING',
   },
   m_spend: {
     id: 'm_spend', label: 'Spending', sub: 'This month',
-    amount: 4832, prefix: 'AED ', delta: '-6.8%', deltaUp: false,
+    amount: 0, prefix: 'AED ', delta: '-0%', deltaUp: false,
     icon: 'arrow-up-circle', gradient: ['#0B1435', '#1A2654', '#0B1435'], chipLabel: 'OUTGOING',
   },
   m_savings: {
-    id: 'm_savings', label: 'Savings', sub: 'Year-to-date',
-    amount: 48200, prefix: 'AED ', delta: '+31.5%', deltaUp: true,
+    id: 'm_savings', label: 'Savings', sub: 'This month',
+    amount: 0, prefix: 'AED ', delta: '+0%', deltaUp: true,
     icon: 'trending-up', gradient: ['#8B5CF6', '#6D28D9', '#4C1D95'], chipLabel: 'GROWTH',
   },
   m_vat: {
@@ -483,33 +491,67 @@ function MiniCard({ variant, label, holder, number }) {
   );
 }
 
-export default function HomeScreen({ navigation, darkMode = true }) {
+export default function HomeScreen({ navigation, darkMode = false }) {
   const { profile } = useAuth();
   const name = profile?.name || 'Friend';
   const [active, setActive] = useState('Dashboard');
   const [metricIds, setMetricIds] = useState(DEFAULT_METRIC_IDS);
   const [showCustomize, setShowCustomize] = useState(false);
   const [ledger, setLedger] = useState([]);
+  const [openingBalance, setOpeningBalanceState] = useState(0);
   const [txSearch, setTxSearch] = useState('');
-  const [showFilter, setShowFilter] = useState(false);
-  const [filter, setFilter] = useState({ period: 'all', minAmount: '', maxAmount: '' });
+  const [filter, setFilter] = useState({ dateFrom: '', dateTo: '', minAmount: '', maxAmount: '' });
 
   const [refreshing, setRefreshing] = useState(false);
+  const [keyboardH, setKeyboardH] = useState(0);
+  const txScrollRef = useRef(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterDraft, setFilterDraft] = useState({ dateFrom: '', dateTo: '', minAmount: '', maxAmount: '' });
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardH(e.endCoordinates.height)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardH(0)
+    );
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const reloadLedger = useCallback(async () => {
     try {
-      const next = await listLedgerTx({ limit: 100 });
+      const [next, opening] = await Promise.all([
+        listLedgerTx({ limit: 100 }),
+        getOpeningBalance(),
+      ]);
+      console.log('[HomeScreen] reloadLedger got', next.length, 'items, opening:', opening);
       setLedger(next);
-    } catch {}
+      setOpeningBalanceState(opening || 0);
+    } catch (e) {
+      console.error('[HomeScreen] reloadLedger error:', e.message);
+    }
   }, []);
 
-  useFocusEffect(useCallback(() => { reloadLedger(); }, [reloadLedger]));
+  useFocusEffect(useCallback(() => {
+    console.log('[HomeScreen] focus — calling reloadLedger');
+    reloadLedger();
+  }, [reloadLedger]));
 
   useEffect(() => {
     reloadLedger();
-    const unsub = subscribeLedger(() => { reloadLedger(); });
-    const sub = DeviceEventEmitter.addListener(LEDGER_EVENT, () => { reloadLedger(); });
-    const poll = setInterval(reloadLedger, 1500);
+    const unsub = subscribeLedger((payload) => {
+      console.log('[HomeScreen] subscribeLedger callback fired:', payload?.action);
+      reloadLedger();
+    });
+    const sub = DeviceEventEmitter.addListener(LEDGER_EVENT, (payload) => {
+      console.log('[HomeScreen] DeviceEventEmitter ledger event fired:', payload?.action);
+      reloadLedger();
+    });
+    const poll = setInterval(() => {
+      reloadLedger();
+    }, 1500);
     return () => { unsub(); sub.remove(); clearInterval(poll); };
   }, [reloadLedger]);
 
@@ -520,25 +562,34 @@ export default function HomeScreen({ navigation, darkMode = true }) {
   }, [reloadLedger]);
 
   const filteredLedger = useMemo(() => {
-    const now = new Date();
-    const periodMap = {
-      today: new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(),
-      week:  now.getTime() - 7 * 86400000,
-      month: now.getTime() - 30 * 86400000,
-      year:  now.getTime() - 365 * 86400000,
-    };
-    const cutoff = periodMap[filter.period];
-    const min = parseFloat(filter.minAmount) || 0;
-    const max = parseFloat(filter.maxAmount) || Infinity;
+    const dateFrom = filter.dateFrom ? new Date(filter.dateFrom).getTime() : null;
+    const dateTo = filter.dateTo ? new Date(filter.dateTo + 'T23:59:59').getTime() : null;
+    const min = filter.minAmount ? parseFloat(filter.minAmount) || 0 : null;
+    const max = filter.maxAmount ? parseFloat(filter.maxAmount) || Infinity : null;
     const q = txSearch.trim().toLowerCase();
     return ledger.filter(t => {
-      if (cutoff && (t.ts || 0) < cutoff) return false;
+      if (dateFrom) { const ts = t.ts || (t.date ? new Date(t.date).getTime() : 0); if (ts < dateFrom) return false; }
+      if (dateTo)   { const ts = t.ts || (t.date ? new Date(t.date).getTime() : 0); if (ts > dateTo) return false; }
       const amt = Math.abs(+t.amount) || 0;
-      if (amt < min || amt > max) return false;
+      if (min != null && amt < min) return false;
+      if (max != null && amt > max) return false;
       if (q && !((t.counterparty || '').toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q))) return false;
       return true;
     });
   }, [ledger, filter, txSearch]);
+
+  const recentSends = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const t of ledger) {
+      const name = (t.counterparty || '').trim();
+      if (!name || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      result.push({ name, color: getColorForName(name) });
+      if (result.length >= 5) break;
+    }
+    return result;
+  }, [ledger]);
 
   useEffect(() => {
     (async () => {
@@ -557,12 +608,82 @@ export default function HomeScreen({ navigation, darkMode = true }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
   };
 
-  const visibleMetrics = useMemo(
-    () => metricIds.map(id => METRIC_LIBRARY[id]).filter(Boolean),
-    [metricIds]
-  );
+  const ledgerStats = useMemo(() => {
+    const now = new Date();
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+    let totalIn = 0, totalOut = 0;
+    let inToday = 0, outToday = 0;
+    let inThisMonth = 0, outThisMonth = 0;
+    let inPrevMonth = 0, outPrevMonth = 0;
+    for (const t of ledger) {
+      const amt = +t.amount || 0;
+      const ts = +t.ts || (t.date ? new Date(t.date).getTime() : 0);
+      if (t.direction === 'in') {
+        totalIn += amt;
+        if (ts >= dayStart) inToday += amt;
+        if (ts >= monthStart) inThisMonth += amt;
+        else if (ts >= prevMonthStart && ts < monthStart) inPrevMonth += amt;
+      } else if (t.direction === 'out') {
+        totalOut += amt;
+        if (ts >= dayStart) outToday += amt;
+        if (ts >= monthStart) outThisMonth += amt;
+        else if (ts >= prevMonthStart && ts < monthStart) outPrevMonth += amt;
+      }
+    }
+    // Total Balance = opening + Σ credits − Σ debits
+    const balanceNum = (+openingBalance || 0) + totalIn - totalOut;
+    const savingsThisMonth = Math.max(inThisMonth - outThisMonth, 0);
+    const pct = (cur, prev) => {
+      if (!prev) return cur > 0 ? 100 : 0;
+      return Math.round(((cur - prev) / prev) * 100);
+    };
+    return {
+      balanceNum,
+      openingBalance: +openingBalance || 0,
+      totalIn,
+      totalOut,
+      inToday,
+      outToday,
+      netToday: inToday - outToday,
+      inThisMonth,
+      outThisMonth,
+      savingsThisMonth,
+      incomeDeltaPct: pct(inThisMonth, inPrevMonth),
+      spendDeltaPct: pct(outThisMonth, outPrevMonth),
+    };
+  }, [ledger, openingBalance]);
 
-  const balance = useMemo(() => 'AED 365,500', []);
+  const visibleMetrics = useMemo(() => {
+    return metricIds.map(id => {
+      const base = METRIC_LIBRARY[id];
+      if (!base) return null;
+      const s = ledgerStats;
+      if (id === 'm_balance') {
+        const isNeg = s.balanceNum < 0;
+        return { ...base, amount: Math.abs(s.balanceNum), prefix: isNeg ? '-AED ' : 'AED ', delta: '', deltaUp: !isNeg };
+      }
+      if (id === 'm_income') {
+        const up = s.incomeDeltaPct >= 0;
+        return { ...base, amount: s.inThisMonth, delta: `${up ? '+' : ''}${s.incomeDeltaPct}%`, deltaUp: up };
+      }
+      if (id === 'm_spend') {
+        const down = s.spendDeltaPct <= 0;
+        return { ...base, amount: s.outThisMonth, delta: `${s.spendDeltaPct >= 0 ? '+' : ''}${s.spendDeltaPct}%`, deltaUp: down };
+      }
+      if (id === 'm_savings') {
+        return { ...base, amount: s.savingsThisMonth, delta: '', deltaUp: true };
+      }
+      return base;
+    }).filter(Boolean);
+  }, [metricIds, ledgerStats]);
+
+  const balance = useMemo(() => {
+    const total = ledgerStats.balanceNum;
+    const sign = total < 0 ? '-' : '';
+    return `${sign}AED ${Math.abs(total).toLocaleString('en-US')}`;
+  }, [ledgerStats]);
 
   const [bills, setBills] = useState([]);
   const [showAddBill, setShowAddBill] = useState(false);
@@ -591,12 +712,7 @@ export default function HomeScreen({ navigation, darkMode = true }) {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#2A63E2" />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
-        stickyHeaderIndices={[]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
-      >
+      <View style={{ flex: 1, marginBottom: keyboardH }}>
         {/* Blue hero */}
         <View style={styles.hero}>
           <Animated.View
@@ -642,7 +758,11 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                 <Text style={styles.balanceValue}>{balance}</Text>
                 <View style={styles.savedPill}>
                   <Ionicons name="sparkles" size={14} color="#FFFFFF" />
-                  <Text style={styles.savedText}>You have saved AED 10 in the last 30 days</Text>
+                  <Text style={styles.savedText}>
+                    {ledgerStats.savingsThisMonth > 0
+                      ? `You saved AED ${Math.round(ledgerStats.savingsThisMonth).toLocaleString()} this month`
+                      : `Log income via chat to track savings`}
+                  </Text>
                   <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
                 </View>
               </Animated.View>
@@ -722,11 +842,11 @@ export default function HomeScreen({ navigation, darkMode = true }) {
         </View>
 
         {/* White bottom sheet */}
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { flex: 1, minHeight: undefined }]}>
           <View style={styles.sheetHandle} />
 
           {active === 'Dashboard' && (
-            <>
+            <View style={{ flex: 1 }}>
               <Animated.View entering={FadeInUp.delay(100).duration(400)}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Recent Send</Text>
@@ -735,24 +855,31 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                   </Pressable>
                 </View>
                 <View style={styles.recentSendRow}>
-                  {RECENT_SEND.map((p, i) => (
+                  {recentSends.length === 0 && (
+                    <Text style={{ color: 'rgba(11,20,53,0.48)', fontSize: 13, paddingVertical: 8 }}>
+                      No recent sends. Log a payment via chat to see it here.
+                    </Text>
+                  )}
+                  {recentSends.map((p) => (
                     <View key={p.name} style={{ alignItems: 'center', marginRight: 16 }}>
                       <Avatar name={p.name} color={p.color} size={52} />
                       <Text style={styles.recentName}>{p.name}</Text>
                     </View>
                   ))}
-                  <Pressable style={styles.recentAdd} hitSlop={8}>
-                    <Ionicons name="add" size={22} color="#2A63E2" />
-                  </Pressable>
+                  {recentSends.length > 0 && (
+                    <Pressable style={styles.recentAdd} hitSlop={8}>
+                      <Ionicons name="add" size={22} color="#2A63E2" />
+                    </Pressable>
+                  )}
                 </View>
               </Animated.View>
 
-              <Animated.View entering={FadeInUp.delay(200).duration(400)}>
+              <View style={{ flex: 1 }}>
                 <View style={[styles.sectionHeader, { marginTop: 22 }]}>
                   <Text style={styles.sectionTitle}>Transactions</Text>
                 </View>
-                <View style={styles.searchRow}>
-                  <View style={styles.searchInputWrap}>
+                <View style={[styles.searchRow, { marginBottom: 4 }]}>
+                  <View style={styles.searchInputWrap} >
                     <Ionicons name="search-outline" size={16} color="rgba(11,20,53,0.48)" />
                     <TextInput
                       value={txSearch}
@@ -760,40 +887,63 @@ export default function HomeScreen({ navigation, darkMode = true }) {
                       placeholder="Search transactions"
                       placeholderTextColor="rgba(11,20,53,0.48)"
                       style={styles.searchInput}
+                      onFocus={() => {
+                        // Scroll search bar above keyboard after it opens
+                        setTimeout(() => {
+                          txScrollRef.current?.scrollTo({ y: 0, animated: true });
+                        }, 350);
+                      }}
                     />
                   </View>
-                  <Pressable style={styles.filterBtn} hitSlop={8} onPress={() => setShowFilter(true)} accessibilityRole="button" accessibilityLabel="Filter transactions">
-                    <Ionicons name="options-outline" size={18} color="#FFFFFF" />
+                  <Pressable
+                    style={styles.filterBtn}
+                    hitSlop={6}
+                    onPress={() => {
+                      setFilterDraft({ ...filter });
+                      setShowFilter(true);
+                    }}
+                  >
+                    <Ionicons
+                      name={filter.dateFrom || filter.dateTo || filter.minAmount || filter.maxAmount ? 'options' : 'options-outline'}
+                      size={20}
+                      color="#FFFFFF"
+                    />
                   </Pressable>
                 </View>
-
-                {filteredLedger.length === 0 && (
-                  <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                    <Text style={{ color: 'rgba(11,20,53,0.48)', fontSize: 13 }}>
-                      No transactions yet. Ask Filey AI "I paid 500 AED to Ravi" to log one.
-                    </Text>
-                  </View>
-                )}
-
-                {filteredLedger.slice(0, 10).map((a) => {
-                  const isIn = a.direction === 'in';
-                  return (
-                    <View key={a.id} style={styles.activityRow}>
-                      <View style={[styles.activityIcon, { backgroundColor: isIn ? 'rgba(34,197,94,0.14)' : 'rgba(255,84,112,0.14)' }]}>
-                        <Ionicons name={isIn ? 'arrow-down-outline' : 'arrow-up-outline'} size={18} color={isIn ? '#22C55E' : '#FF5470'} />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.activityName}>{a.counterparty}</Text>
-                        <Text style={styles.activitySub}>{a.note || a.category || a.date}</Text>
-                      </View>
-                      <Text style={[styles.activityAmt, { color: isIn ? '#22C55E' : '#FF5470' }]}>
-                        {isIn ? '+' : '-'}AED {Math.abs(+a.amount).toLocaleString()}
+                <ScrollView
+                  ref={txScrollRef}
+                  style={{ flex: 1 }}
+                  showsVerticalScrollIndicator={false}
+                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2A63E2" />}
+                >
+                  {filteredLedger.length === 0 && (
+                    <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                      <Text style={{ color: 'rgba(11,20,53,0.48)', fontSize: 13 }}>
+                        No transactions yet. Ask Filey AI "I paid 500 AED to Ravi" to log one.
                       </Text>
                     </View>
-                  );
-                })}
-              </Animated.View>
-            </>
+                  )}
+
+                  {filteredLedger.slice(0, 10).map((a) => {
+                    const isIn = a.direction === 'in';
+                    return (
+                      <View key={a.id} style={styles.activityRow}>
+                        <View style={[styles.activityIcon, { backgroundColor: isIn ? 'rgba(34,197,94,0.14)' : 'rgba(255,84,112,0.14)' }]}>
+                          <Ionicons name={isIn ? 'arrow-down-outline' : 'arrow-up-outline'} size={18} color={isIn ? '#22C55E' : '#FF5470'} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={styles.activityName}>{a.counterparty}</Text>
+                          <Text style={styles.activitySub}>{a.note || a.category || a.date}</Text>
+                        </View>
+                        <Text style={[styles.activityAmt, { color: isIn ? '#22C55E' : '#FF5470' }]}>
+                          {isIn ? '+' : '-'}AED {Math.abs(+a.amount).toLocaleString()}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
           )}
 
           {active === 'Analytics' && (
@@ -891,7 +1041,88 @@ export default function HomeScreen({ navigation, darkMode = true }) {
             </Animated.View>
           )}
         </View>
-      </ScrollView>
+      </View>
+
+      <Modal visible={showFilter} transparent animationType="fade" onRequestClose={() => setShowFilter(false)}>
+        <Pressable style={styles.modalBg} onPress={() => setShowFilter(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Filter Transactions</Text>
+
+            <Text style={styles.filterLabel}>Date Range (optional)</Text>
+            <View style={styles.filterRow}>
+              <TextInput
+                placeholder="From (YYYY-MM-DD)"
+                placeholderTextColor="rgba(11,20,53,0.4)"
+                style={[styles.modalInput, { flex: 1 }]}
+                value={filterDraft.dateFrom}
+                onChangeText={(v) => setFilterDraft(d => ({ ...d, dateFrom: v }))}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+              />
+              <Text style={{ color: 'rgba(11,20,53,0.4)', marginHorizontal: 6 }}>–</Text>
+              <TextInput
+                placeholder="To (YYYY-MM-DD)"
+                placeholderTextColor="rgba(11,20,53,0.4)"
+                style={[styles.modalInput, { flex: 1 }]}
+                value={filterDraft.dateTo}
+                onChangeText={(v) => setFilterDraft(d => ({ ...d, dateTo: v }))}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+              />
+            </View>
+
+            <Text style={[styles.filterLabel, { marginTop: 14 }]}>Amount Range (optional)</Text>
+            <View style={styles.filterRow}>
+              <TextInput
+                placeholder="Min (AED)"
+                placeholderTextColor="rgba(11,20,53,0.4)"
+                style={[styles.modalInput, { flex: 1 }]}
+                value={filterDraft.minAmount}
+                onChangeText={(v) => setFilterDraft(d => ({ ...d, minAmount: v }))}
+                keyboardType="numeric"
+              />
+              <Text style={{ color: 'rgba(11,20,53,0.4)', marginHorizontal: 6 }}>–</Text>
+              <TextInput
+                placeholder="Max (AED)"
+                placeholderTextColor="rgba(11,20,53,0.4)"
+                style={[styles.modalInput, { flex: 1 }]}
+                value={filterDraft.maxAmount}
+                onChangeText={(v) => setFilterDraft(d => ({ ...d, maxAmount: v }))}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <Pressable
+                onPress={() => {
+                  const cleared = { dateFrom: '', dateTo: '', minAmount: '', maxAmount: '' };
+                  setFilter(cleared);
+                  setFilterDraft(cleared);
+                  setShowFilter(false);
+                }}
+                style={[styles.modalBtn, { backgroundColor: '#F3F4F6' }]}
+              >
+                <Text style={{ color: '#0B1435', fontWeight: '700' }}>Clear</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  const hasDate = filterDraft.dateFrom || filterDraft.dateTo;
+                  const hasAmt = filterDraft.minAmount || filterDraft.maxAmount;
+                  if (!hasDate && !hasAmt) {
+                    Alert.alert('Filter required', 'Enter a date range or amount range (or both).');
+                    return;
+                  }
+                  setFilter({ ...filterDraft });
+                  setShowFilter(false);
+                }}
+                style={[styles.modalBtn, { backgroundColor: '#2A63E2' }]}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Apply</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <CustomizeSheet
         visible={showCustomize}
@@ -899,69 +1130,6 @@ export default function HomeScreen({ navigation, darkMode = true }) {
         ids={metricIds}
         setIds={persistMetrics}
       />
-
-      <Modal visible={showFilter} transparent animationType="slide" onRequestClose={() => setShowFilter(false)}>
-        <Pressable style={filterStyles.backdrop} onPress={() => setShowFilter(false)}>
-          <Pressable style={filterStyles.sheet} onPress={() => {}}>
-            <View style={filterStyles.handle} />
-            <Text style={filterStyles.title}>Filter transactions</Text>
-
-            <Text style={filterStyles.label}>TIME PERIOD</Text>
-            <View style={filterStyles.chipRow}>
-              {[
-                { k: 'all', l: 'All time' },
-                { k: 'today', l: 'Today' },
-                { k: 'week', l: '7 days' },
-                { k: 'month', l: '30 days' },
-                { k: 'year', l: '1 year' },
-              ].map(o => {
-                const on = filter.period === o.k;
-                return (
-                  <Pressable
-                    key={o.k}
-                    onPress={() => setFilter(f => ({ ...f, period: o.k }))}
-                    style={[filterStyles.chip, on && filterStyles.chipOn]}
-                  >
-                    <Text style={[filterStyles.chipText, on && filterStyles.chipTextOn]}>{o.l}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Text style={filterStyles.label}>AMOUNT RANGE</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TextInput
-                value={filter.minAmount}
-                onChangeText={(v) => setFilter(f => ({ ...f, minAmount: v.replace(/[^0-9.]/g, '') }))}
-                placeholder="Min"
-                placeholderTextColor="rgba(11,20,53,0.4)"
-                keyboardType="numeric"
-                style={filterStyles.input}
-              />
-              <TextInput
-                value={filter.maxAmount}
-                onChangeText={(v) => setFilter(f => ({ ...f, maxAmount: v.replace(/[^0-9.]/g, '') }))}
-                placeholder="Max"
-                placeholderTextColor="rgba(11,20,53,0.4)"
-                keyboardType="numeric"
-                style={filterStyles.input}
-              />
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <Pressable
-                onPress={() => { setFilter({ period: 'all', minAmount: '', maxAmount: '' }); }}
-                style={filterStyles.resetBtn}
-              >
-                <Text style={filterStyles.resetText}>Reset</Text>
-              </Pressable>
-              <Pressable onPress={() => setShowFilter(false)} style={filterStyles.applyBtn}>
-                <Text style={filterStyles.applyText}>Apply</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <Modal visible={showAddBill} transparent animationType="fade" onRequestClose={() => setShowAddBill(false)}>
         <Pressable style={styles.modalBg} onPress={() => setShowAddBill(false)}>
@@ -1013,24 +1181,6 @@ export default function HomeScreen({ navigation, darkMode = true }) {
     </View>
   );
 }
-
-const filterStyles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
-  handle: { alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(11,20,53,0.15)', marginBottom: 14 },
-  title: { fontSize: 18, fontWeight: '700', color: '#0B1435', marginBottom: 18 },
-  label: { fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)', backgroundColor: '#F7F8FB' },
-  chipOn: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#0B1435' },
-  chipTextOn: { color: '#FFFFFF' },
-  input: { flex: 1, borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#0B1435', backgroundColor: '#F7F8FB' },
-  resetBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#F0F2F8' },
-  resetText: { color: '#0B1435', fontWeight: '700', fontSize: 14 },
-  applyBtn: { flex: 2, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: '#2A63E2' },
-  applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-});
 
 const HERO_H = 340;
 
@@ -1582,6 +1732,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 8,
   },
+  filterLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.5, marginBottom: 8 },
+  filterRow: { flexDirection: 'row', alignItems: 'center' },
   modalBg: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center', padding: 20,

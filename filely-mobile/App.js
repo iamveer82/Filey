@@ -4,6 +4,7 @@ import './src/lib/polyfills';
 import 'react-native-url-polyfill/auto';
 // Gesture handler must be imported before navigation
 import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { registerRootComponent } from 'expo';
@@ -44,6 +45,10 @@ import AIMessagingHub from './src/screens/AIMessagingHub';
 import TeamScreen from './src/screens/TeamScreen';
 import ComplianceVault from './src/screens/ComplianceVault';
 import ServicesScreen from './src/screens/ServicesScreen';
+import ClipScreen from './src/screens/ClipScreen';
+import ToolPickerScreen from './src/screens/ToolPickerScreen';
+import RunToolScreen from './src/screens/RunToolScreen';
+import PdfEditScreen from './src/screens/PdfEditScreen';
 import ScannerScreen from './src/screens/ScannerScreen';
 import SignatureScreen from './src/screens/SignatureScreen';
 import ExportScreen from './src/screens/ExportScreen';
@@ -362,7 +367,7 @@ const toggleStyles = StyleSheet.create({
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
-  const [darkMode, setDarkMode]     = useState(true);   // default dark -- matches navy theme
+  const [darkMode, setDarkMode]     = useState(false);  // default light -- white + blue
   const [aiReady, setAiReady]       = useState(true);   // demo mode: skip download
   const [checkingAi]                = useState(false);
 
@@ -474,8 +479,24 @@ function AppContent() {
             {(props) => (
               <ClipStack.Navigator screenOptions={{ headerShown: false }}>
                 <ClipStack.Screen name="ClipHome">
-                  {(screenProps) => <ServicesScreen {...screenProps} darkMode={darkMode} />}
+                  {(screenProps) => <ToolPickerScreen {...screenProps} darkMode={darkMode} />}
                 </ClipStack.Screen>
+                <ClipStack.Screen
+                  name="RunTool"
+                  component={RunToolScreen}
+                  options={{
+                    presentation: 'card',
+                    animation: 'slide_from_right',
+                  }}
+                />
+                <ClipStack.Screen
+                  name="PdfEdit"
+                  component={PdfEditScreen}
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
                 <ClipStack.Screen
                   name="Scanner"
                   component={ScannerScreen}
@@ -585,11 +606,13 @@ const headerStyles = StyleSheet.create({
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

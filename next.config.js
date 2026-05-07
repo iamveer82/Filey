@@ -41,6 +41,15 @@ const nextConfig = {
       },
     ];
   },
+  // Serve PDFCraft static export under /clip — map clean URLs to index.html files
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/clip', destination: '/clip/index.html' },
+        { source: '/clip/:path((?!_next/)[^/.]+)', destination: '/clip/:path/index.html' },
+      ],
+    };
+  },
 };
 
 module.exports = nextConfig;
