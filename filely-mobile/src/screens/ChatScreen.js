@@ -32,6 +32,7 @@ import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '.
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { scanReceipt, parseExpenseText } from '../services/receiptPipeline';
+import ThinkingPetal from '../components/ThinkingPetal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -408,8 +409,9 @@ export default function ChatScreen() {
               <View style={[s.aiAvatar]}>
                 <Text style={{ fontSize: 13 }}>🦊</Text>
               </View>
-              <View style={[s.aiBubble, { backgroundColor: c.card, borderColor: c.border }]}>
-                <TypingDots color="#3B6BFF" />
+              <View style={[s.aiBubble, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', justifyContent: 'center', minHeight: 52 }]}>
+                <ThinkingPetal color="#3B6BFF" />
+                <Text style={[s.thinkingLabel, { color: c.textMuted }]}>Thinking…</Text>
               </View>
             </View>
           )}
@@ -519,6 +521,7 @@ const s = StyleSheet.create({
   // Typing
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 20 },
   dot: { width: 7, height: 7, borderRadius: 4 },
+  thinkingLabel: { fontSize: 11, marginTop: 4 },
 
   // Transaction Card
   txnCard: {

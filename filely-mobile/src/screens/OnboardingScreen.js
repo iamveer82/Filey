@@ -71,8 +71,8 @@ function IllustrationCircle({ icon, c }) {
   );
 }
 
-export default function OnboardingScreen({ darkMode = true, onComplete }) {
-  const c = Colors.light;
+export default function OnboardingScreen({ darkMode = false, onComplete }) {
+  const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const isLast = step === STEPS.length - 1;
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     borderRadius: (ILLUS - 100) / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#3B6BFF',
+    shadowColor: '#2A63E2',
     shadowOpacity: 0.35,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#3B6BFF',
+    shadowColor: '#2A63E2',
     shadowOpacity: 0.28,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },

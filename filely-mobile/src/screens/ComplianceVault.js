@@ -60,7 +60,7 @@ function StatPill({ label, value }) {
 }
 
 export default function ComplianceVault({ darkMode }) {
-  const c = Colors.light;
+  const c = darkMode ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { orgId } = useAuth();
 
@@ -277,7 +277,7 @@ export default function ComplianceVault({ darkMode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#3B6BFF',
+    backgroundColor: '#2A63E2',
     paddingBottom: 44,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
