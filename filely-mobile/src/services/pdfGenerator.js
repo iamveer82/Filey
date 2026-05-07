@@ -10,10 +10,11 @@ const { PdfGenerator: Native } = NativeModules;
  * Generate a PDF from image URIs.
  * @param {string[]} imageUris - Array of file:// image URIs
  * @param {string} filename - Output filename
+ * @param {object} [options] - { pageSize, orientation, quality, autoCrop, enhanceContrast, grayscale }
  * @returns {Promise<{ uri: string, pageCount: number, success: boolean }>}
  */
-export async function generatePdf(imageUris, filename = `Scan-${Date.now()}.pdf`) {
-  return Native.generatePdf(imageUris, filename);
+export async function generatePdf(imageUris, filename = `Scan-${Date.now()}.pdf`, options = {}) {
+  return Native.generatePdf(imageUris, filename, options);
 }
 
 /**

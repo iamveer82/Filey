@@ -1,61 +1,106 @@
 # Filely iOS Native Modules
 
-This directory contains native iOS modules for the Filey React Native app.
+All native iOS modules live under `LocalPods/` and are managed by CocoaPods via the Podfile.
+Each module has its own `.podspec` — installed with `cd ios && pod install`.
 
 ## Modules
 
 ### 1. VisionOcr (`RNVisionOcr`)
+`LocalPods/VisionOcr/`
 
 Apple Vision framework integration for receipt text recognition.
 
 **Features:**
 - Uses `VNRecognizeTextRequest` for high-accuracy OCR
-- Supports English (US/GB) text recognition
+- Supports 50+ languages (dynamically queried via `supportedRecognitionLanguages()` on iOS 16+)
 - Returns text, confidence scores, and bounding boxes
-- Handles both `file://` URIs and base64 data URIs
+- Custom words list support for domain-specific recognition
 
-**Requirements:**
-- iOS 10.3+ (Vision framework)
-- Camera permission in `app.json` (already configured)
+**Requirements:** iOS 15.0+ (podspec minimum), Vision framework (built-in)
 
-**Usage from JavaScript:**
 ```javascript
 import { recognizeText } from './src/services/visionOcr';
-
-const result = await recognizeText(imageUri);
-console.log(result.text);        // Full OCR text
-console.log(result.confidence);  // Average confidence 0-1
-console.log(result.regions);     // Individual text regions with bounds
+const result = await recognizeText(imageUri, { languages: ['en-US', 'ar-SA'] });
 ```
 
-### 2. GemmaInference (`RNGemmaInference`)
+### 2. VisionEdgeDetection
+`LocalPods/VisionEdgeDetection/`
 
-LiteRT (TensorFlow Lite) integration for on-device NLP inference.
+Document edge detection using `VNDetectRectanglesRequest` with perspective correction.
 
 **Features:**
-- Runs Gemma 4 model locally (no API calls needed)
-- Parses receipt OCR text into structured JSON
-- Falls back to regex-based parser when model unavailable
-- Supports offline operation
+- Rectangle detection with configurable aspect ratio and confidence
+- Perspective correction via `CIPerspectiveCorrection`
+- Image preprocessing (denoise, contrast boost, edge enhancement)
+- Batch processing support
 
-**Requirements:**
-- TensorFlowLiteC framework (optional, for full inference)
-- Gemma 4 model file at `DocumentDirectory/ai/gemma-4-E2B-it.litertlm`
-
-**Usage from JavaScript:**
 ```javascript
-import { parseReceipt, isModelReady } from './src/services/gemmaInference';
+import { detectDocumentEdges, applyPerspectiveCorrection } from './src/services/documentScanner';
+```
 
-const ready = await isModelReady();
-if (ready) {
-  const transaction = await parseReceipt(ocrText);
-  // Returns: { merchant, date, amount, vat, trn, category, paymentMethod }
-}
+### 3. PdfGenerator
+`LocalPods/PdfGenerator/`
+
+Multi-page PDF generation from images using `UIGraphicsPDFRenderer`.
+
+**Features:**
+- A4 / Letter / original size support
+- Auto-orientation detection
+- Image enhancement (auto-enhance, contrast, grayscale)
+- Auto-crop via CIDetector rectangle detection
+
+```javascript
+import { generatePdf } from './src/services/pdfGenerator';
+const result = await generatePdf(imageUris, 'output.pdf', { pageSize: 'a4' });
+```
+
+### 4. PdfTools
+`LocalPods/PdfTools/`
+
+67+ PDF operations on-device via PDFKit, CoreGraphics, CoreImage, Vision, WebKit.
+
+**Categories:** Organize & Manage, Edit & Annotate, Convert, Secure, Optimize & Repair.
+
+Dependencies: ZIPFoundation (for CBZ/EPUB/XLSX/PPTX/FB2 extraction).
+
+```javascript
+import * as PdfTools from './src/services/pdfTools';
+const result = await PdfTools.mergePdfs([uri1, uri2], 'merged.pdf');
+```
+
+### 5. BrushCanvas
+`LocalPods/PdfTools/BrushCanvas.swift`
+
+PencilKit-backed drawing canvas for PDF annotation and signatures.
+
+```javascript
+import BrushCanvas from './src/components/BrushCanvas';
+// Use via ref: canvasRef.current.exportPng({ scale: 2, composite: true })
+```
+
+## Gemma Inference (On-Device AI)
+
+The Gemma 4 model (`gemma-4-E2B-it.litertlm`) provides on-device NLP for receipt parsing.
+JS-side fallback (`gemmaInference.js`) uses regex when native module is unavailable.
+
+**Requirements for full inference:**
+1. TensorFlowLiteC framework — uncomment in Podfile
+2. Model file at `DocumentDirectory/ai/gemma-4-E2B-it.litertlm`
+
+## File Structure
+
+```
+ios/
+├── LocalPods/
+│   ├── VisionOcr/           # OCR via Apple Vision (Swift)
+│   ├── VisionEdgeDetection/  # Document edge detection (Swift)
+│   ├── PdfGenerator/         # Image→PDF generation (Swift)
+│   └── PdfTools/             # 67+ PDF ops + BrushCanvas (Swift)
+├── Podfile                   # CocoaPods configuration
+└── README.md
 ```
 
 ## Building
-
-### Option 1: Development Build (Recommended)
 
 ```bash
 cd filely-mobile
@@ -65,74 +110,18 @@ pod install
 npx expo run:ios
 ```
 
-### Option 2: Manual Framework Integration
-
-For full Gemma inference, download TensorFlow Lite:
-
-1. Download `TensorFlowLiteC.xcframework` from https://github.com/tensorflow/tensorflow/releases
-2. Add to Xcode project under `ios/Filely/`
-3. Uncomment the Podfile lines for TensorFlowLiteC
-
-## File Structure
-
-```
-ios/
-├── VisionOcr/
-│   ├── RNVisionOcr.h       # Module header
-│   └── RNVisionOcr.m       # Implementation (Apple Vision)
-├── GemmaInference/
-│   ├── RNGemmaInference.h  # Module header
-│   └── RNGemmaInference.m  # Implementation (LiteRT + fallback parser)
-├── Podfile                 # CocoaPods configuration
-└── README.md               # This file
-```
-
-## Testing
-
-### Test OCR Module
-```javascript
-import { recognizeText } from './src/services/visionOcr';
-
-// Test with a sample receipt image
-const result = await recognizeText('file:///path/to/receipt.jpg');
-console.log('OCR Result:', result);
-```
-
-### Test Gemma Inference
-```javascript
-import { parseReceipt } from './src/services/gemmaInference';
-
-const ocrText = `ENOC Service Station
-15/03/2024
-Total: 150.50 AED
-VAT (5%): 7.53 AED
-TRN: 123456789012345`;
-
-const transaction = await parseReceipt(ocrText);
-console.log('Parsed:', transaction);
-// Expected: { merchant: 'ENOC', amount: 150.50, vat: 7.53, trn: '123456789012345', ... }
-```
-
 ## Troubleshooting
 
-### "Native module not found"
-- Ensure you've run `npx expo prebuild --platform ios`
-- Check that `pod install` completed successfully
-- Verify modules are linked in Xcode
-
-### OCR returns empty text
-- Check camera/photo library permissions
-- Ensure image quality is sufficient (not too blurry/dark)
-- Vision framework requires iOS 10.3+
-
-### Model not ready
-- Check `AIInitializationScreen` completed download
-- Verify model exists at `DocumentDirectory/ai/gemma-4-E2B-it.litertlm`
-- Model file should be ~2.5GB
+| Problem | Fix |
+|---------|-----|
+| "Native module not found" | Run `npx expo prebuild --platform ios` then `cd ios && pod install` |
+| OCR returns empty text | Check camera permissions, ensure iOS 15.0+ |
+| Gemma model not ready | Model file (~2.5GB) must be at `DocumentDirectory/ai/gemma-4-E2B-it.litertlm` |
+| Build errors | Ensure `IPHONEOS_DEPLOYMENT_TARGET = 15.0` (set in Podfile post_install) |
 
 ## Architecture Notes
 
-- Both modules use async dispatch to avoid blocking the JS thread
-- Gemma module gracefully falls back to local regex parser when unavailable
-- All native code is wrapped in `@try/@catch` for safety
-- Platform checks in JavaScript prevent web crashes
+- All modules dispatch to background queues — never block JS thread
+- Platform checks in JavaScript (`Platform.OS === 'ios'`) prevent web/Android crashes
+- Native modules gracefully degrade — PdfTools returns structured errors on unsupported formats
+- Progress events emitted via RCTEventEmitter for long-running operations (merge, split, compress)
