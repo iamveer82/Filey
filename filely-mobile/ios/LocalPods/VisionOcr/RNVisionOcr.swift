@@ -109,9 +109,7 @@ class RNVisionOcr: NSObject {
       request.customWords = words
     }
 
-    let handler = VNImageRequestHandler(cgImage: cgImage, options: [
-      VNImageOption: Any.self
-    ])
+    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
 
     DispatchQueue.global(qos: .userInitiated).async {
       do {

@@ -50,7 +50,7 @@ class PdfTools: RCTEventEmitter {
   }
 
   private func writeRendered(_ pdf: PDFDocument, to url: URL) -> Bool {
-    let renderer = UIGraphicsPDFRenderer()
+    let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
     let data = renderer.pdfData { ctx in
       for i in 0..<pdf.pageCount {
         guard let page = pdf.page(at: i) else { continue }
@@ -317,7 +317,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("nup_\(Int(Date().timeIntervalSince1970))")
     let r = max(1, rows); let c = max(1, cols); let perPage = r * c
     DispatchQueue.global(qos: .userInitiated).async {
-      let outData = UIGraphicsPDFRenderer().pdfData { ctx in
+      let outData = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         let srcBounds = pdf.page(at: 0)!.bounds(for: .mediaBox)
         let outW = srcBounds.width * CGFloat(c)
         let outH = srcBounds.height * CGFloat(r)
@@ -395,7 +395,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("divided_\(Int(Date().timeIntervalSince1970))")
     let r = max(1, rows); let c = max(1, cols)
     DispatchQueue.global(qos: .userInitiated).async {
-      let outData = UIGraphicsPDFRenderer().pdfData { renderCtx in
+      let outData = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { renderCtx in
         for pageIdx in 0..<pdf.pageCount {
           guard let page = pdf.page(at: pageIdx) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -743,7 +743,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outputUrl = tempUrl("greyscale_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let data = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
@@ -788,7 +788,7 @@ class PdfTools: RCTEventEmitter {
     let clamped = max(1, min(pageNumber, pdfDoc.pageCount))
     let outputUrl = tempUrl("signed_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdfDoc.pageCount {
           guard let p = pdfDoc.page(at: i) else { continue }
           let bounds = p.bounds(for: .mediaBox)
@@ -826,7 +826,7 @@ class PdfTools: RCTEventEmitter {
     let colorHex = options["color"] as? String ?? "#808080"
     let pages = options["pages"] as? [Int]
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdfDoc.pageCount {
           guard let page = pdfDoc.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -894,7 +894,7 @@ class PdfTools: RCTEventEmitter {
     let targetPages = pages.map { Set($0.filter { $0 >= 1 && $0 <= pdf.pageCount }) }
       ?? Set(1...pdf.pageCount)
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -965,7 +965,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outputUrl = tempUrl("flattened_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1022,7 +1022,7 @@ class PdfTools: RCTEventEmitter {
     let prefix = options["prefix"] as? String ?? ""
     let suffix = options["suffix"] as? String ?? ""
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1063,7 +1063,7 @@ class PdfTools: RCTEventEmitter {
     let fontSize = options["fontSize"] as? CGFloat ?? 10
     let colorHex = options["color"] as? String ?? "#666666"
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1110,7 +1110,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("stamped_\(Int(Date().timeIntervalSince1970))")
     let clamped = max(1, min(pageNumber, pdfDoc.pageCount))
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdfDoc.pageCount {
           guard let page = pdfDoc.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1142,7 +1142,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("bgcolored_\(Int(Date().timeIntervalSince1970))")
     let color = UIColor(hex: colorHex) ?? .white
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1170,7 +1170,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outputUrl = tempUrl("inverted_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1285,7 +1285,7 @@ class PdfTools: RCTEventEmitter {
       // Rebuild from CGPDFDocument
       let outputUrl = self.tempUrl("repaired_\(Int(Date().timeIntervalSince1970))")
       DispatchQueue.global(qos: .userInitiated).async {
-        let renderer = UIGraphicsPDFRenderer()
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
         let outData = renderer.pdfData { ctx in
           for i in 1...cgPdf.numberOfPages {
             guard let page = cgPdf.page(at: i) else { continue }
@@ -1322,7 +1322,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("rasterized_\(Int(Date().timeIntervalSince1970))")
     let scale = CGFloat(dpi) / 72.0
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1470,7 +1470,7 @@ class PdfTools: RCTEventEmitter {
       guard let data = pdf.dataRepresentation() else {
         reject("PERM_ERROR", "Could not get PDF data", nil); return
       }
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let outData = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
@@ -1548,7 +1548,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("posterized_\(Int(Date().timeIntervalSince1970))")
     let r = max(1, rows); let c = max(1, cols)
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for pageIdx in 0..<pdf.pageCount {
           guard let page = pdf.page(at: pageIdx) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1651,7 +1651,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outputUrl = tempUrl("noforms_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1702,7 +1702,7 @@ class PdfTools: RCTEventEmitter {
     DispatchQueue.global(qos: .userInitiated).async {
       // Remove metadata, annotations, JS actions — then re-render
       pdf.documentAttributes = nil
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           page.removeAllAnnotations()
@@ -1735,7 +1735,7 @@ class PdfTools: RCTEventEmitter {
       // PDFKit's findString gives us PDFSelections
       let selections = pdf.findString(searchText, withOptions: .caseInsensitive)
       // Redact by overlaying black rectangles at each selection
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -1847,7 +1847,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("outlined_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
       // Re-render with drawWithBox which converts text to paths
-      let data = UIGraphicsPDFRenderer().pdfData { ctx in
+      let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
           let bounds = page.bounds(for: .mediaBox)
@@ -2402,7 +2402,7 @@ class PdfTools: RCTEventEmitter {
     let langs = (languages?.isEmpty == false) ? languages! : ["en-US"]
     DispatchQueue.global(qos: .userInitiated).async {
       var totalRecognized = 0
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let data = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
@@ -2458,7 +2458,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outputUrl = tempUrl("deskewed_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let data = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
@@ -2510,7 +2510,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outputUrl = tempUrl("pdfa_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let data = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
@@ -2609,7 +2609,7 @@ class PdfTools: RCTEventEmitter {
     let outputUrl = tempUrl("textcolored_\(Int(Date().timeIntervalSince1970))")
     let color = UIColor(hex: colorHex) ?? .black
     DispatchQueue.global(qos: .userInitiated).async {
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let data = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let page = pdf.page(at: i) else { continue }
@@ -3123,7 +3123,7 @@ class PdfTools: RCTEventEmitter {
     }
     let outUrl = tempUrl("inked_batch_\(Int(Date().timeIntervalSince1970))")
     DispatchQueue.global(qos: .userInitiated).async {
-      let renderer = UIGraphicsPDFRenderer()
+      let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
       let data = renderer.pdfData { ctx in
         for i in 0..<pdf.pageCount {
           guard let p = pdf.page(at: i) else { continue }
