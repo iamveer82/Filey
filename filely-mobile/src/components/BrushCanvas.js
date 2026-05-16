@@ -4,7 +4,7 @@
  *
  * Props:
  *   tool          — 'pen' | 'marker' | 'pencil' | 'eraser' | 'lasso'
- *   strokeColor   — hex string ('#0B1435')
+ *   strokeColor   — hex string ('#0B1324')
  *   strokeWidth   — number (points)
  *   backgroundUri — optional file:// URI for backdrop image (PDF page render)
  *   showToolPicker— boolean, shows native PKToolPicker palette
@@ -36,7 +36,7 @@ const Manager = NativeModules.BrushCanvasManager;
 const BrushCanvas = forwardRef(function BrushCanvas(
   {
     tool = 'pen',
-    strokeColor = '#0B1435',
+    strokeColor = '#0B1324',
     strokeWidth = 4,
     backgroundUri,
     showToolPicker = false,

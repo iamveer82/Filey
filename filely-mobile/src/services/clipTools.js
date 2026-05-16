@@ -13,7 +13,7 @@
  */
 
 export const CATEGORIES = [
-  { id: 'organize-manage',  label: 'Organize & Manage',  icon: 'folder-outline',       color: '#2A63E2' },
+  { id: 'organize-manage',  label: 'Organize & Manage',  icon: 'folder-outline',       color: '#0F53DC' },
   { id: 'edit-annotate',    label: 'Edit & Annotate',    icon: 'create-outline',        color: '#8B5CF6' },
   { id: 'convert-to-pdf',   label: 'Convert to PDF',     icon: 'arrow-down-outline',    color: '#10B981' },
   { id: 'convert-from-pdf', label: 'Convert from PDF',   icon: 'arrow-up-outline',      color: '#F59E0B' },

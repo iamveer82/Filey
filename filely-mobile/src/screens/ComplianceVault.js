@@ -277,7 +277,7 @@ export default function ComplianceVault({ darkMode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     paddingBottom: 44,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(11,23,53,0.15)',
+    backgroundColor: 'rgba(11,19,36,0.15)',
     alignSelf: 'center', marginTop: 6, marginBottom: 10,
   },
   searchBar: {

@@ -97,7 +97,7 @@ export default function SignatureScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar style="light" />
       <View style={styles.pdfBar}>
-        <Ionicons name="document-text" size={16} color="#2A63E2" />
+        <Ionicons name="document-text" size={16} color="#0F53DC" />
         <Text style={styles.pdfName} numberOfLines={1}>{pdfName}</Text>
       </View>
       <SignaturePad onDone={handleSignature} onCancel={() => navigation.goBack()} />

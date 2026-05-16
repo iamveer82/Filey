@@ -104,15 +104,15 @@ export async function exportMovementsPDF({ limit, direction, title } = {}) {
   <html><head><meta charset="utf-8" />
   <style>
     @page { margin: 24mm 16mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0B1735; font-size: 11pt; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0B1324; font-size: 11pt; }
     h1 { font-size: 18pt; margin: 0 0 4px; letter-spacing: -0.4px; }
     .sub { color: #64748B; font-size: 10pt; margin-bottom: 18px; }
     .totals { display: flex; gap: 18px; margin: 16px 0 22px; flex-wrap: wrap; }
-    .pill { background: #F3F6FC; border: 1px solid rgba(11,23,53,0.08); border-radius: 12px; padding: 10px 14px; min-width: 130px; }
+    .pill { background: #F3F6FC; border: 1px solid rgba(11,19,36,0.08); border-radius: 12px; padding: 10px 14px; min-width: 130px; }
     .pill .l { font-size: 9pt; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; }
     .pill .v { font-size: 14pt; font-weight: 700; margin-top: 2px; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(11,23,53,0.08); font-size: 10pt; vertical-align: top; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(11,19,36,0.08); font-size: 10pt; vertical-align: top; }
     th { background: #F3F6FC; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; font-size: 9pt; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     tr.cr td.num { color: #16A34A; }

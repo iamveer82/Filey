@@ -15,7 +15,7 @@ export default function IconPicker({ value, onChange, size = 44 }) {
             accessibilityLabel={i.label}
             style={[
               styles.tile,
-              { backgroundColor: i.bg, width: size, height: size, borderColor: active ? '#2A63E2' : 'transparent' },
+              { backgroundColor: i.bg, width: size, height: size, borderColor: active ? '#0F53DC' : 'transparent' },
             ]}
           >
             <SvgXml xml={i.xml} width={size * 0.55} height={size * 0.55} />

@@ -85,7 +85,7 @@ export default function ChatInputBox({
         <View style={styles.box}>
           {/* Left: plus */}
           <SpringPressable onPress={() => setShowMenu(true)} style={styles.iconBtn}>
-            <Ionicons name="add" size={24} color="#0B1435" />
+            <Ionicons name="add" size={24} color="#0B1324" />
           </SpringPressable>
 
           {/* Center: text input or recorder */}
@@ -116,7 +116,7 @@ export default function ChatInputBox({
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder || 'Chat with Claude'}
-                placeholderTextColor="rgba(11,20,53,0.35)"
+                placeholderTextColor="rgba(11,19,36,0.35)"
                 style={styles.input}
                 multiline
                 maxLength={4000}
@@ -129,7 +129,7 @@ export default function ChatInputBox({
           {/* Right: mic when empty, send arrow when has text */}
           {!hasContent && !isRecording ? (
             <SpringPressable onPress={handleMic} style={styles.iconBtn}>
-              <Ionicons name="mic" size={22} color="#0B1435" />
+              <Ionicons name="mic" size={22} color="#0B1324" />
             </SpringPressable>
           ) : (
             <SpringPressable
@@ -138,8 +138,8 @@ export default function ChatInputBox({
               style={[
                 styles.sendBtn,
                 !loading
-                  ? { backgroundColor: '#2A63E2' }
-                  : { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)' },
+                  ? { backgroundColor: '#0F53DC' }
+                  : { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: 'rgba(11,19,36,0.12)' },
               ]}
             >
               <Ionicons
@@ -163,14 +163,14 @@ export default function ChatInputBox({
               onPress={() => { setShowMenu(false); onCamera?.(); }}
               style={styles.menuRow}
             >
-              <View style={[styles.menuIcon, { backgroundColor: '#2A63E2' }]}>
+              <View style={[styles.menuIcon, { backgroundColor: '#0F53DC' }]}>
                 <Ionicons name="camera" size={20} color="#FFFFFF" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuLabel}>Camera</Text>
                 <Text style={styles.menuSub}>Scan a receipt or invoice</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(11,20,53,0.25)" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(11,19,36,0.25)" />
             </Pressable>
 
             <Pressable
@@ -184,7 +184,7 @@ export default function ChatInputBox({
                 <Text style={styles.menuLabel}>Photos</Text>
                 <Text style={styles.menuSub}>Pick from your library</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(11,20,53,0.25)" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(11,19,36,0.25)" />
             </Pressable>
 
             <Pressable
@@ -198,7 +198,7 @@ export default function ChatInputBox({
                 <Text style={styles.menuLabel}>File upload</Text>
                 <Text style={styles.menuSub}>PDF invoices or documents</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(11,20,53,0.25)" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(11,19,36,0.25)" />
             </Pressable>
 
             <Pressable onPress={() => setShowMenu(false)} style={styles.menuCancel}>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   input: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 15.5,
     lineHeight: 22,
     paddingTop: 4,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   recorderTime: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 13,
-    color: '#0B1435',
+    color: '#0B1324',
   },
   visualizer: {
     flexDirection: 'row',
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 3,
-    backgroundColor: 'rgba(11,20,53,0.35)',
+    backgroundColor: 'rgba(11,19,36,0.35)',
     borderRadius: 2,
   },
   iconBtn: {
@@ -308,14 +308,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(11,20,53,0.15)',
+    backgroundColor: 'rgba(11,19,36,0.15)',
     alignSelf: 'center',
     marginBottom: 8,
   },
   menuTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0B1435',
+    color: '#0B1324',
     marginBottom: 8,
     letterSpacing: -0.3,
   },
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.06)',
+    borderColor: 'rgba(11,19,36,0.06)',
   },
   menuIcon: {
     width: 42,
@@ -337,12 +337,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   menuLabel: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 15,
     fontWeight: '700',
   },
   menuSub: {
-    color: 'rgba(11,20,53,0.5)',
+    color: 'rgba(11,19,36,0.5)',
     fontSize: 12,
     marginTop: 2,
   },
@@ -353,10 +353,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.08)',
+    borderColor: 'rgba(11,19,36,0.08)',
   },
   menuCancelText: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 15,
     fontWeight: '600',
   },

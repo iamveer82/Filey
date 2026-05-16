@@ -1,7 +1,10 @@
 /**
- * Filely Design Tokens — Dark Navy Fintech System
- * Soft blue glow shadows, glass cards, rounded modern feel.
+ * Filely Design Tokens — Deep Navy + Cobalt Blue Fintech System
+ * Sharp high-contrast shadows, elevated cards, modern rounded feel.
  */
+import { Colors } from './colors';
+
+const { dark: C } = Colors;
 
 // ─── Typography ───────────────────────────────────────────
 export const Typography = {
@@ -47,9 +50,9 @@ export const Spacing = {
 export const Radius = {
   sm:   8,
   md:   12,
-  lg:   20,
-  xl:   24,
-  xxl:  28,
+  lg:   16,
+  xl:   20,
+  xxl:  24,
   pill: 100,
   full: 9999,
 };
@@ -63,83 +66,83 @@ export const BorderWidth = {
   heavy:    3,
 };
 
-// ─── Shadows — Soft Blue Glow (fintech style) ─────────────
+// ─── Shadows — Cobalt Blue Accent Glow ────────────────────
 export const Shadow = {
-  // Subtle card lift
+  // Subtle card lift on dark bg
   softSm: {
-    shadowColor: '#2A63E2',
+    shadowColor: '#0F53DC',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  softMd: {
+    shadowColor: '#0F53DC',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  softLg: {
+    shadowColor: '#0F53DC',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
+    shadowRadius: 40,
+    elevation: 12,
+  },
+  // Blue glow for CTAs
+  limeSm: {
+    shadowColor: '#0F53DC',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  limeMd: {
+    shadowColor: '#0F53DC',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  // Dark subtle (light mode cards)
+  darkSm: {
+    shadowColor: '#000E28',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  // Legacy aliases
+  hardSm: {
+    shadowColor: '#0F53DC',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 4,
   },
-  softMd: {
-    shadowColor: '#2A63E2',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  softLg: {
-    shadowColor: '#2A63E2',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.20,
-    shadowRadius: 40,
-    elevation: 12,
-  },
-  // Lime glow for CTAs
-  limeSm: {
-    shadowColor: '#2A63E2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.30,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  limeMd: {
-    shadowColor: '#2A63E2',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  // Dark subtle (light mode)
-  darkSm: {
-    shadowColor: '#0D1526',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  // Legacy aliases (used in existing screens)
-  hardSm: {
-    shadowColor: '#2A63E2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 4,
-  },
   hardMd: {
-    shadowColor: '#2A63E2',
+    shadowColor: '#0F53DC',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.20,
+    shadowOpacity: 0.18,
     shadowRadius: 20,
     elevation: 8,
   },
   hardLg: {
-    shadowColor: '#2A63E2',
+    shadowColor: '#0F53DC',
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.20,
     shadowRadius: 32,
     elevation: 12,
   },
 };
 
-// ─── Card Presets (Glass / Fintech Style) ─────────────────
+// ─── Card Presets — Navy + White Contrast ─────────────────
 export const CardPresets = {
-  // Dark glass card (primary — most screens)
+  // Dark navy card (metric widgets, search bar)
   cardDark: {
-    backgroundColor: '#141B2D',
-    borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: C.card,
+    borderColor: C.border,
     borderWidth: 1,
     borderRadius: Radius.xl,
     ...Shadow.softSm,
@@ -147,53 +150,53 @@ export const CardPresets = {
   // Light mode card
   cardLight: {
     backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(13,21,38,0.08)',
+    borderColor: 'rgba(11, 19, 36, 0.08)',
     borderWidth: 1,
     borderRadius: Radius.xl,
     ...Shadow.darkSm,
   },
-  // Elevated dark card (modals, featured)
+  // Elevated dark card (featured metrics)
   cardElevatedDark: {
-    backgroundColor: '#1C2540',
-    borderColor: 'rgba(79,142,255,0.15)',
+    backgroundColor: C.cardElevated,
+    borderColor: 'rgba(15, 83, 220, 0.15)',
     borderWidth: 1,
     borderRadius: Radius.xl,
     ...Shadow.softMd,
   },
   // Blue tinted card
   cardAccentDark: {
-    backgroundColor: 'rgba(79,142,255,0.10)',
-    borderColor: 'rgba(79,142,255,0.20)',
+    backgroundColor: C.primaryBg,
+    borderColor: 'rgba(15, 83, 220, 0.20)',
     borderWidth: 1,
     borderRadius: Radius.xl,
   },
-  // Lime/success card
+  // Success/positive card
   cardLimeDark: {
-    backgroundColor: 'rgba(68,229,113,0.10)',
-    borderColor: 'rgba(68,229,113,0.20)',
+    backgroundColor: C.positiveLight,
+    borderColor: 'rgba(22, 163, 74, 0.20)',
     borderWidth: 1,
     borderRadius: Radius.xl,
   },
-  // Inverted (accent bg) — dark mode
+  // Inverted card — dark mode
   cardInvertedDark: {
-    backgroundColor: '#1C2540',
-    borderColor: 'rgba(79,142,255,0.20)',
+    backgroundColor: C.cardElevated,
+    borderColor: 'rgba(15, 83, 220, 0.20)',
     borderWidth: 1,
     borderRadius: Radius.xl,
     ...Shadow.softSm,
   },
-  // Inverted — light mode
+  // Inverted card — light mode
   cardInvertedLight: {
-    backgroundColor: '#0D1526',
-    borderColor: 'rgba(13,21,38,0.12)',
+    backgroundColor: '#000E28',
+    borderColor: 'rgba(0, 14, 40, 0.12)',
     borderWidth: 1,
     borderRadius: Radius.xl,
     ...Shadow.darkSm,
   },
-  // Button primary (lime green CTA)
+  // Primary CTA button — cobalt blue pill
   btnPrimary: {
-    backgroundColor: '#2A63E2',
-    borderColor: 'rgba(0,83,31,0.3)',
+    backgroundColor: C.primary,
+    borderColor: 'rgba(10, 61, 166, 0.3)',
     borderWidth: 1,
     borderRadius: Radius.pill,
     ...Shadow.limeSm,

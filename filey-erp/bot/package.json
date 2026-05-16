@@ -1,0 +1,17 @@
+{
+  "name": "filey-telegram-claude-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone Telegram <-> Claude bridge for Filey",
+  "scripts": {
+    "start": "node --env-file=.env telegram-claude-bot.mjs",
+    "start:noenv": "node telegram-claude-bot.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  }
+}

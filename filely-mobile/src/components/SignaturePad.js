@@ -30,7 +30,7 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const PAD_W = SCREEN_W - 32;
 const PAD_H = 300;
 
-const COLORS = ['#0B1435', '#2A63E2', '#1F2937', '#7C3AED'];
+const COLORS = ['#0B1324', '#0F53DC', '#1F2937', '#7C3AED'];
 const WIDTHS = [
   { id: 'fine', value: 3, label: 'Fine' },
   { id: 'med',  value: 5, label: 'Med' },
@@ -57,7 +57,7 @@ function SpringBtn({ children, onPress, style, disabled }) {
 
 export default function SignaturePad({ onDone, onCancel }) {
   const canvasRef = useRef(null);
-  const [color, setColor] = useState('#0B1435');
+  const [color, setColor] = useState('#0B1324');
   const [width, setWidth] = useState(5);
   const [isEmpty, setIsEmpty] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -94,7 +94,7 @@ export default function SignaturePad({ onDone, onCancel }) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Add Digital Signature</Text>
         <Pressable onPress={clear} hitSlop={10} style={styles.clearBtn}>
-          <Ionicons name="refresh" size={14} color="#2A63E2" />
+          <Ionicons name="refresh" size={14} color="#0F53DC" />
           <Text style={styles.clearText}>Clear</Text>
         </Pressable>
       </View>
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  clearText: { fontSize: 14, fontWeight: '700', color: '#2A63E2' },
+  clearText: { fontSize: 14, fontWeight: '700', color: '#0F53DC' },
 
   padWrap: {
     flex: 1,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   colorDotActive: {
     borderWidth: 2.5,
-    borderColor: '#2A63E2',
+    borderColor: '#0F53DC',
     transform: [{ scale: 1.1 }],
   },
   widthRow: { flexDirection: 'row', gap: 8 },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  widthChipActive: { backgroundColor: '#2A63E2' },
+  widthChipActive: { backgroundColor: '#0F53DC' },
   widthDot: { borderRadius: 999 },
   widthChipText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
   widthChipTextActive: { color: '#FFFFFF' },
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     alignItems: 'center',
     justifyContent: 'center',
   },

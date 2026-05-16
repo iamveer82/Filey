@@ -13,7 +13,7 @@ import { exportPeppolBatch } from '../services/eInvoiceExport';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const FORMATS = [
-  { id: 'pdf',    label: 'PDF Report',     desc: 'Professional formatted PDF',     icon: 'document-text',       color: '#2A63E2', ext: '.pdf' },
+  { id: 'pdf',    label: 'PDF Report',     desc: 'Professional formatted PDF',     icon: 'document-text',       color: '#0F53DC', ext: '.pdf' },
   { id: 'csv',    label: 'CSV (Excel)',     desc: 'Spreadsheet compatible',        icon: 'grid',                color: '#10B981', ext: '.csv' },
   { id: 'word',   label: 'Microsoft Word',  desc: 'Rich text document (.rtf)',     icon: 'document',            color: '#2563EB', ext: '.rtf' },
   { id: 'peppol', label: 'PEPPOL eInvoice', desc: 'XML for government portals',    icon: 'cloud-upload',        color: '#F43F5E', ext: '.xml' },
@@ -55,7 +55,7 @@ export default function ExportScreen({ navigation }) {
 
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#0B1435" />
+          <Ionicons name="chevron-back" size={24} color="#0B1324" />
         </Pressable>
         <Text style={styles.headerTitle}>Export to…</Text>
         <View style={styles.backBtn} />
@@ -78,9 +78,9 @@ export default function ExportScreen({ navigation }) {
                 <Text style={styles.rowDesc}>{f.desc}</Text>
               </View>
               {busy === f.id ? (
-                <ActivityIndicator size="small" color="#2A63E2" />
+                <ActivityIndicator size="small" color="#0F53DC" />
               ) : (
-                <Ionicons name="chevron-forward" size={18} color="rgba(11,20,53,0.25)" />
+                <Ionicons name="chevron-forward" size={18} color="rgba(11,19,36,0.25)" />
               )}
             </Pressable>
           </Animated.View>
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0B1435',
+    color: '#0B1324',
   },
   sheet: {
     flex: 1,
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(11,20,53,0.45)',
+    color: 'rgba(11,19,36,0.45)',
     letterSpacing: 0.8,
     marginBottom: 10,
   },
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.06)',
+    borderColor: 'rgba(11,19,36,0.06)',
   },
   iconWrap: {
     width: 44, height: 44,
@@ -146,11 +146,11 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0B1435',
+    color: '#0B1324',
   },
   rowDesc: {
     fontSize: 12,
-    color: 'rgba(11,20,53,0.5)',
+    color: 'rgba(11,19,36,0.5)',
     marginTop: 2,
   },
 });

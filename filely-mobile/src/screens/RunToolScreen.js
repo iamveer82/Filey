@@ -53,7 +53,7 @@ const FIELD_TYPES = ['text', 'checkbox', 'radio', 'dropdown', 'signature'];
 
 const OPACITY_PRESETS = [0.2, 0.4, 0.6, 0.8, 1.0];
 
-const ACCENT = '#2A63E2';
+const ACCENT = '#0F53DC';
 const NativePdfTools = Platform.OS === 'ios' ? NativeModules.PdfTools : null;
 
 // Tools that should redirect to PdfEditScreen even if reached directly.
@@ -148,7 +148,7 @@ function ParamSheet({ toolId, params, setParams }) {
             onChangeText={(v) => update('password', v)}
             secureTextEntry
             placeholder="Required"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
             autoCapitalize="none"
           />
         </ParamRow>
@@ -164,7 +164,7 @@ function ParamSheet({ toolId, params, setParams }) {
               update('pages', parsePageList(v));
             }}
             placeholder="1,3,5-7"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -179,7 +179,7 @@ function ParamSheet({ toolId, params, setParams }) {
               update('ranges', parseRanges(v));
             }}
             placeholder="1-3,4-6"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -194,7 +194,7 @@ function ParamSheet({ toolId, params, setParams }) {
               update('order', parsePageList(v));
             }}
             placeholder="3,1,2,4"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -279,7 +279,7 @@ function ParamSheet({ toolId, params, setParams }) {
             value={params.searchText || ''}
             onChangeText={(v) => update('searchText', v)}
             placeholder="Confidential"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -291,7 +291,7 @@ function ParamSheet({ toolId, params, setParams }) {
             value={params.text || ''}
             onChangeText={(v) => update('text', v)}
             placeholder="CONFIDENTIAL"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -315,8 +315,8 @@ function ParamSheet({ toolId, params, setParams }) {
             style={styles.input}
             value={params.colorHex || ''}
             onChangeText={(v) => update('colorHex', v)}
-            placeholder="#2A63E2"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholder="#0F53DC"
+            placeholderTextColor="rgba(11,19,36,0.3)"
             autoCapitalize="characters"
           />
         </ParamRow>
@@ -376,7 +376,7 @@ function ParamSheet({ toolId, params, setParams }) {
                 value={params.name || ''}
                 onChangeText={(v) => update('name', v)}
                 placeholder="invoice.docx"
-                placeholderTextColor="rgba(11,20,53,0.3)"
+                placeholderTextColor="rgba(11,19,36,0.3)"
               />
             </ParamRow>
           )}
@@ -522,7 +522,7 @@ function ParamSheet({ toolId, params, setParams }) {
                 value={params.metadata?.[k] || ''}
                 onChangeText={(v) => update('metadata', { ...(params.metadata || {}), [k]: v })}
                 placeholder={k}
-                placeholderTextColor="rgba(11,20,53,0.3)"
+                placeholderTextColor="rgba(11,19,36,0.3)"
               />
             </ParamRow>
           ))}
@@ -544,9 +544,9 @@ function ParamSheet({ toolId, params, setParams }) {
                   <Ionicons
                     name={active ? 'checkmark-circle' : 'ellipse-outline'}
                     size={16}
-                    color={active ? '#10B981' : 'rgba(11,20,53,0.4)'}
+                    color={active ? '#10B981' : 'rgba(11,19,36,0.4)'}
                   />
-                  <Text style={[styles.permChipText, active && { color: '#0B1435' }]}>{p.label}</Text>
+                  <Text style={[styles.permChipText, active && { color: '#0B1324' }]}>{p.label}</Text>
                 </Pressable>
               );
             })}
@@ -569,7 +569,7 @@ function ParamSheet({ toolId, params, setParams }) {
               update('bookmarks', parsed);
             }}
             placeholder={'Introduction|1\nChapter 1|3\nConclusion|12'}
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -600,7 +600,7 @@ function ParamSheet({ toolId, params, setParams }) {
             onChangeText={(v) => update('text', v)}
             multiline
             placeholder="Type or paste text…"
-            placeholderTextColor="rgba(11,20,53,0.3)"
+            placeholderTextColor="rgba(11,19,36,0.3)"
           />
         </ParamRow>
       )}
@@ -675,7 +675,7 @@ function ResultView({ result, onShare, onShareAll }) {
               <Text style={styles.fileRowText} numberOfLines={1}>
                 {it.name || `Page ${it.page || i + 1}`}
               </Text>
-              <Ionicons name="share-outline" size={16} color="rgba(11,20,53,0.4)" />
+              <Ionicons name="share-outline" size={16} color="rgba(11,19,36,0.4)" />
             </Pressable>
           ))}
         </ScrollView>
@@ -835,7 +835,7 @@ export default function RunToolScreen({ route, navigation }) {
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.iconBtn}>
-            <Ionicons name="chevron-back" size={22} color="#0B1435" />
+            <Ionicons name="chevron-back" size={22} color="#0B1324" />
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle} numberOfLines={1}>{tool.label}</Text>
@@ -843,9 +843,9 @@ export default function RunToolScreen({ route, navigation }) {
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.center}>
-          <Ionicons name="information-circle-outline" size={56} color="rgba(11,20,53,0.35)" />
+          <Ionicons name="information-circle-outline" size={56} color="rgba(11,19,36,0.35)" />
           <Text style={styles.errorTitle}>Not supported on iOS</Text>
-          <Text style={[styles.errorSub, { color: 'rgba(11,20,53,0.55)', marginTop: 12 }]}>
+          <Text style={[styles.errorSub, { color: 'rgba(11,19,36,0.55)', marginTop: 12 }]}>
             {getUnsupportedReason(toolId)}
           </Text>
           <Pressable onPress={() => navigation.goBack()} style={styles.retryBtn}>
@@ -868,7 +868,7 @@ export default function RunToolScreen({ route, navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color="#0B1435" />
+          <Ionicons name="chevron-back" size={22} color="#0B1324" />
         </Pressable>
         <View style={styles.headerCenter}>
           <View style={[styles.headerDot, { backgroundColor: cat?.color || ACCENT }]}>
@@ -920,7 +920,7 @@ export default function RunToolScreen({ route, navigation }) {
                     </Text>
                   </View>
                   <Pressable onPress={() => removeFile(i)} hitSlop={8}>
-                    <Ionicons name="close-circle" size={20} color="rgba(11,20,53,0.4)" />
+                    <Ionicons name="close-circle" size={20} color="rgba(11,19,36,0.4)" />
                   </Pressable>
                 </View>
               ))
@@ -973,7 +973,7 @@ export default function RunToolScreen({ route, navigation }) {
 
         {/* Native badge */}
         <View style={styles.nativeBadge}>
-          <Ionicons name="hardware-chip-outline" size={12} color="rgba(11,20,53,0.55)" />
+          <Ionicons name="hardware-chip-outline" size={12} color="rgba(11,19,36,0.55)" />
           <Text style={styles.nativeBadgeText}>Runs on-device · zero upload</Text>
         </View>
       </ScrollView>
@@ -1019,13 +1019,13 @@ const styles = StyleSheet.create({
     width: 26, height: 26, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 16, fontWeight: '800', color: '#0B1435', letterSpacing: -0.3 },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: '#0B1324', letterSpacing: -0.3 },
   scrollContent: { padding: 20, paddingBottom: 140 },
 
   // File section
   fileSection: { marginBottom: 16 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#0B1435' },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#0B1324' },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14,
@@ -1042,34 +1042,34 @@ const styles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#E8EFFF', alignItems: 'center', justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 15, fontWeight: '800', color: '#0B1435' },
-  emptySub: { fontSize: 12, color: 'rgba(11,20,53,0.5)', marginTop: -2 },
+  emptyTitle: { fontSize: 15, fontWeight: '800', color: '#0B1324' },
+  emptySub: { fontSize: 12, color: 'rgba(11,19,36,0.5)', marginTop: -2 },
 
   fileChip: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, marginBottom: 8,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)',
   },
-  fileChipName: { fontSize: 13, fontWeight: '700', color: '#0B1435' },
-  fileChipSize: { fontSize: 11, color: 'rgba(11,20,53,0.5)', marginTop: 2 },
+  fileChipName: { fontSize: 13, fontWeight: '700', color: '#0B1324' },
+  fileChipSize: { fontSize: 11, color: 'rgba(11,19,36,0.5)', marginTop: 2 },
   hint: { fontSize: 12, color: '#EF4444', fontWeight: '600', marginTop: 6, marginLeft: 4 },
 
   // Param sheet
   paramSheet: {
     backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, marginBottom: 16,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)',
   },
-  paramTitle: { fontSize: 14, fontWeight: '800', color: '#0B1435', marginBottom: 12 },
+  paramTitle: { fontSize: 14, fontWeight: '800', color: '#0B1324', marginBottom: 12 },
   paramRow: { marginBottom: 12 },
-  paramLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(11,20,53,0.6)', marginBottom: 6 },
-  subLabel: { fontSize: 12, fontWeight: '800', color: '#0B1435', marginBottom: 8, marginTop: 4 },
+  paramLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(11,19,36,0.6)', marginBottom: 6 },
+  subLabel: { fontSize: 12, fontWeight: '800', color: '#0B1324', marginBottom: 8, marginTop: 4 },
   pickerBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#F3F6FC', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12,
     borderWidth: 1, borderColor: 'rgba(42,99,226,0.18)',
   },
-  pickerBtnText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#0B1435' },
-  pickerBtnSub: { fontSize: 10, fontWeight: '600', color: 'rgba(11,20,53,0.45)' },
+  pickerBtnText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#0B1324' },
+  pickerBtnSub: { fontSize: 10, fontWeight: '600', color: 'rgba(11,19,36,0.45)' },
   permGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   permChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1077,10 +1077,10 @@ const styles = StyleSheet.create({
     minWidth: '47%',
   },
   permChipActive: { backgroundColor: 'rgba(16,185,129,0.10)' },
-  permChipText: { fontSize: 12, fontWeight: '700', color: 'rgba(11,20,53,0.55)' },
+  permChipText: { fontSize: 12, fontWeight: '700', color: 'rgba(11,19,36,0.55)' },
   input: {
     backgroundColor: '#F3F6FC', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 14, color: '#0B1435',
+    fontSize: 14, color: '#0B1324',
   },
   chipRow: { flexDirection: 'row', gap: 8 },
   chip: {
@@ -1088,7 +1088,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F6FC',
   },
   chipActive: { backgroundColor: ACCENT },
-  chipText: { fontSize: 12, fontWeight: '700', color: '#0B1435' },
+  chipText: { fontSize: 12, fontWeight: '700', color: '#0B1324' },
   chipTextActive: { color: '#FFFFFF' },
 
   // Run / progress
@@ -1102,7 +1102,7 @@ const styles = StyleSheet.create({
   runBtnDisabled: { opacity: 0.4, shadowOpacity: 0 },
   runBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', flex: 1, textAlign: 'center' },
   progressBox: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 24, alignItems: 'center', gap: 10 },
-  progressText: { fontSize: 13, color: 'rgba(11,20,53,0.6)', fontWeight: '600' },
+  progressText: { fontSize: 13, color: 'rgba(11,19,36,0.6)', fontWeight: '600' },
   progressBar: {
     height: 6, alignSelf: 'stretch', backgroundColor: 'rgba(42,99,226,0.1)',
     borderRadius: 3, overflow: 'hidden', marginTop: 6,
@@ -1113,14 +1113,14 @@ const styles = StyleSheet.create({
   // Result
   resultBox: {
     backgroundColor: '#FFFFFF', borderRadius: 18, padding: 24, alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)',
   },
   resultIconCircle: {
     width: 72, height: 72, borderRadius: 24,
     backgroundColor: '#E8EFFF', alignItems: 'center', justifyContent: 'center',
   },
-  resultTitle: { fontSize: 17, fontWeight: '800', color: '#0B1435', marginTop: 6 },
-  resultMeta: { fontSize: 12, color: 'rgba(11,20,53,0.55)', fontWeight: '600' },
+  resultTitle: { fontSize: 17, fontWeight: '800', color: '#0B1324', marginTop: 6 },
+  resultMeta: { fontSize: 12, color: 'rgba(11,19,36,0.55)', fontWeight: '600' },
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
     backgroundColor: ACCENT, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 22,
@@ -1131,12 +1131,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8, paddingHorizontal: 10,
     borderRadius: 10, backgroundColor: '#F8FAFC', marginBottom: 6,
   },
-  fileRowText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#0B1435' },
-  metaText: { fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#0B1435' },
+  fileRowText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#0B1324' },
+  metaText: { fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#0B1324' },
 
   // Error
   errorBox: { backgroundColor: '#FEF2F2', borderRadius: 18, padding: 24, alignItems: 'center', gap: 8 },
-  errorTitle: { fontSize: 16, fontWeight: '800', color: '#0B1435', marginTop: 4 },
+  errorTitle: { fontSize: 16, fontWeight: '800', color: '#0B1324', marginTop: 4 },
   errorSub: { fontSize: 12, color: '#EF4444', textAlign: 'center', fontWeight: '600' },
   retryBtn: {
     marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1147,9 +1147,9 @@ const styles = StyleSheet.create({
   nativeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginTop: 16,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12,
-    backgroundColor: 'rgba(11,20,53,0.04)',
+    backgroundColor: 'rgba(11,19,36,0.04)',
   },
-  nativeBadgeText: { fontSize: 11, fontWeight: '600', color: 'rgba(11,20,53,0.55)' },
+  nativeBadgeText: { fontSize: 11, fontWeight: '600', color: 'rgba(11,19,36,0.55)' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });

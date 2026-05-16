@@ -527,7 +527,7 @@ const s = StyleSheet.create({
   txnCard: {
     marginTop: 8, marginLeft: 38, marginBottom: 8,
     borderRadius: 16, padding: 16,
-    backgroundColor: '#F8FAFF', borderWidth: 1, borderColor: 'rgba(59,107,255,0.15)',
+    backgroundColor: '#F8FAFF', borderWidth: 1, borderColor: 'rgba(15,83,220,0.15)',
   },
   txnCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   txnCardBar: { width: 3, height: 32, backgroundColor: '#3B6BFF', borderRadius: 2 },
@@ -535,9 +535,9 @@ const s = StyleSheet.create({
   txnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 4 },
   txnCell: { width: '46%', marginBottom: 8 },
   txnLabel: { fontSize: 10, fontWeight: '700', color: '#8B9CC7', letterSpacing: 1, marginBottom: 4 },
-  txnValue: { fontSize: 14, fontWeight: '600', color: '#0B1735' },
+  txnValue: { fontSize: 14, fontWeight: '600', color: '#0B1324' },
   txnAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  txnAmountVal: { fontSize: 18, fontWeight: '700', color: '#0B1735' },
+  txnAmountVal: { fontSize: 18, fontWeight: '700', color: '#0B1324' },
   vatPill: {
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
     backgroundColor: 'rgba(34,197,94,0.12)',

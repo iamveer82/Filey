@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function IconCircle({
-  name, size = 22, bgColor = '#E8EFFF', iconColor = '#2A63E2',
+  name, size = 22, bgColor = '#E8EFFF', iconColor = '#0F53DC',
   containerSize = 32, radius = 8,
 }) {
   return (

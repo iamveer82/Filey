@@ -43,7 +43,7 @@ function Avatar({ name, size = 36, isAdmin, stackOffset }) {
       stackOffset ? { marginLeft: -12 } : null,
       isAdmin ? styles.avatarAdmin : styles.avatarMember,
     ]}>
-      <Text style={{ color: isAdmin ? '#2A63E2' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
+      <Text style={{ color: isAdmin ? '#0F53DC' : '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>
         {letter}
       </Text>
     </View>
@@ -439,7 +439,7 @@ export default function TeamScreen({ darkMode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     paddingBottom: 40,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   heroInner: { gap: 18 },
   avatar: {
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#2A63E2',
+    borderWidth: 2, borderColor: '#0F53DC',
   },
   avatarAdmin: { backgroundColor: '#FFFFFF' },
   avatarMember: { backgroundColor: 'rgba(255,255,255,0.2)' },
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0, right: 0,
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#FFFFFF',
   },
@@ -499,9 +499,9 @@ const styles = StyleSheet.create({
   },
   expandBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#2A63E2', shadowOpacity: 0.4,
+    shadowColor: '#0F53DC', shadowOpacity: 0.4,
     shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
@@ -509,8 +509,8 @@ const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
   },
-  pillActive: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
-  pillIdle: { backgroundColor: 'rgba(11,23,53,0.06)', borderColor: 'rgba(11,23,53,0.12)' },
+  pillActive: { backgroundColor: '#0F53DC', borderColor: '#0F53DC' },
+  pillIdle: { backgroundColor: 'rgba(11,19,36,0.06)', borderColor: 'rgba(11,19,36,0.12)' },
   pillText: { fontSize: 13, fontWeight: '700' },
   sheet: {
     flex: 1, marginTop: -24,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(11,23,53,0.15)',
+    backgroundColor: 'rgba(11,19,36,0.15)',
     alignSelf: 'center', marginTop: 6, marginBottom: 10,
   },
   empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 20 },
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 28, borderWidth: 1,
-    shadowColor: '#0B1735', shadowOpacity: 0.08, shadowRadius: 16,
+    shadowColor: '#0B1324', shadowOpacity: 0.08, shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 }, elevation: 6,
   },
   input: { flex: 1, maxHeight: 120, minHeight: 36, paddingHorizontal: 6, paddingVertical: 8, fontSize: 14.5 },

@@ -45,7 +45,7 @@ import {
 } from '../services/pdfTools';
 import { addFile } from '../services/recentFiles';
 
-const ACCENT = '#2A63E2';
+const ACCENT = '#0F53DC';
 const { width: SW } = Dimensions.get('window');
 
 const TOOLS = [
@@ -56,7 +56,7 @@ const TOOLS = [
 ];
 
 const COLORS = [
-  '#0B1435', '#2A63E2', '#EF4444', '#F59E0B',
+  '#0B1324', '#0F53DC', '#EF4444', '#F59E0B',
   '#10B981', '#8B5CF6', '#EC4899', '#FFFFFF',
 ];
 
@@ -83,7 +83,7 @@ export default function PdfEditScreen({ route, navigation }) {
   const [pageImage, setPageImage] = useState(null);   // backdrop info
   const [loadingPage, setLoadingPage] = useState(true);
   const [tool, setTool] = useState('pen');
-  const [color, setColor] = useState(mode === 'sign' ? '#0B1435' : '#2A63E2');
+  const [color, setColor] = useState(mode === 'sign' ? '#0B1324' : '#0F53DC');
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [inkByPage, setInkByPage] = useState({});      // { pageNum: pngUri }
   const [annotatedPages, setAnnotatedPages] = useState(new Set());
@@ -311,7 +311,7 @@ export default function PdfEditScreen({ route, navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color="#0B1435" />
+          <Ionicons name="chevron-back" size={22} color="#0B1324" />
         </Pressable>
         <View style={styles.headerCenter}>
           <Ionicons
@@ -427,7 +427,7 @@ export default function PdfEditScreen({ route, navigation }) {
               <Ionicons
                 name={t.icon}
                 size={18}
-                color={tool === t.id ? '#FFFFFF' : '#0B1435'}
+                color={tool === t.id ? '#FFFFFF' : '#0B1324'}
               />
               <Text
                 style={[styles.toolChipText, tool === t.id && styles.toolChipTextActive]}
@@ -448,8 +448,8 @@ export default function PdfEditScreen({ route, navigation }) {
               <View
                 style={[
                   styles.widthDot,
-                  { width: w.value + 2, height: w.value + 2, backgroundColor: color === '#FFFFFF' ? '#0B1435' : color },
-                  strokeWidth === w.value && color === '#FFFFFF' && { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#0B1435' },
+                  { width: w.value + 2, height: w.value + 2, backgroundColor: color === '#FFFFFF' ? '#0B1324' : color },
+                  strokeWidth === w.value && color === '#FFFFFF' && { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#0B1324' },
                 ]}
               />
               <Text
@@ -463,10 +463,10 @@ export default function PdfEditScreen({ route, navigation }) {
             </Pressable>
           ))}
           <Pressable onPress={onUndo} style={styles.iconAction} hitSlop={8}>
-            <Ionicons name="arrow-undo" size={18} color="#0B1435" />
+            <Ionicons name="arrow-undo" size={18} color="#0B1324" />
           </Pressable>
           <Pressable onPress={onRedo} style={styles.iconAction} hitSlop={8}>
-            <Ionicons name="arrow-redo" size={18} color="#0B1435" />
+            <Ionicons name="arrow-redo" size={18} color="#0B1324" />
           </Pressable>
           <Pressable onPress={onClearPage} style={styles.iconAction} hitSlop={8}>
             <Ionicons name="trash-outline" size={18} color="#EF4444" />
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 8,
   },
-  headerTitle: { fontSize: 14, fontWeight: '700', color: '#0B1435' },
+  headerTitle: { fontSize: 14, fontWeight: '700', color: '#0B1324' },
   doneBtn: {
     paddingHorizontal: 16,
     paddingVertical: 9,
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   },
   pageChipActive: { backgroundColor: ACCENT },
   pageChipAnnotated: { backgroundColor: '#E8EFFF' },
-  pageChipText: { fontSize: 13, fontWeight: '700', color: '#0B1435' },
+  pageChipText: { fontSize: 13, fontWeight: '700', color: '#0B1324' },
   pageChipTextActive: { color: '#FFFFFF' },
   pageDot: {
     width: 5,
@@ -560,13 +560,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#0B1435',
+    shadowColor: '#0B1324',
     shadowOpacity: 0.12,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.08)',
+    borderColor: 'rgba(11,19,36,0.08)',
   },
   loading: {
     ...StyleSheet.absoluteFillObject,
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#FFFFFF',
   },
-  loadingText: { fontSize: 12, color: 'rgba(11,20,53,0.55)' },
+  loadingText: { fontSize: 12, color: 'rgba(11,19,36,0.55)' },
 
   // Toolbar
   toolbar: {
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: 8,
-    borderColor: 'rgba(11,20,53,0.18)',
+    borderColor: 'rgba(11,19,36,0.18)',
   },
   colorDotActive: {
     borderWidth: 2.5,
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   toolChipActive: { backgroundColor: ACCENT },
-  toolChipText: { fontSize: 12, fontWeight: '700', color: '#0B1435' },
+  toolChipText: { fontSize: 12, fontWeight: '700', color: '#0B1324' },
   toolChipTextActive: { color: '#FFFFFF' },
   widthRow: {
     flexDirection: 'row',
@@ -630,9 +630,9 @@ const styles = StyleSheet.create({
     minWidth: 64,
     justifyContent: 'center',
   },
-  widthChipActive: { backgroundColor: '#0B1435' },
+  widthChipActive: { backgroundColor: '#0B1324' },
   widthDot: { borderRadius: 999 },
-  widthChipText: { fontSize: 11, fontWeight: '700', color: '#0B1435' },
+  widthChipText: { fontSize: 11, fontWeight: '700', color: '#0B1324' },
   widthChipTextActive: { color: '#FFFFFF' },
   iconAction: {
     width: 36,

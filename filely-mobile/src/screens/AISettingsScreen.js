@@ -345,7 +345,7 @@ export default function AISettingsScreen({ darkMode, onBack }) {
 
 const s = StyleSheet.create({
   hero: {
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     paddingBottom: 40,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
@@ -373,7 +373,7 @@ const s = StyleSheet.create({
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(11,23,53,0.15)',
+    backgroundColor: 'rgba(11,19,36,0.15)',
     alignSelf: 'center', marginTop: 6, marginBottom: 10,
   },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10, marginLeft: 4 },

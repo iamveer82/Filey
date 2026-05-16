@@ -176,7 +176,7 @@ export default function AIInitializationScreen({ darkMode, onComplete }) {
   }));
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#2A63E2' }}>
+    <View style={{ flex: 1, backgroundColor: '#0F53DC' }}>
       <StatusBar style="light" />
       <View style={[styles.hero, { paddingTop: insets.top + 40 }]}>
         <Animated.View entering={FadeInUp.duration(700)} style={{ alignItems: 'center' }}>
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(11,23,53,0.15)',
+    backgroundColor: 'rgba(11,19,36,0.15)',
     alignSelf: 'center', marginTop: 6, marginBottom: 24,
   },
   stepsSection: { gap: 14, marginBottom: 24 },

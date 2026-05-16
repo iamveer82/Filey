@@ -69,14 +69,14 @@ export async function exportPDF(transactions, opts = {}) {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, Helvetica, sans-serif; color: #0B1435; padding: 32px; }
-    .hero { background: #2A63E2; color: #fff; padding: 24px; border-radius: 16px; margin-bottom: 24px; }
+    body { font-family: -apple-system, Helvetica, sans-serif; color: #0B1324; padding: 32px; }
+    .hero { background: #0F53DC; color: #fff; padding: 24px; border-radius: 16px; margin-bottom: 24px; }
     .hero h1 { margin: 0; font-size: 26px; letter-spacing: -0.5px; }
     .hero p { margin: 4px 0 0; opacity: 0.85; font-size: 13px; }
     .stats { display: flex; gap: 14px; margin-bottom: 20px; }
     .stat { flex: 1; background: #F4F6FB; border-radius: 14px; padding: 14px 18px; }
     .stat .k { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #6B7280; }
-    .stat .v { font-size: 22px; font-weight: 800; color: #0B1435; margin-top: 4px; }
+    .stat .v { font-size: 22px; font-weight: 800; color: #0B1324; margin-top: 4px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th { text-align: left; background: #F4F6FB; padding: 10px 8px; color: #6B7280; font-weight: 700; letter-spacing: 1px; font-size: 10px; }
     td { padding: 10px 8px; border-bottom: 1px solid #E5E7EB; }

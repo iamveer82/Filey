@@ -195,7 +195,7 @@ export default function ClaudeSidebar({
               hitSlop={12}
               style={styles.brandClose}
             >
-              <Ionicons name="menu" size={20} color="#0B1435" />
+              <Ionicons name="menu" size={20} color="#0B1324" />
             </Pressable>
           </View>
 
@@ -212,13 +212,13 @@ export default function ClaudeSidebar({
                   }}
                   style={({ pressed }) => [
                     styles.navRow,
-                    pressed && { backgroundColor: 'rgba(11,20,53,0.04)' },
+                    pressed && { backgroundColor: 'rgba(11,19,36,0.04)' },
                   ]}
                 >
                   <Ionicons
                     name={it.icon}
                     size={22}
-                    color={isActive ? '#0B1435' : 'rgba(11,20,53,0.65)'}
+                    color={isActive ? '#0B1324' : 'rgba(11,19,36,0.65)'}
                   />
                   <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
                     {it.label}
@@ -257,7 +257,7 @@ export default function ClaudeSidebar({
                     styles.recentRow,
                     isActiveThread && styles.recentRowActive,
                     pressed && !isActiveThread && {
-                      backgroundColor: 'rgba(11,20,53,0.04)',
+                      backgroundColor: 'rgba(11,19,36,0.04)',
                     },
                   ]}
                 >
@@ -269,7 +269,7 @@ export default function ClaudeSidebar({
                       onSubmitEditing={saveRename}
                       autoFocus
                       style={styles.recentEditInput}
-                      placeholderTextColor="rgba(11,20,53,0.35)"
+                      placeholderTextColor="rgba(11,19,36,0.35)"
                     />
                   ) : (
                     <Text
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: 'rgba(11,20,53,0.08)',
+    borderRightColor: 'rgba(11,19,36,0.08)',
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.08,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   brandText: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0B1435',
+    color: '#0B1324',
     letterSpacing: -0.6,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(11,20,53,0.05)',
+    backgroundColor: 'rgba(11,19,36,0.05)',
   },
 
   navBlock: {
@@ -377,18 +377,18 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     fontSize: 17,
-    color: 'rgba(11,20,53,0.78)',
+    color: 'rgba(11,19,36,0.78)',
     fontWeight: '500',
     letterSpacing: -0.2,
   },
   navLabelActive: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontWeight: '600',
   },
 
   sectionLabel: {
     fontSize: 12.5,
-    color: 'rgba(11,20,53,0.45)',
+    color: 'rgba(11,19,36,0.45)',
     fontWeight: '600',
     letterSpacing: 0.2,
     paddingHorizontal: 4,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     fontSize: 13,
-    color: 'rgba(11,20,53,0.4)',
+    color: 'rgba(11,19,36,0.4)',
     paddingHorizontal: 4,
     paddingVertical: 12,
   },
@@ -415,21 +415,21 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   recentRowActive: {
-    backgroundColor: 'rgba(11,20,53,0.06)',
+    backgroundColor: 'rgba(11,19,36,0.06)',
   },
   recentText: {
     fontSize: 15,
-    color: '#0B1435',
+    color: '#0B1324',
     fontWeight: '500',
     letterSpacing: -0.2,
   },
   recentTextActive: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontWeight: '600',
   },
   recentEditInput: {
     fontSize: 15,
-    color: '#0B1435',
+    color: '#0B1324',
     paddingVertical: 0,
   },
 
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     gap: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(11,20,53,0.06)',
+    borderTopColor: 'rgba(11,19,36,0.06)',
   },
   userPill: {
     flexDirection: 'row',
@@ -450,14 +450,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 100,
-    backgroundColor: 'rgba(11,20,53,0.05)',
+    backgroundColor: 'rgba(11,19,36,0.05)',
     flex: 1,
   },
   avatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#0B1435',
+    backgroundColor: '#0B1324',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 14,
-    color: '#0B1435',
+    color: '#0B1324',
     fontWeight: '500',
     flexShrink: 1,
   },

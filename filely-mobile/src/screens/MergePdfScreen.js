@@ -77,18 +77,18 @@ export default function MergePdfScreen({ navigation }) {
 
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#0B1435" />
+          <Ionicons name="chevron-back" size={24} color="#0B1324" />
         </Pressable>
         <Text style={styles.headerTitle}>Merge PDF</Text>
         <Pressable onPress={addPdfs} hitSlop={10} style={styles.backBtn}>
-          <Ionicons name="add" size={24} color="#2A63E2" />
+          <Ionicons name="add" size={24} color="#0F53DC" />
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         {pdfs.length === 0 && (
           <View style={styles.empty}>
-            <Ionicons name="documents-outline" size={40} color="rgba(11,20,53,0.2)" />
+            <Ionicons name="documents-outline" size={40} color="rgba(11,19,36,0.2)" />
             <Text style={styles.emptyText}>Tap + to add PDFs</Text>
           </View>
         )}
@@ -100,10 +100,10 @@ export default function MergePdfScreen({ navigation }) {
                 {p.selected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
               </View>
             </Pressable>
-            <Ionicons name="document-text" size={22} color="#2A63E2" style={{ marginHorizontal: 10 }} />
+            <Ionicons name="document-text" size={22} color="#0F53DC" style={{ marginHorizontal: 10 }} />
             <Text style={styles.docName} numberOfLines={1}>{p.name}</Text>
             <Pressable onPress={() => remove(i)} hitSlop={8}>
-              <Ionicons name="close-circle" size={20} color="rgba(11,20,53,0.25)" />
+              <Ionicons name="close-circle" size={20} color="rgba(11,19,36,0.25)" />
             </Pressable>
           </Animated.View>
         ))}
@@ -136,36 +136,36 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(11,20,53,0.06)',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(11,19,36,0.06)',
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#0B1435' },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: '#0B1324' },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 8 },
-  emptyText: { color: 'rgba(11,20,53,0.45)', fontSize: 14, fontWeight: '500' },
+  emptyText: { color: 'rgba(11,19,36,0.45)', fontSize: 14, fontWeight: '500' },
   docCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#F8FAFC', borderRadius: 14,
     padding: 12, marginBottom: 10,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)',
   },
   checkbox: { padding: 4 },
   checkInner: {
     width: 22, height: 22, borderRadius: 6,
-    borderWidth: 2, borderColor: 'rgba(11,20,53,0.2)',
+    borderWidth: 2, borderColor: 'rgba(11,19,36,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
-  checkOn: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
-  docName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#0B1435' },
+  checkOn: { backgroundColor: '#0F53DC', borderColor: '#0F53DC' },
+  docName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#0B1324' },
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1, borderTopColor: 'rgba(11,20,53,0.08)',
+    borderTopWidth: 1, borderTopColor: 'rgba(11,19,36,0.08)',
     paddingHorizontal: 20, paddingVertical: 16,
     paddingBottom: Platform.OS === 'ios' ? 32 : 16,
   },
   mergeBtn: {
     height: 52, borderRadius: 14,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   mergeText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },

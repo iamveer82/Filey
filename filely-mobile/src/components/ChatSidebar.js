@@ -64,7 +64,7 @@ function SwipeableThreadRow({ t, active, isEdit, editing, onPick, onLongPress, o
           delayLongPress={300}
           style={[sw.threadRow, active && sw.threadRowActive]}
         >
-          <Ionicons name={active ? 'chatbubble' : 'chatbubble-outline'} size={14} color={active ? '#2A63E2' : '#71717A'} />
+          <Ionicons name={active ? 'chatbubble' : 'chatbubble-outline'} size={14} color={active ? '#0F53DC' : '#71717A'} />
           {isEdit ? (
             <TextInput
               value={draft}
@@ -322,7 +322,7 @@ const s = StyleSheet.create({
   },
   avatar: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: {

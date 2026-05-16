@@ -42,7 +42,7 @@ function getToolColor(toolId) {
 
 function getCatColor(catId) {
   const c = CATEGORIES.find(x => x.id === catId);
-  return c?.color || '#2A63E2';
+  return c?.color || '#0F53DC';
 }
 
 // ─── Tool Chip (horizontal scroll items) ──────────────────────
@@ -68,7 +68,7 @@ function ToolChip({ tool, isActive, onPress, onRemove, editMode }) {
           hitSlop={4}
           style={chipStyles.xBtn}
         >
-          <Ionicons name="close-circle" size={18} color="rgba(11,20,53,0.35)" />
+          <Ionicons name="close-circle" size={18} color="rgba(11,19,36,0.35)" />
         </Pressable>
       )}
     </Pressable>
@@ -96,7 +96,7 @@ const chipStyles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0B1435',
+    color: '#0B1324',
     textAlign: 'center',
   },
   xBtn: {
@@ -131,7 +131,7 @@ function CatToolCard({ tool, isMine, onPress, onAdd }) {
       )}
       {!isMine && !unsupported && (
         <Pressable onPress={(e) => { e.stopPropagation(); onAdd(tool.id); }} hitSlop={4} style={catToolStyles.plus}>
-          <Ionicons name="add-circle" size={18} color="#2A63E2" />
+          <Ionicons name="add-circle" size={18} color="#0F53DC" />
         </Pressable>
       )}
     </Pressable>
@@ -159,7 +159,7 @@ const catToolStyles = StyleSheet.create({
   label: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#0B1435',
+    color: '#0B1324',
     textAlign: 'center',
     lineHeight: 14,
   },
@@ -331,7 +331,7 @@ export default function ToolPickerScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="attach" size={22} color="#2A63E2" style={{ transform: [{ scaleX: -1 }] }} />
+          <Ionicons name="attach" size={22} color="#0F53DC" style={{ transform: [{ scaleX: -1 }] }} />
           <Text style={styles.headerTitle}>Clip Tools</Text>
         </View>
         <View style={styles.headerActions}>
@@ -340,7 +340,7 @@ export default function ToolPickerScreen({ navigation }) {
             hitSlop={8}
             style={[styles.headerBtn, editMode && styles.headerBtnActive]}
           >
-            <Ionicons name={editMode ? 'checkmark' : 'options-outline'} size={18} color={editMode ? '#FFFFFF' : '#0B1435'} />
+            <Ionicons name={editMode ? 'checkmark' : 'options-outline'} size={18} color={editMode ? '#FFFFFF' : '#0B1324'} />
           </Pressable>
         </View>
       </View>
@@ -361,7 +361,7 @@ export default function ToolPickerScreen({ navigation }) {
                 </Pressable>
               )}
               <Pressable onPress={() => setEditMode(e => !e)} hitSlop={8}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2A63E2' }}>{editMode ? 'Done' : 'Edit'}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F53DC' }}>{editMode ? 'Done' : 'Edit'}</Text>
               </Pressable>
             </View>
           </View>
@@ -390,7 +390,7 @@ export default function ToolPickerScreen({ navigation }) {
             ))}
             {/* Add more button */}
             <Pressable style={chipAddStyles.card}>
-              <Ionicons name="add" size={24} color="#2A63E2" />
+              <Ionicons name="add" size={24} color="#0F53DC" />
               <Text style={chipAddStyles.text}>Add</Text>
             </Pressable>
           </ScrollView>
@@ -411,7 +411,7 @@ export default function ToolPickerScreen({ navigation }) {
               {pickedFiles.map((f, i) => (
                 <View key={i} style={styles.filePreview}>
                   <View style={styles.fileIconWrap}>
-                    <Ionicons name="document-text" size={32} color="#2A63E2" />
+                    <Ionicons name="document-text" size={32} color="#0F53DC" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
@@ -421,19 +421,19 @@ export default function ToolPickerScreen({ navigation }) {
                     onPress={() => setPickedFiles((prev) => prev.filter((_, j) => j !== i))}
                     hitSlop={8} style={styles.clearFile}
                   >
-                    <Ionicons name="close-circle" size={20} color="rgba(11,20,53,0.4)" />
+                    <Ionicons name="close-circle" size={20} color="rgba(11,19,36,0.4)" />
                   </Pressable>
                 </View>
               ))}
               <Pressable onPress={pickFile} style={styles.addMoreBtn}>
-                <Ionicons name="add" size={16} color="#2A63E2" />
+                <Ionicons name="add" size={16} color="#0F53DC" />
                 <Text style={styles.addMoreText}>Add another</Text>
               </Pressable>
             </View>
           ) : (
             <Pressable onPress={pickFile} style={styles.uploadArea}>
               <View style={styles.uploadIconCircle}>
-                <Ionicons name="cloud-upload-outline" size={32} color="#2A63E2" />
+                <Ionicons name="cloud-upload-outline" size={32} color="#0F53DC" />
               </View>
               <Text style={styles.uploadTitle}>Drop your document here</Text>
               <Text style={styles.uploadSub}>
@@ -469,7 +469,7 @@ export default function ToolPickerScreen({ navigation }) {
               <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
             </Pressable>
             <View style={styles.nativeBadge}>
-              <Ionicons name="hardware-chip-outline" size={11} color="rgba(11,20,53,0.5)" />
+              <Ionicons name="hardware-chip-outline" size={11} color="rgba(11,19,36,0.5)" />
               <Text style={styles.nativeBadgeText}>Runs natively · zero upload</Text>
             </View>
           </Animated.View>
@@ -498,7 +498,7 @@ export default function ToolPickerScreen({ navigation }) {
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
                     size={18}
-                    color="rgba(11,20,53,0.4)"
+                    color="rgba(11,19,36,0.4)"
                   />
                 </Pressable>
 
@@ -540,7 +540,7 @@ const chipAddStyles = StyleSheet.create({
     backgroundColor: 'rgba(42,99,226,0.04)',
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  text: { fontSize: 11, fontWeight: '700', color: '#2A63E2' },
+  text: { fontSize: 11, fontWeight: '700', color: '#0F53DC' },
 });
 
 // ─── Main styles ──────────────────────────────────────────────
@@ -553,24 +553,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(15,23,42,0.08)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#0B1435', letterSpacing: -0.4 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#0B1324', letterSpacing: -0.4 },
   headerActions: { flexDirection: 'row', gap: 4 },
   headerBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F6FC',
   },
-  headerBtnActive: { backgroundColor: '#2A63E2' },
+  headerBtnActive: { backgroundColor: '#0F53DC' },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#0B1435', letterSpacing: -0.3 },
-  sectionSub: { fontSize: 13, color: 'rgba(11,20,53,0.5)', marginTop: -2, marginBottom: 14 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#0B1324', letterSpacing: -0.3 },
+  sectionSub: { fontSize: 13, color: 'rgba(11,19,36,0.5)', marginTop: -2, marginBottom: 14 },
   activeInfo: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: '#FFFFFF', borderRadius: 12, alignSelf: 'flex-start',
-    marginTop: 14, borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)',
+    marginTop: 14, borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)',
   },
-  activeName: { fontSize: 13, fontWeight: '700', color: '#0B1435' },
+  activeName: { fontSize: 13, fontWeight: '700', color: '#0B1324' },
 
   // Drop zone
   dropZone: { marginTop: 18 },
@@ -583,12 +583,12 @@ const styles = StyleSheet.create({
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: '#E8EFFF', alignItems: 'center', justifyContent: 'center',
   },
-  uploadTitle: { fontSize: 17, fontWeight: '800', color: '#0B1435', letterSpacing: -0.3 },
-  uploadSub: { fontSize: 13, color: 'rgba(11,20,53,0.48)', textAlign: 'center', lineHeight: 19 },
+  uploadTitle: { fontSize: 17, fontWeight: '800', color: '#0B1324', letterSpacing: -0.3 },
+  uploadSub: { fontSize: 13, color: 'rgba(11,19,36,0.48)', textAlign: 'center', lineHeight: 19 },
   uploadBtn: {
     marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#2A63E2', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 22,
-    shadowColor: '#2A63E2', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5,
+    backgroundColor: '#0F53DC', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 22,
+    shadowColor: '#0F53DC', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5,
   },
   uploadBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
 
@@ -596,23 +596,23 @@ const styles = StyleSheet.create({
   filePreview: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.06)', shadowColor: '#0B1435',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)', shadowColor: '#0B1324',
     shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3,
   },
   fileIconWrap: {
     width: 52, height: 52, borderRadius: 16, backgroundColor: '#E8EFFF',
     alignItems: 'center', justifyContent: 'center',
   },
-  fileName: { flex: 1, fontSize: 14, fontWeight: '700', color: '#0B1435' },
-  fileSize: { fontSize: 12, color: 'rgba(11,20,53,0.48)', fontWeight: '600' },
+  fileName: { flex: 1, fontSize: 14, fontWeight: '700', color: '#0B1324' },
+  fileSize: { fontSize: 12, color: 'rgba(11,19,36,0.48)', fontWeight: '600' },
   clearFile: { padding: 4 },
 
   // Run button
   runBtn: {
     marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, backgroundColor: '#2A63E2', borderRadius: 18,
+    gap: 10, backgroundColor: '#0F53DC', borderRadius: 18,
     paddingVertical: 16, paddingHorizontal: 24,
-    shadowColor: '#2A63E2', shadowOpacity: 0.35, shadowRadius: 18,
+    shadowColor: '#0F53DC', shadowOpacity: 0.35, shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
   runBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
@@ -623,14 +623,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(42,99,226,0.4)',
     backgroundColor: 'rgba(42,99,226,0.04)',
   },
-  addMoreText: { fontSize: 13, fontWeight: '700', color: '#2A63E2' },
+  addMoreText: { fontSize: 13, fontWeight: '700', color: '#0F53DC' },
 
   nativeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginTop: 10,
     paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12,
-    backgroundColor: 'rgba(11,20,53,0.04)',
+    backgroundColor: 'rgba(11,19,36,0.04)',
   },
-  nativeBadgeText: { fontSize: 11, fontWeight: '600', color: 'rgba(11,20,53,0.5)' },
+  nativeBadgeText: { fontSize: 11, fontWeight: '600', color: 'rgba(11,19,36,0.5)' },
 
   // Categories
   catBlock: { marginBottom: 4 },
@@ -643,11 +643,11 @@ const styles = StyleSheet.create({
     width: 30, height: 30, borderRadius: 11,
     alignItems: 'center', justifyContent: 'center',
   },
-  catLabel: { fontSize: 14, fontWeight: '700', color: '#0B1435' },
+  catLabel: { fontSize: 14, fontWeight: '700', color: '#0B1324' },
   catCount: {
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
-    backgroundColor: 'rgba(11,20,53,0.06)',
+    backgroundColor: 'rgba(11,19,36,0.06)',
   },
-  catCountText: { fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.45)' },
+  catCountText: { fontSize: 11, fontWeight: '700', color: 'rgba(11,19,36,0.45)' },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 6 },
 });

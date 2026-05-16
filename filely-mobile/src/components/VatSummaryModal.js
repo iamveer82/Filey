@@ -187,14 +187,14 @@ export default function VatSummaryModal({ visible, onClose }) {
               <Text style={[s.sectionTitle, { marginTop: 28 }]}>EXPORT</Text>
               <View style={s.exportRow}>
                 <Tap onPress={() => doExport('csv')} disabled={exporting === 'csv'} style={s.exportBtn}>
-                  {exporting === 'csv' ? <ActivityIndicator color="#0B1435" /> : (
+                  {exporting === 'csv' ? <ActivityIndicator color="#0B1324" /> : (
                     <>
-                      <Ionicons name="grid-outline" size={16} color="#0B1435" />
+                      <Ionicons name="grid-outline" size={16} color="#0B1324" />
                       <Text style={s.exportText}>CSV (Excel)</Text>
                     </>
                   )}
                 </Tap>
-                <Tap onPress={() => doExport('pdf')} disabled={exporting === 'pdf'} style={[s.exportBtn, { backgroundColor: '#2A63E2' }]}>
+                <Tap onPress={() => doExport('pdf')} disabled={exporting === 'pdf'} style={[s.exportBtn, { backgroundColor: '#0F53DC' }]}>
                   {exporting === 'pdf' ? <ActivityIndicator color="#FFF" /> : (
                     <>
                       <Ionicons name="document-text-outline" size={16} color="#FFF" />
@@ -216,7 +216,7 @@ export default function VatSummaryModal({ visible, onClose }) {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFF' },
   hero: {
-    backgroundColor: '#2A63E2', paddingHorizontal: 20, paddingBottom: 22,
+    backgroundColor: '#0F53DC', paddingHorizontal: 20, paddingBottom: 22,
     borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
   },
   topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
@@ -246,9 +246,9 @@ const s = StyleSheet.create({
   },
   catHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   catDot: { width: 10, height: 10, borderRadius: 5 },
-  catLabel: { flex: 1, color: '#0B1435', fontSize: 13.5, fontWeight: '700' },
+  catLabel: { flex: 1, color: '#0B1324', fontSize: 13.5, fontWeight: '700' },
   catCount: { color: '#6B7280', fontSize: 11, fontWeight: '600', marginRight: 6 },
-  catAmt: { color: '#0B1435', fontSize: 13, fontWeight: '700' },
+  catAmt: { color: '#0B1324', fontSize: 13, fontWeight: '700' },
   catBarBg: { height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden' },
   catBarFill: { height: '100%', borderRadius: 3 },
   catVat: { color: '#6B7280', fontSize: 11, fontWeight: '600', marginTop: 6 },
@@ -257,7 +257,7 @@ const s = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, height: 48, borderRadius: 16, backgroundColor: '#E8EEFF',
   },
-  exportText: { color: '#0B1435', fontSize: 13.5, fontWeight: '700' },
+  exportText: { color: '#0B1324', fontSize: 13.5, fontWeight: '700' },
   foot: { textAlign: 'center', fontSize: 11, color: '#94A3B8', marginTop: 20 },
   empty: { color: '#6B7280', fontSize: 14, textAlign: 'center', marginTop: 40 },
   scopeRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
@@ -267,7 +267,7 @@ const s = StyleSheet.create({
     borderRadius: 14, backgroundColor: '#F4F6FB',
     borderWidth: 1, borderColor: '#E5E7EB',
   },
-  scopeChipActive: { backgroundColor: '#2A63E2', borderColor: '#2A63E2' },
+  scopeChipActive: { backgroundColor: '#0F53DC', borderColor: '#0F53DC' },
   scopeText: { color: '#6B7280', fontSize: 13, fontWeight: '700' },
   scopeTextActive: { color: '#FFF' },
   memberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 },
@@ -277,12 +277,12 @@ const s = StyleSheet.create({
   },
   memberAvatar: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },
   memberInitial: { color: '#FFF', fontSize: 12, fontWeight: '800' },
-  memberName: { color: '#0B1435', fontSize: 11.5, fontWeight: '700' },
-  memberAmt: { color: '#0B1435', fontSize: 12.5, fontWeight: '700', marginTop: 2 },
+  memberName: { color: '#0B1324', fontSize: 11.5, fontWeight: '700' },
+  memberAmt: { color: '#0B1324', fontSize: 12.5, fontWeight: '700', marginTop: 2 },
   memberCount: { color: '#6B7280', fontSize: 10, fontWeight: '600' },
 });

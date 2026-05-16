@@ -12,7 +12,7 @@ import { createShareLink } from '../services/publicShare';
 import { useAuth } from '../context/AuthContext';
 import { listFiles, addFile, removeFile, subscribeFiles, formatWhen } from '../services/recentFiles';
 
-const BRAND = '#2A63E2';
+const BRAND = '#0F53DC';
 
 const TOOLS = [
   { id: 'scan',      label: 'Scan Code',   icon: 'qr-code-outline',         bg: '#FDECEA', tint: '#E74C3C' },
@@ -22,11 +22,11 @@ const TOOLS = [
   { id: 'merge',     label: 'Merge PDF',   icon: 'albums-outline',          bg: '#FFF4E5', tint: '#EA580C' },
   { id: 'protect',   label: 'Protect PDF', icon: 'lock-closed-outline',     bg: '#DCFCE7', tint: '#16A34A' },
   { id: 'compress',  label: 'Compress PDF',icon: 'contract-outline',       bg: '#E0E7FF', tint: '#4338CA' },
-  { id: 'all',       label: 'All Tools',   icon: 'apps-outline',            bg: '#E8EFFF', tint: '#2A63E2' },
+  { id: 'all',       label: 'All Tools',   icon: 'apps-outline',            bg: '#E8EFFF', tint: '#0F53DC' },
 ];
 
 const ALL_TOOLS = [
-  { id: 'scanReceipt', label: 'Scan Receipt',     icon: 'scan-outline',            bg: '#E8EFFF', tint: '#2A63E2' },
+  { id: 'scanReceipt', label: 'Scan Receipt',     icon: 'scan-outline',            bg: '#E8EFFF', tint: '#0F53DC' },
   { id: 'pdfscan',     label: 'PDF Scanner',      icon: 'document-outline',        bg: '#EEF2FF', tint: '#6366F1' },
   { id: 'pdfword',     label: 'PDF → Word',       icon: 'document-text-outline',   bg: '#F5F3FF', tint: '#8B5CF6' },
   { id: 'pdfexcel',    label: 'PDF → Excel',      icon: 'grid-outline',            bg: '#ECFDF5', tint: '#10B981' },
@@ -178,7 +178,7 @@ export default function ServicesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#2A63E2" />
+      <StatusBar barStyle="light-content" backgroundColor="#0F53DC" />
 
       {/* Blue section: tool grid only */}
       <View style={styles.blueSection}>
@@ -274,10 +274,10 @@ export default function ServicesScreen({ navigation }) {
                   <Text style={styles.fileDate}>{formatWhen(f.ts)}</Text>
                 </View>
                 <Pressable hitSlop={8} onPress={() => shareFile(f)} style={styles.fileIconBtn}>
-                  <Ionicons name="share-social-outline" size={18} color="#0B1435" />
+                  <Ionicons name="share-social-outline" size={18} color="#0B1324" />
                 </Pressable>
                 <Pressable hitSlop={8} onPress={() => removeFile(f.id)} style={styles.fileIconBtn}>
-                  <Ionicons name="ellipsis-vertical" size={18} color="#0B1435" />
+                  <Ionicons name="ellipsis-vertical" size={18} color="#0B1324" />
                 </Pressable>
               </Animated.View>
             );
@@ -301,10 +301,10 @@ export default function ServicesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#2A63E2' },
+  root: { flex: 1, backgroundColor: '#0F53DC' },
 
   blueSection: {
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
   },
 
   hero: {
@@ -376,24 +376,24 @@ const styles = StyleSheet.create({
     marginTop: 4, marginBottom: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  recentTitle: { fontSize: 18, fontWeight: '800', color: '#0B1435', letterSpacing: -0.3 },
+  recentTitle: { fontSize: 18, fontWeight: '800', color: '#0B1324', letterSpacing: -0.3 },
 
   emptyBox: { paddingVertical: 24, alignItems: 'center' },
-  emptyText: { color: 'rgba(11,20,53,0.5)', fontSize: 13, textAlign: 'center' },
+  emptyText: { color: 'rgba(11,19,36,0.5)', fontSize: 13, textAlign: 'center' },
 
   fileCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderRadius: 16, padding: 14, marginBottom: 12,
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.08)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.08)',
   },
   fileThumb: {
     width: 46, height: 54, borderRadius: 8,
     backgroundColor: '#F2F4F8',
     alignItems: 'center', justifyContent: 'center',
   },
-  fileName: { color: '#0B1435', fontSize: 14, fontWeight: '700' },
-  fileDate: { color: 'rgba(11,20,53,0.5)', fontSize: 11.5, marginTop: 4 },
+  fileName: { color: '#0B1324', fontSize: 14, fontWeight: '700' },
+  fileDate: { color: 'rgba(11,19,36,0.5)', fontSize: 11.5, marginTop: 4 },
   fileIconBtn: {
     width: 34, height: 34, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',

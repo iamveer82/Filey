@@ -31,6 +31,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Modal, Switch, Keyboard, Alert } from 'react-native';
 import { Colors } from '../theme/colors';
+const { dark: C } = Colors;
 import { useAuth } from '../context/AuthContext';
 import { listTx as listLedgerTx, LEDGER_EVENT, subscribeLedger, getOpeningBalance } from '../services/localLedger';
 import { listBills, addBill, removeBill, toggleReminder, subscribeBills } from '../services/bills';
@@ -87,7 +88,7 @@ const METRIC_LIBRARY = {
   m_balance: {
     id: 'm_balance', label: 'Total Balance', sub: 'All accounts',
     amount: 0, prefix: 'AED ', delta: '+2.4%', deltaUp: true,
-    icon: 'wallet', gradient: ['#2A63E2', '#2E5BFF', '#1E3A8A'], chipLabel: 'PRIMARY',
+    icon: 'wallet', gradient: ['#0F53DC', '#0A3DA6', '#1E3A8A'], chipLabel: 'PRIMARY',
   },
   m_income: {
     id: 'm_income', label: 'Income', sub: 'This month',
@@ -97,7 +98,7 @@ const METRIC_LIBRARY = {
   m_spend: {
     id: 'm_spend', label: 'Spending', sub: 'This month',
     amount: 0, prefix: 'AED ', delta: '-0%', deltaUp: false,
-    icon: 'arrow-up-circle', gradient: ['#0B1435', '#1A2654', '#0B1435'], chipLabel: 'OUTGOING',
+    icon: 'arrow-up-circle', gradient: ['#0B1324', '#1A2654', '#0B1324'], chipLabel: 'OUTGOING',
   },
   m_savings: {
     id: 'm_savings', label: 'Savings', sub: 'This month',
@@ -146,7 +147,7 @@ function Avatar({ name, color, size = 36 }) {
         borderColor: '#FFFFFF',
       }}
     >
-      <Text style={{ color: '#0B1435', fontWeight: '700', fontSize: size * 0.38 }}>
+      <Text style={{ color: '#0B1324', fontWeight: '700', fontSize: size * 0.38 }}>
         {initials}
       </Text>
     </View>
@@ -171,7 +172,7 @@ function PillTab({ t, isActive, onPress }) {
         <Text
           style={[
             styles.pillTabText,
-            { color: isActive ? '#2A63E2' : 'rgba(255,255,255,0.78)' },
+            { color: isActive ? '#0F53DC' : C.textMuted },
           ]}
         >
           {t}
@@ -306,7 +307,7 @@ function MetricCarousel({ metrics, onOpenCustomize }) {
         <Ionicons name="albums-outline" size={28} color="rgba(255,255,255,0.7)" />
         <Text style={styles.emptyCarouselText}>No cards visible</Text>
         <Pressable onPress={onOpenCustomize} style={styles.emptyCarouselBtn}>
-          <Ionicons name="add" size={14} color="#2A63E2" />
+          <Ionicons name="add" size={14} color="#0F53DC" />
           <Text style={styles.emptyCarouselBtnText}>Add a card</Text>
         </Pressable>
       </Animated.View>
@@ -415,17 +416,17 @@ function CustomizeSheet({ visible, onClose, ids, setIds }) {
                   {enabled && (
                     <View style={styles.orderControls}>
                       <Pressable onPress={() => move(id, -1)} hitSlop={8} disabled={idx === 0} style={[styles.orderBtn, idx === 0 && { opacity: 0.35 }]}>
-                        <Ionicons name="chevron-up" size={14} color="#0B1435" />
+                        <Ionicons name="chevron-up" size={14} color="#0B1324" />
                       </Pressable>
                       <Pressable onPress={() => move(id, 1)} hitSlop={8} disabled={idx === local.length - 1} style={[styles.orderBtn, idx === local.length - 1 && { opacity: 0.35 }]}>
-                        <Ionicons name="chevron-down" size={14} color="#0B1435" />
+                        <Ionicons name="chevron-down" size={14} color="#0B1324" />
                       </Pressable>
                     </View>
                   )}
                   <Switch
                     value={enabled}
                     onValueChange={() => toggle(id)}
-                    trackColor={{ false: '#E5E7EB', true: '#2A63E2' }}
+                    trackColor={{ false: '#E5E7EB', true: '#0F53DC' }}
                     thumbColor="#FFFFFF"
                   />
                 </View>
@@ -470,8 +471,8 @@ function Bar({ a, b, label, delay }) {
 
 function MiniCard({ variant, label, holder, number }) {
   const isBlue = variant === 'blue';
-  const bg = isBlue ? '#2A63E2' : '#111827';
-  const accentBg = isBlue ? '#2E5BFF' : '#1F2937';
+  const bg = isBlue ? '#0F53DC' : '#111827';
+  const accentBg = isBlue ? '#0A3DA6' : '#1F2937';
   return (
     <View style={[styles.miniCard, { backgroundColor: bg }]}>
       <View style={[styles.miniCardHighlight, { backgroundColor: accentBg }]} />
@@ -700,17 +701,17 @@ export default function HomeScreen({ navigation, darkMode = false }) {
   const brandIcon = (name) => {
     const n = (name || '').toLowerCase();
     if (n.includes('figma'))    return { lib: 'fa', icon: 'figma',    bg: '#F4F0FF', color: '#A259FF' };
-    if (n.includes('github'))   return { lib: 'fa', icon: 'github',   bg: '#ECECEC', color: '#0B1435' };
+    if (n.includes('github'))   return { lib: 'fa', icon: 'github',   bg: '#ECECEC', color: '#0B1324' };
     if (n.includes('spotify'))  return { lib: 'fa', icon: 'spotify',  bg: '#E6F9EE', color: '#1DB954' };
     if (n.includes('netflix'))  return { lib: 'ion', icon: 'film-outline', bg: '#FFE5E5', color: '#E50914' };
-    if (n.includes('apple'))    return { lib: 'fa', icon: 'apple',    bg: '#F2F2F2', color: '#0B1435' };
+    if (n.includes('apple'))    return { lib: 'fa', icon: 'apple',    bg: '#F2F2F2', color: '#0B1324' };
     if (n.includes('google'))   return { lib: 'fa', icon: 'google',   bg: '#FFF4E5', color: '#EA4335' };
-    return { lib: 'ion', icon: 'card-outline', bg: '#E8EFFF', color: '#2A63E2' };
+    return { lib: 'ion', icon: 'card-outline', bg: '#E8EFFF', color: '#0F53DC' };
   };
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#2A63E2" />
+      <StatusBar barStyle="light-content" backgroundColor="#0F53DC" />
 
       <View style={{ flex: 1, marginBottom: keyboardH }}>
         {/* Blue hero */}
@@ -856,7 +857,7 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                 </View>
                 <View style={styles.recentSendRow}>
                   {recentSends.length === 0 && (
-                    <Text style={{ color: 'rgba(11,20,53,0.48)', fontSize: 13, paddingVertical: 8 }}>
+                    <Text style={{ color: 'rgba(11,19,36,0.48)', fontSize: 13, paddingVertical: 8 }}>
                       No recent sends. Log a payment via chat to see it here.
                     </Text>
                   )}
@@ -868,7 +869,7 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                   ))}
                   {recentSends.length > 0 && (
                     <Pressable style={styles.recentAdd} hitSlop={8}>
-                      <Ionicons name="add" size={22} color="#2A63E2" />
+                      <Ionicons name="add" size={22} color="#0F53DC" />
                     </Pressable>
                   )}
                 </View>
@@ -880,12 +881,12 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                 </View>
                 <View style={[styles.searchRow, { marginBottom: 4 }]}>
                   <View style={styles.searchInputWrap} >
-                    <Ionicons name="search-outline" size={16} color="rgba(11,20,53,0.48)" />
+                    <Ionicons name="search-outline" size={16} color="rgba(11,19,36,0.48)" />
                     <TextInput
                       value={txSearch}
                       onChangeText={setTxSearch}
                       placeholder="Search transactions"
-                      placeholderTextColor="rgba(11,20,53,0.48)"
+                      placeholderTextColor="rgba(11,19,36,0.48)"
                       style={styles.searchInput}
                       onFocus={() => {
                         // Scroll search bar above keyboard after it opens
@@ -914,11 +915,11 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                   ref={txScrollRef}
                   style={{ flex: 1 }}
                   showsVerticalScrollIndicator={false}
-                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2A63E2" />}
+                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0F53DC" />}
                 >
                   {filteredLedger.length === 0 && (
                     <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                      <Text style={{ color: 'rgba(11,20,53,0.48)', fontSize: 13 }}>
+                      <Text style={{ color: 'rgba(11,19,36,0.48)', fontSize: 13 }}>
                         No transactions yet. Ask Filey AI "I paid 500 AED to Ravi" to log one.
                       </Text>
                     </View>
@@ -961,7 +962,7 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                     <Text style={styles.budgetSub}>Track monthly spending limits</Text>
                   </View>
                   <Pressable style={styles.budgetAdd} hitSlop={8}>
-                    <Ionicons name="add" size={20} color="#0B1435" />
+                    <Ionicons name="add" size={20} color="#0B1324" />
                   </Pressable>
                 </View>
               </Animated.View>
@@ -1008,14 +1009,14 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                           <Ionicons
                             name={b.reminder ? 'notifications' : 'notifications-off-outline'}
                             size={14}
-                            color={b.reminder ? '#2A63E2' : 'rgba(11,20,53,0.4)'}
+                            color={b.reminder ? '#0F53DC' : 'rgba(11,19,36,0.4)'}
                           />
                         </Pressable>
                       </Pressable>
                     );
                   })}
                   <Pressable style={styles.billAddCard} onPress={() => setShowAddBill(true)} hitSlop={8}>
-                    <Ionicons name="add" size={22} color="#2A63E2" />
+                    <Ionicons name="add" size={22} color="#0F53DC" />
                     <Text style={styles.billAddText}>Add a Bill</Text>
                   </Pressable>
                 </ScrollView>
@@ -1052,17 +1053,17 @@ export default function HomeScreen({ navigation, darkMode = false }) {
             <View style={styles.filterRow}>
               <TextInput
                 placeholder="From (YYYY-MM-DD)"
-                placeholderTextColor="rgba(11,20,53,0.4)"
+                placeholderTextColor="rgba(11,19,36,0.4)"
                 style={[styles.modalInput, { flex: 1 }]}
                 value={filterDraft.dateFrom}
                 onChangeText={(v) => setFilterDraft(d => ({ ...d, dateFrom: v }))}
                 keyboardType="numbers-and-punctuation"
                 maxLength={10}
               />
-              <Text style={{ color: 'rgba(11,20,53,0.4)', marginHorizontal: 6 }}>–</Text>
+              <Text style={{ color: 'rgba(11,19,36,0.4)', marginHorizontal: 6 }}>–</Text>
               <TextInput
                 placeholder="To (YYYY-MM-DD)"
-                placeholderTextColor="rgba(11,20,53,0.4)"
+                placeholderTextColor="rgba(11,19,36,0.4)"
                 style={[styles.modalInput, { flex: 1 }]}
                 value={filterDraft.dateTo}
                 onChangeText={(v) => setFilterDraft(d => ({ ...d, dateTo: v }))}
@@ -1075,16 +1076,16 @@ export default function HomeScreen({ navigation, darkMode = false }) {
             <View style={styles.filterRow}>
               <TextInput
                 placeholder="Min (AED)"
-                placeholderTextColor="rgba(11,20,53,0.4)"
+                placeholderTextColor="rgba(11,19,36,0.4)"
                 style={[styles.modalInput, { flex: 1 }]}
                 value={filterDraft.minAmount}
                 onChangeText={(v) => setFilterDraft(d => ({ ...d, minAmount: v }))}
                 keyboardType="numeric"
               />
-              <Text style={{ color: 'rgba(11,20,53,0.4)', marginHorizontal: 6 }}>–</Text>
+              <Text style={{ color: 'rgba(11,19,36,0.4)', marginHorizontal: 6 }}>–</Text>
               <TextInput
                 placeholder="Max (AED)"
-                placeholderTextColor="rgba(11,20,53,0.4)"
+                placeholderTextColor="rgba(11,19,36,0.4)"
                 style={[styles.modalInput, { flex: 1 }]}
                 value={filterDraft.maxAmount}
                 onChangeText={(v) => setFilterDraft(d => ({ ...d, maxAmount: v }))}
@@ -1102,7 +1103,7 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                 }}
                 style={[styles.modalBtn, { backgroundColor: '#F3F4F6' }]}
               >
-                <Text style={{ color: '#0B1435', fontWeight: '700' }}>Clear</Text>
+                <Text style={{ color: '#0B1324', fontWeight: '700' }}>Clear</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -1115,7 +1116,7 @@ export default function HomeScreen({ navigation, darkMode = false }) {
                   setFilter({ ...filterDraft });
                   setShowFilter(false);
                 }}
-                style={[styles.modalBtn, { backgroundColor: '#2A63E2' }]}
+                style={[styles.modalBtn, { backgroundColor: '#0F53DC' }]}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Apply</Text>
               </Pressable>
@@ -1137,41 +1138,41 @@ export default function HomeScreen({ navigation, darkMode = false }) {
             <Text style={styles.modalTitle}>Add a Bill</Text>
             <TextInput
               placeholder="Name (e.g. Figma, Netflix, Rent)"
-              placeholderTextColor="rgba(11,20,53,0.4)"
+              placeholderTextColor="rgba(11,19,36,0.4)"
               style={styles.modalInput}
               value={newBill.name}
               onChangeText={(v) => setNewBill(b => ({ ...b, name: v, iconId: guessIconId(v) || b.iconId }))}
             />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.6, marginTop: 4, marginBottom: 6 }}>LABEL ICON</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(11,19,36,0.55)', letterSpacing: 0.6, marginTop: 4, marginBottom: 6 }}>LABEL ICON</Text>
             <IconPicker value={newBill.iconId} onChange={(id) => setNewBill(b => ({ ...b, iconId: id }))} />
             <TextInput
               placeholder="Amount (AED)"
               keyboardType="numeric"
-              placeholderTextColor="rgba(11,20,53,0.4)"
+              placeholderTextColor="rgba(11,19,36,0.4)"
               style={styles.modalInput}
               value={newBill.amount}
               onChangeText={(v) => setNewBill(b => ({ ...b, amount: v }))}
             />
             <TextInput
               placeholder="Due date (YYYY-MM-DD)"
-              placeholderTextColor="rgba(11,20,53,0.4)"
+              placeholderTextColor="rgba(11,19,36,0.4)"
               style={styles.modalInput}
               value={newBill.dueDate}
               onChangeText={(v) => setNewBill(b => ({ ...b, dueDate: v }))}
             />
             <View style={styles.modalRowBtn}>
-              <Text style={{ color: '#0B1435', fontWeight: '600' }}>Remind me</Text>
+              <Text style={{ color: '#0B1324', fontWeight: '600' }}>Remind me</Text>
               <Switch
                 value={newBill.reminder}
                 onValueChange={(v) => setNewBill(b => ({ ...b, reminder: v }))}
-                trackColor={{ true: '#2A63E2', false: '#CCC' }}
+                trackColor={{ true: '#0F53DC', false: '#CCC' }}
               />
             </View>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
               <Pressable onPress={() => setShowAddBill(false)} style={[styles.modalBtn, { backgroundColor: '#F3F4F6' }]}>
-                <Text style={{ color: '#0B1435', fontWeight: '700' }}>Cancel</Text>
+                <Text style={{ color: '#0B1324', fontWeight: '700' }}>Cancel</Text>
               </Pressable>
-              <Pressable onPress={saveBill} style={[styles.modalBtn, { backgroundColor: '#2A63E2' }]}>
+              <Pressable onPress={saveBill} style={[styles.modalBtn, { backgroundColor: '#0F53DC' }]}>
                 <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Save</Text>
               </Pressable>
             </View>
@@ -1190,7 +1191,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   hero: {
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     paddingTop: Platform.OS === 'ios' ? 56 : 36,
     paddingBottom: 8,
   },
@@ -1226,7 +1227,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FF5470',
     borderWidth: 1.5,
-    borderColor: '#2A63E2',
+    borderColor: '#0F53DC',
   },
   pillTab: {
     height: 36,
@@ -1257,7 +1258,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     padding: 20,
     overflow: 'hidden',
-    shadowColor: '#0B1435',
+    shadowColor: '#0B1324',
     shadowOpacity: 0.35,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 12 },
@@ -1546,7 +1547,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(11,20,53,0.14)',
+    backgroundColor: 'rgba(11,19,36,0.14)',
     marginBottom: 14,
   },
   sectionHeader: {
@@ -1556,13 +1557,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
   sectionLink: {
-    color: '#2A63E2',
+    color: '#0F53DC',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1572,7 +1573,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   recentName: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
@@ -1583,7 +1584,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(59,107,255,0.45)',
+    borderColor: 'rgba(15,83,220,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1601,19 +1602,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.06)',
+    borderColor: 'rgba(11,19,36,0.06)',
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 14,
   },
   filterBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
@@ -1623,7 +1624,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(11,20,53,0.06)',
+    borderBottomColor: 'rgba(11,19,36,0.06)',
   },
   activityIcon: {
     width: 40,
@@ -1633,12 +1634,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activityName: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 14,
     fontWeight: '700',
   },
   activitySub: {
-    color: 'rgba(11,20,53,0.58)',
+    color: 'rgba(11,19,36,0.58)',
     fontSize: 12,
     marginTop: 2,
   },
@@ -1647,7 +1648,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   budgetCard: {
-    backgroundColor: '#0B1435',
+    backgroundColor: '#0B1324',
     borderRadius: 18,
     padding: 14,
     flexDirection: 'row',
@@ -1685,27 +1686,27 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: '#F3F6FC',
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.06)',
+    borderColor: 'rgba(11,19,36,0.06)',
   },
   billDay: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 18,
     fontWeight: '800',
   },
   billMo: {
-    color: 'rgba(11,20,53,0.58)',
+    color: 'rgba(11,19,36,0.58)',
     fontSize: 11,
     fontWeight: '600',
     marginTop: -2,
     marginBottom: 10,
   },
   billName: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 13,
     fontWeight: '700',
   },
   billAmt: {
-    color: '#2A63E2',
+    color: '#0F53DC',
     fontSize: 14,
     fontWeight: '800',
     marginTop: 4,
@@ -1714,15 +1715,15 @@ const styles = StyleSheet.create({
     width: 120,
     borderRadius: 16,
     padding: 14,
-    backgroundColor: 'rgba(59,107,255,0.08)',
+    backgroundColor: 'rgba(15,83,220,0.08)',
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(59,107,255,0.45)',
+    borderColor: 'rgba(15,83,220,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   billAddText: {
-    color: '#2A63E2',
+    color: '#0F53DC',
     fontSize: 12,
     fontWeight: '700',
     marginTop: 6,
@@ -1732,7 +1733,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 8,
   },
-  filterLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(11,20,53,0.55)', letterSpacing: 0.5, marginBottom: 8 },
+  filterLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(11,19,36,0.55)', letterSpacing: 0.5, marginBottom: 8 },
   filterRow: { flexDirection: 'row', alignItems: 'center' },
   modalBg: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
@@ -1742,11 +1743,11 @@ const styles = StyleSheet.create({
     width: '100%', maxWidth: 380,
     backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0B1435', marginBottom: 14 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0B1324', marginBottom: 14 },
   modalInput: {
-    borderWidth: 1, borderColor: 'rgba(11,20,53,0.12)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.12)',
     borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 14, color: '#0B1435', marginBottom: 10,
+    fontSize: 14, color: '#0B1324', marginBottom: 10,
   },
   modalRowBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1756,7 +1757,7 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
   },
   bodyMuted: {
-    color: 'rgba(11,20,53,0.58)',
+    color: 'rgba(11,19,36,0.58)',
     fontSize: 13,
   },
   emptyCarousel: {
@@ -1770,7 +1771,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
     marginTop: 4,
   },
-  emptyCarouselBtnText: { color: '#2A63E2', fontSize: 13, fontWeight: '700' },
+  emptyCarouselBtnText: { color: '#0F53DC', fontSize: 13, fontWeight: '700' },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   customSheet: {
     backgroundColor: '#F3F6FC',
@@ -1779,48 +1780,48 @@ const styles = StyleSheet.create({
   },
   customHandle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(11,23,53,0.18)',
+    backgroundColor: 'rgba(11,19,36,0.18)',
     alignSelf: 'center', marginTop: 8, marginBottom: 6,
   },
   customHeader: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(11,23,53,0.06)',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(11,19,36,0.06)',
   },
-  customTitle: { fontSize: 20, fontWeight: '800', color: '#0B1435', letterSpacing: -0.4 },
-  customSub: { fontSize: 12.5, color: 'rgba(11,23,53,0.6)', marginTop: 2 },
+  customTitle: { fontSize: 20, fontWeight: '800', color: '#0B1324', letterSpacing: -0.4 },
+  customSub: { fontSize: 12.5, color: 'rgba(11,19,36,0.6)', marginTop: 2 },
   resetBtn: {
     paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 12, backgroundColor: 'rgba(59,107,255,0.1)',
+    borderRadius: 12, backgroundColor: 'rgba(15,83,220,0.1)',
   },
-  resetText: { color: '#2A63E2', fontWeight: '700', fontSize: 12.5 },
+  resetText: { color: '#0F53DC', fontWeight: '700', fontSize: 12.5 },
   customRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FFFFFF',
     padding: 14, borderRadius: 16, marginBottom: 10,
-    borderWidth: 1, borderColor: 'rgba(11,23,53,0.06)',
+    borderWidth: 1, borderColor: 'rgba(11,19,36,0.06)',
   },
   customDot: {
     width: 38, height: 38, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  customRowLabel: { fontSize: 14.5, fontWeight: '700', color: '#0B1435' },
-  customRowSub: { fontSize: 12, color: 'rgba(11,23,53,0.55)', marginTop: 2 },
+  customRowLabel: { fontSize: 14.5, fontWeight: '700', color: '#0B1324' },
+  customRowSub: { fontSize: 12, color: 'rgba(11,19,36,0.55)', marginTop: 2 },
   orderControls: { flexDirection: 'column', gap: 2 },
   orderBtn: {
     width: 28, height: 22, borderRadius: 7,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(11,23,53,0.06)',
+    backgroundColor: 'rgba(11,19,36,0.06)',
   },
   customFooter: {
     padding: 16, paddingBottom: 28,
-    borderTopWidth: 1, borderTopColor: 'rgba(11,23,53,0.06)',
+    borderTopWidth: 1, borderTopColor: 'rgba(11,19,36,0.06)',
     backgroundColor: '#FFFFFF',
   },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#2A63E2', height: 52, borderRadius: 26,
-    shadowColor: '#2A63E2', shadowOpacity: 0.3, shadowRadius: 14,
+    gap: 8, backgroundColor: '#0F53DC', height: 52, borderRadius: 26,
+    shadowColor: '#0F53DC', shadowOpacity: 0.3, shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
   saveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },

@@ -1236,7 +1236,7 @@ ${personaBlock}`,
 
       <View style={[styles.topBar, { paddingTop: insets.top + 10, backgroundColor: '#FFFFFF' }]}>
         <Pressable onPress={() => setShowThreads(true)} hitSlop={10} style={styles.topIconBtn}>
-          <Ionicons name="menu" size={22} color="#0B1435" />
+          <Ionicons name="menu" size={22} color="#0B1324" />
         </Pressable>
 
         <Pressable
@@ -1244,15 +1244,15 @@ ${personaBlock}`,
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={[styles.topTitle, { color: '#0B1435' }]} numberOfLines={1}>
+            <Text style={[styles.topTitle, { color: '#0B1324' }]} numberOfLines={1}>
               {llmPref?.model ? (llmPref.model.length > 20 ? llmPref.model.slice(0, 18) + '…' : llmPref.model) : 'Select model'}
             </Text>
-            <Ionicons name="chevron-down" size={14} color="#0B1435" />
+            <Ionicons name="chevron-down" size={14} color="#0B1324" />
           </View>
         </Pressable>
 
         <Pressable onPress={clearMemory} hitSlop={10} style={styles.topIconBtn}>
-          <Ionicons name="create-outline" size={22} color="#0B1435" />
+          <Ionicons name="create-outline" size={22} color="#0B1324" />
         </Pressable>
       </View>
 
@@ -1513,15 +1513,15 @@ ${personaBlock}`,
                       >
                         <View style={{ width: 22, paddingTop: 2, alignItems: 'center' }}>
                           {it.current ? (
-                            <Ionicons name="checkmark" size={20} color="#0B1435" />
+                            <Ionicons name="checkmark" size={20} color="#0B1324" />
                           ) : null}
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 16, fontWeight: '700', color: '#0B1435' }} numberOfLines={1}>
+                          <Text style={{ fontSize: 16, fontWeight: '700', color: '#0B1324' }} numberOfLines={1}>
                             {it.model}
                           </Text>
                           {tagline ? (
-                            <Text style={{ fontSize: 13, color: 'rgba(11,20,53,0.6)', marginTop: 2 }} numberOfLines={2}>
+                            <Text style={{ fontSize: 13, color: 'rgba(11,19,36,0.6)', marginTop: 2 }} numberOfLines={2}>
                               {tagline}
                             </Text>
                           ) : null}
@@ -1530,7 +1530,7 @@ ${personaBlock}`,
                     );
                   });
                 })()}
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(11,20,53,0.12)', marginVertical: 6, marginHorizontal: 18 }} />
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(11,19,36,0.12)', marginVertical: 6, marginHorizontal: 18 }} />
                 <Pressable
                   onPress={() => {
                     setShowModelPicker(false);
@@ -1547,10 +1547,10 @@ ${personaBlock}`,
                   }}
                 >
                   <View style={{ width: 22 }} />
-                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: '#0B1435' }}>
+                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: '#0B1324' }}>
                     Change provider
                   </Text>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(11,20,53,0.55)" />
+                  <Ionicons name="chevron-forward" size={18} color="rgba(11,19,36,0.55)" />
                 </Pressable>
               </View>
             </BlurView>
@@ -1563,7 +1563,7 @@ ${personaBlock}`,
 
 const mdStyles = {
   body: { color: '#1F2937', fontSize: 15.5, lineHeight: 23 },
-  strong: { color: '#0B1735', fontWeight: '700' },
+  strong: { color: '#0B1324', fontWeight: '700' },
   em: { color: '#1F2937', fontStyle: 'italic' },
   bullet_list: { marginVertical: 4 },
   ordered_list: { marginVertical: 4 },
@@ -1571,11 +1571,11 @@ const mdStyles = {
   code_inline: { backgroundColor: '#F3F4F6', color: '#1F2937', paddingHorizontal: 4, borderRadius: 4 },
   code_block: { backgroundColor: '#F3F4F6', color: '#1F2937', padding: 10, borderRadius: 10 },
   fence: { backgroundColor: '#F3F4F6', color: '#1F2937', padding: 10, borderRadius: 10 },
-  heading1: { color: '#0B1735', fontSize: 20, fontWeight: '800' },
-  heading2: { color: '#0B1735', fontSize: 17, fontWeight: '800' },
-  heading3: { color: '#0B1735', fontSize: 15, fontWeight: '700' },
+  heading1: { color: '#0B1324', fontSize: 20, fontWeight: '800' },
+  heading2: { color: '#0B1324', fontSize: 17, fontWeight: '800' },
+  heading3: { color: '#0B1324', fontSize: 15, fontWeight: '700' },
   link: { color: '#2563EB' },
-  blockquote: { backgroundColor: '#F3F4F6', borderLeftWidth: 3, borderLeftColor: '#2A63E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  blockquote: { backgroundColor: '#F3F4F6', borderLeftWidth: 3, borderLeftColor: '#0F53DC', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
 };
 
 const styles = StyleSheet.create({
@@ -1610,7 +1610,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(11,20,53,0.06)',
+    borderBottomColor: 'rgba(11,19,36,0.06)',
   },
   topIconBtn: {
     width: 36, height: 36, borderRadius: 18,
@@ -1641,7 +1641,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   welcomeHeadline: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 30,
     lineHeight: 36,
     fontWeight: '500',
@@ -1660,10 +1660,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.10)',
+    borderColor: 'rgba(11,19,36,0.10)',
   },
   suggestText: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -1681,11 +1681,11 @@ const styles = StyleSheet.create({
 
   userRow: { alignItems: 'flex-end', marginVertical: 6 },
   userBubble: {
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 18, borderBottomRightRadius: 6,
     maxWidth: '88%',
-    borderWidth: 1, borderColor: 'rgba(59,107,255,0.35)',
+    borderWidth: 1, borderColor: 'rgba(15,83,220,0.35)',
   },
   userText: { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
   attachedImage: {
@@ -1771,7 +1771,7 @@ const styles = StyleSheet.create({
 
   composer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(11,20,53,0.06)',
+    borderTopColor: 'rgba(11,19,36,0.06)',
     paddingTop: 6,
     paddingBottom: 0,
     backgroundColor: '#FFFFFF',

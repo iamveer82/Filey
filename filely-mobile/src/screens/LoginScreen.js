@@ -30,8 +30,8 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function CreditCard({ variant, label, number, holder, extra, style }) {
   const isBlue = variant === 'blue';
-  const bg = isBlue ? '#2A63E2' : '#111827';
-  const accentBg = isBlue ? '#2E5BFF' : '#1F2937';
+  const bg = isBlue ? '#0F53DC' : '#111827';
+  const accentBg = isBlue ? '#0A3DA6' : '#1F2937';
 
   return (
     <View style={[styles.card, { backgroundColor: bg }, style]}>
@@ -127,7 +127,7 @@ export default function LoginScreen({ darkMode = false, onNavigateToCompanySetup
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B1435" />
+      <StatusBar barStyle="light-content" backgroundColor="#0B1324" />
 
       <Animated.View
         entering={FadeInDown.duration(500)}
@@ -196,7 +196,7 @@ export default function LoginScreen({ darkMode = false, onNavigateToCompanySetup
           style={[styles.ctaBtn, btnStyle]}
         >
           <Text style={styles.ctaText}>Let's Go!</Text>
-          <Ionicons name="arrow-forward" size={20} color="#0B1435" style={{ marginLeft: 8 }} />
+          <Ionicons name="arrow-forward" size={20} color="#0B1324" style={{ marginLeft: 8 }} />
         </AnimatedPressable>
 
         <Pressable
@@ -242,12 +242,12 @@ export default function LoginScreen({ darkMode = false, onNavigateToCompanySetup
 
             {mode === 'signup' ? (
               <View style={styles.inputWrap}>
-                <Ionicons name="person-outline" size={18} color="rgba(11,20,53,0.48)" />
+                <Ionicons name="person-outline" size={18} color="rgba(11,19,36,0.48)" />
                 <TextInput
                   value={name}
                   onChangeText={setName}
                   placeholder="Name"
-                  placeholderTextColor="rgba(11,20,53,0.48)"
+                  placeholderTextColor="rgba(11,19,36,0.48)"
                   style={styles.input}
                   autoCapitalize="words"
                   editable={!loading}
@@ -256,12 +256,12 @@ export default function LoginScreen({ darkMode = false, onNavigateToCompanySetup
             ) : null}
 
             <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color="rgba(11,20,53,0.48)" />
+              <Ionicons name="mail-outline" size={18} color="rgba(11,19,36,0.48)" />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email"
-                placeholderTextColor="rgba(11,20,53,0.48)"
+                placeholderTextColor="rgba(11,19,36,0.48)"
                 style={styles.input}
                 autoCapitalize="none"
                 keyboardType="email-address"
@@ -270,12 +270,12 @@ export default function LoginScreen({ darkMode = false, onNavigateToCompanySetup
             </View>
 
             <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color="rgba(11,20,53,0.48)" />
+              <Ionicons name="lock-closed-outline" size={18} color="rgba(11,19,36,0.48)" />
               <TextInput
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor="rgba(11,20,53,0.48)"
+                placeholderTextColor="rgba(11,19,36,0.48)"
                 style={styles.input}
                 secureTextEntry
                 editable={!loading}
@@ -329,7 +329,7 @@ const CARD_H = 220;
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0B1435',
+    backgroundColor: '#0B1324',
     paddingHorizontal: 24,
     paddingTop: Platform.OS === 'ios' ? 56 : 36,
     paddingBottom: 24,
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   ctaText: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.2,
@@ -501,17 +501,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(11,20,53,0.14)',
+    backgroundColor: 'rgba(11,19,36,0.14)',
     marginBottom: 14,
   },
   sheetTitle: {
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   sheetSubtitle: {
-    color: 'rgba(11,20,53,0.64)',
+    color: 'rgba(11,19,36,0.64)',
     fontSize: 14,
     marginTop: 4,
     marginBottom: 18,
@@ -524,13 +524,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(11,20,53,0.06)',
+    borderColor: 'rgba(11,19,36,0.06)',
   },
   input: {
     flex: 1,
     height: 52,
     marginLeft: 10,
-    color: '#0B1435',
+    color: '#0B1324',
     fontSize: 15,
   },
   errorText: {
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#2A63E2',
+    backgroundColor: '#0F53DC',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   switchModeText: {
-    color: 'rgba(11,20,53,0.64)',
+    color: 'rgba(11,19,36,0.64)',
     fontSize: 13,
   },
 });
