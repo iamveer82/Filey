@@ -18,9 +18,51 @@ module.exports = {
     	},
     	extend: {
     		colors: {
+    			/* Semantic surface */
+    			bg:                'hsl(var(--bg))',
+    			'bg-elevated':     'hsl(var(--bg-elevated))',
+    			'bg-muted':        'hsl(var(--bg-muted))',
+    			'bg-subtle':       'hsl(var(--bg-subtle))',
+    			/* Semantic text */
+    			fg:                'hsl(var(--fg))',
+    			'fg-muted':        'hsl(var(--fg-muted))',
+    			'fg-subtle':       'hsl(var(--fg-subtle))',
+    			'fg-disabled':     'hsl(var(--fg-disabled))',
+    			'fg-inverse':      'hsl(var(--fg-inverse))',
+    			/* Borders */
     			border: 'hsl(var(--border))',
-    			input: 'hsl(var(--input))',
-    			ring: 'hsl(var(--ring))',
+    			'border-strong':   'hsl(var(--border-strong))',
+    			input:  'hsl(var(--input))',
+    			ring:   'hsl(var(--ring))',
+    			/* Brand */
+    			brand: {
+    				DEFAULT: 'hsl(var(--brand))',
+    				fg:      'hsl(var(--brand-fg))',
+    				soft:    'hsl(var(--brand-soft))',
+    				strong:  'hsl(var(--brand-strong))',
+    			},
+    			/* Status */
+    			success: {
+    				DEFAULT: 'hsl(var(--success))',
+    				fg:      'hsl(var(--success-fg))',
+    				soft:    'hsl(var(--success-soft))',
+    			},
+    			warning: {
+    				DEFAULT: 'hsl(var(--warning))',
+    				fg:      'hsl(var(--warning-fg))',
+    				soft:    'hsl(var(--warning-soft))',
+    			},
+    			danger: {
+    				DEFAULT: 'hsl(var(--danger))',
+    				fg:      'hsl(var(--danger-fg))',
+    				soft:    'hsl(var(--danger-soft))',
+    			},
+    			info: {
+    				DEFAULT: 'hsl(var(--info))',
+    				fg:      'hsl(var(--info-fg))',
+    				soft:    'hsl(var(--info-soft))',
+    			},
+    			/* shadcn-compat */
     			background: 'hsl(var(--background))',
     			foreground: 'hsl(var(--foreground))',
     			primary: {
@@ -51,28 +93,31 @@ module.exports = {
     				DEFAULT: 'hsl(var(--card))',
     				foreground: 'hsl(var(--card-foreground))'
     			},
-    			chart: {
-    				'1': 'hsl(var(--chart-1))',
-    				'2': 'hsl(var(--chart-2))',
-    				'3': 'hsl(var(--chart-3))',
-    				'4': 'hsl(var(--chart-4))',
-    				'5': 'hsl(var(--chart-5))'
-    			},
-    			sidebar: {
-    				DEFAULT: 'hsl(var(--sidebar-background))',
-    				foreground: 'hsl(var(--sidebar-foreground))',
-    				primary: 'hsl(var(--sidebar-primary))',
-    				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-    				accent: 'hsl(var(--sidebar-accent))',
-    				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-    				border: 'hsl(var(--sidebar-border))',
-    				ring: 'hsl(var(--sidebar-ring))'
-    			}
     		},
     		borderRadius: {
-    			lg: 'var(--radius)',
-    			md: 'calc(var(--radius) - 2px)',
-    			sm: 'calc(var(--radius) - 4px)'
+    			sm: 'var(--radius-sm)',
+    			md: 'var(--radius-md)',
+    			lg: 'var(--radius-lg)',
+    			xl: 'var(--radius-xl)',
+    		},
+    		boxShadow: {
+    			sm: 'var(--shadow-sm)',
+    			md: 'var(--shadow-md)',
+    			lg: 'var(--shadow-lg)',
+    			xl: 'var(--shadow-xl)',
+    		},
+    		transitionTimingFunction: {
+    			out: 'var(--ease-out)',
+    			spring: 'var(--ease-spring)',
+    		},
+    		transitionDuration: {
+    			fast: 'var(--duration-fast)',
+    			base: 'var(--duration-base)',
+    			slow: 'var(--duration-slow)',
+    		},
+    		fontSize: {
+    			'2xs': ['0.6875rem', { lineHeight: '1rem' }],   // 11
+    			caption: ['0.75rem', { lineHeight: '1rem' }],    // 12
     		},
     		keyframes: {
     			'accordion-down': {
@@ -98,5 +143,5 @@ module.exports = {
     		}
     	}
     },
-    plugins: [require("tailwindcss-animate")],
+    plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
   }

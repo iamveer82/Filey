@@ -254,4 +254,56 @@ export const db = {
   // Activity log
   createActivity: (data) =>
     supabase.from('activity').insert(data).select().single(),
+
+  // Projects / client bill-back (C3)
+  listProjects: (orgId) =>
+    supabase.from('projects').select('*').eq('org_id', orgId).eq('archived', false),
+  upsertProject: (data) =>
+    supabase.from('projects').upsert(data).select().single(),
+  archiveProject: (id) =>
+    supabase.from('projects').update({ archived: true, updated_at: new Date().toISOString() }).eq('id', id),
+
+  // OOO delegation (C3)
+  getDeputy: (managerId) =>
+    supabase.from('deputies').select('*').eq('manager_id', managerId).maybeSingle(),
+  setDeputy: (data) =>
+    supabase.from('deputies').upsert(data).select().single(),
+  clearDeputy: (managerId) =>
+    supabase.from('deputies').delete().eq('manager_id', managerId),
+
+  // Referral (C5)
+  getReferralCode: (userId) =>
+    supabase.from('referral_codes').select('code').eq('user_id', userId).maybeSingle(),
+  saveReferralCode: (userId, code) =>
+    supabase.from('referral_codes').upsert({ user_id: userId, code }).select().single(),
+  findReferralOwner: (code) =>
+    supabase.from('referral_codes').select('user_id').eq('code', code).maybeSingle(),
+  recordRedemption: (redeemerId, code, grantedUntil) =>
+    supabase.from('referral_redemptions')
+      .insert({ redeemer_id: redeemerId, code, granted_until: grantedUntil })
+      .select().single(),
+  getPremiumCredits: (userId) =>
+    supabase.from('premium_credits').select('premium_until').eq('user_id', userId).maybeSingle(),
+  upsertPremiumCredits: (userId, premiumUntil) =>
+    supabase.from('premium_credits')
+      .upsert({ user_id: userId, premium_until: premiumUntil, updated_at: new Date().toISOString() })
+      .select().single(),
+
+  // Public share links (C5)
+  createShareLink: (data) =>
+    supabase.from('share_links').insert(data).select().single(),
+  listShareLinks: (orgId) =>
+    supabase.from('share_links').select('*')
+      .eq('org_id', orgId).eq('revoked', false)
+      .order('created_at', { ascending: false }),
+  revokeShareLink: (id) =>
+    supabase.from('share_links').update({ revoked: true }).eq('id', id),
+  resolveShareToken: (token) =>
+    supabase.from('share_links').select('*').eq('token', token).maybeSingle(),
+
+  // Receipt version audit (C1)
+  appendTxVersion: (data) =>
+    supabase.from('tx_versions').insert(data).select().single(),
+  listTxVersions: (txId) =>
+    supabase.from('tx_versions').select('*').eq('tx_id', txId).order('ts', { ascending: true }),
 };

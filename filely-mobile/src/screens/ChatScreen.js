@@ -32,6 +32,7 @@ import { Typography, Radius, Shadow, CardPresets, Spacing, BorderWidth } from '.
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { scanReceipt, parseExpenseText } from '../services/receiptPipeline';
+import ThinkingPetal from '../components/ThinkingPetal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -408,8 +409,9 @@ export default function ChatScreen() {
               <View style={[s.aiAvatar]}>
                 <Text style={{ fontSize: 13 }}>🦊</Text>
               </View>
-              <View style={[s.aiBubble, { backgroundColor: c.card, borderColor: c.border }]}>
-                <TypingDots color="#3B6BFF" />
+              <View style={[s.aiBubble, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', justifyContent: 'center', minHeight: 52 }]}>
+                <ThinkingPetal color="#3B6BFF" />
+                <Text style={[s.thinkingLabel, { color: c.textMuted }]}>Thinking…</Text>
               </View>
             </View>
           )}
@@ -519,12 +521,13 @@ const s = StyleSheet.create({
   // Typing
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 20 },
   dot: { width: 7, height: 7, borderRadius: 4 },
+  thinkingLabel: { fontSize: 11, marginTop: 4 },
 
   // Transaction Card
   txnCard: {
     marginTop: 8, marginLeft: 38, marginBottom: 8,
     borderRadius: 16, padding: 16,
-    backgroundColor: '#F8FAFF', borderWidth: 1, borderColor: 'rgba(59,107,255,0.15)',
+    backgroundColor: '#F8FAFF', borderWidth: 1, borderColor: 'rgba(15,83,220,0.15)',
   },
   txnCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   txnCardBar: { width: 3, height: 32, backgroundColor: '#3B6BFF', borderRadius: 2 },
@@ -532,9 +535,9 @@ const s = StyleSheet.create({
   txnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 4 },
   txnCell: { width: '46%', marginBottom: 8 },
   txnLabel: { fontSize: 10, fontWeight: '700', color: '#8B9CC7', letterSpacing: 1, marginBottom: 4 },
-  txnValue: { fontSize: 14, fontWeight: '600', color: '#0B1735' },
+  txnValue: { fontSize: 14, fontWeight: '600', color: '#0B1324' },
   txnAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  txnAmountVal: { fontSize: 18, fontWeight: '700', color: '#0B1735' },
+  txnAmountVal: { fontSize: 18, fontWeight: '700', color: '#0B1324' },
   vatPill: {
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
     backgroundColor: 'rgba(34,197,94,0.12)',

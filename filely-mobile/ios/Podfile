@@ -12,7 +12,24 @@ target 'Filely' do
   # React Native
   pod 'React-Core', :path => '../node_modules/react-native'
 
-  # Vision OCR dependencies
+  # ─── Local Native Modules ───────────────────────────────────────────────
+  # Document edge detection using Apple Vision framework
+  pod 'VisionEdgeDetection', :path => './LocalPods/VisionEdgeDetection'
+
+  # Multi-page PDF generation using native iOS UIGraphicsPDFRenderer
+  pod 'PdfGenerator', :path => './LocalPods/PdfGenerator'
+
+  # On-device OCR using Apple Vision VNRecognizeTextRequest
+  pod 'RNVisionOcr', :path => './LocalPods/VisionOcr'
+
+  # PDF operations: merge, split, protect, compress via PDFKit
+  pod 'PdfTools', :path => './LocalPods/PdfTools'
+
+  # ZIP archive read/write — pure Swift, MIT licensed, no deps.
+  # Used by PdfTools for CBZ / EPUB / XLSX / PPTX / XPS / FB2 extraction.
+  pod 'ZIPFoundation', '~> 0.9.19'
+  # ─────────────────────────────────────────────────────────────────────────
+
   # Vision framework is built into iOS 10.3+
 
   # Gemma Inference dependencies (TensorFlow Lite)

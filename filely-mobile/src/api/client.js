@@ -70,8 +70,9 @@ class ApiClient {
   getChatMessages(sessionId) { return this.get('chat/messages', { sessionId }); }
 
   // ── Transactions ───────────────────────────────────────
-  getTransactions() { return this.get('transactions'); }
+  getTransactions(params = {}) { return this.get('transactions', params); }
   createTransaction(data) { return this.post('transactions', data); }
+  getOrgTransactions(orgId, params = {}) { return this.get('transactions', { orgId, ...params }); }
 
   // ── Files ──────────────────────────────────────────────
   getFiles(params = {}) { return this.get('files', params); }
